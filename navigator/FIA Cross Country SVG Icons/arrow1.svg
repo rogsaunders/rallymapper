@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 144 144">
+  <!-- Generator: Adobe Illustrator 29.1.0, SVG Export Plug-In . SVG Version: 2.1.0 Build 142)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #010101;
+      }
+
+      .st1 {
+        fill: #fff;
+      }
+    </style>
+  </defs>
+  <rect class="st1" x="-.04" y="0" width="144" height="144"/>
+  <g>
+    <polygon class="st0" points="8.27 71.98 23.97 81.05 23.97 62.92 8.27 71.98"/>
+    <polygon class="st0" points="135.65 71.98 119.95 81.05 119.95 62.92 135.65 71.98"/>
+    <g>
+      <circle class="st0" cx="27.78" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="35.09" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="42.41" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="49.72" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="57.04" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="64.35" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="71.67" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="78.98" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="86.3" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="93.61" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="100.93" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="108.24" cy="71.98" r="2.75"/>
+      <circle class="st0" cx="115.56" cy="71.98" r="2.75"/>
+    </g>
+  </g>
+</svg>

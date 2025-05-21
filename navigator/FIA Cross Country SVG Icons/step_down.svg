@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.1"
+   id="_x35_0m"
+   x="0px"
+   y="0px"
+   width="144px"
+   height="144px"
+   viewBox="0 0 144 144"
+   enable-background="new 0 0 144 144"
+   xml:space="preserve"
+   sodipodi:docname="step_down.svg"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs11" /><sodipodi:namedview
+   id="namedview9"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="10.944444"
+   inkscape:cx="51.944162"
+   inkscape:cy="137.7868"
+   inkscape:window-width="1920"
+   inkscape:window-height="986"
+   inkscape:window-x="-11"
+   inkscape:window-y="-11"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="_x35_0m" />
+<g
+   id="g6">
+	<path
+   fill="#010101"
+   d="M100.71,100.319c-2.104,2.103-0.201,6.111,3.006,6.111l37.178,0.401c1.803,0,3.105-1.303,3.105-3.107   l-0.4-37.177c0-3.207-4.008-5.11-6.113-3.006l-13.829,13.829L67.742,21.354L79.365,9.729c1.904-1.904,1.704-5.111-0.4-7.216   l-0.802-0.801c-2.104-2.105-5.411-2.306-7.215-0.401L38.481,33.679c-1.904,1.904-1.704,5.111,0.4,7.215l0.701,0.702   c2.105,2.104,5.412,2.305,7.215,0.4l11.625-11.624l56.017,56.018L100.71,100.319z"
+   id="path2" />
+	<polygon
+   fill="#ed2224"
+   points="69.646,64.234 0,64.234 0,75.257 59.023,75.257 59.023,141.797 59.124,141.797 59.124,144.001 128.869,144.001 128.869,132.979 70.046,132.979 70.046,64.836 70.035,64.234 "
+   id="polygon4"
+   style="stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+   transform="matrix(0.99293745,0,0,1.0023355,0.91192465,-1.065495)" />
+</g>
+</svg>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.1"
+   id="_x35_0m"
+   x="0px"
+   y="0px"
+   width="144px"
+   height="144px"
+   viewBox="0 0 144 144"
+   enable-background="new 0 0 144 144"
+   xml:space="preserve"
+   sodipodi:docname="waypoint_navigation.svg"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs479" /><sodipodi:namedview
+   id="namedview477"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="5.4722222"
+   inkscape:cx="54.639594"
+   inkscape:cy="72"
+   inkscape:window-width="1920"
+   inkscape:window-height="986"
+   inkscape:window-x="-11"
+   inkscape:window-y="-11"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="_x35_0m" />
+<g
+   id="g474">
+	<path
+   fill="#3D93D0"
+   d="M71.999,144.001c-9.7,0-19.2-1.9-28-5.701c-8.6-3.6-16.3-8.799-22.9-15.4c-6.6-6.6-11.8-14.301-15.4-22.898   c-3.799-8.801-5.699-18.301-5.699-28c0-9.701,1.9-19.201,5.699-28c3.601-8.602,8.801-16.301,15.4-22.9   c6.601-6.6,14.301-11.801,22.9-15.4c8.899-3.801,18.3-5.699,28-5.699s19.2,1.898,28,5.699c8.6,3.6,16.3,8.801,22.899,15.4   c6.601,6.6,11.801,14.299,15.4,22.9c3.8,8.9,5.7,18.299,5.7,28c0,9.699-1.9,19.199-5.7,28c-3.6,8.598-8.8,16.299-15.4,22.898   c-6.6,6.602-14.3,11.801-22.899,15.4C91.199,142.101,81.699,144.001,71.999,144.001z"
+   id="path466" />
+	<path
+   fill="#FFFFFF"
+   d="M71.999,10.3c-16.5,0-32,6.4-43.7,18.1c-11.7,11.701-18,27.102-18,43.602s6.4,31.998,18.101,43.699   c11.699,11.699,27.199,18.1,43.699,18.1s32-6.4,43.7-18.1c11.7-11.701,18.1-27.199,18.1-43.6s-6.399-32-18.1-43.701   C104.099,16.7,88.499,10.3,71.999,10.3z"
+   id="path468" />
+	<g
+   id="g472">
+		<path
+   fill="#3d93d0"
+   d="M 94.9,100.15 H 83.101 l -23,-40 v 40.1 H 49.1 v -56.5 h 12.3 l 22.501,39.4 V 43.75 H 94.9 Z"
+   id="path470" />
+	</g>
+</g>
+</svg>

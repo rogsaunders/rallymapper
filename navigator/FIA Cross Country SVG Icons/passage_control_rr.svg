@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.1"
+   id="Layer_1"
+   x="0px"
+   y="0px"
+   width="144px"
+   height="144px"
+   viewBox="0 0 144 144"
+   enable-background="new 0 0 144 144"
+   xml:space="preserve"
+   sodipodi:docname="passage_control.svg"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs150" /><sodipodi:namedview
+   id="namedview148"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="5.4722222"
+   inkscape:cx="54.639594"
+   inkscape:cy="72"
+   inkscape:window-width="1920"
+   inkscape:window-height="986"
+   inkscape:window-x="-11"
+   inkscape:window-y="-11"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="g143" />
+<g
+   id="g143">
+	<circle
+   fill="#eb2227"
+   cx="72"
+   cy="72"
+   r="68.099998"
+   id="circle380" /><polygon
+   fill="#070909"
+   points="37.517,33 33.959,33 33.959,37.106 33.959,111 37.517,111 37.517,37.106 110.043,37.106    110.043,33  "
+   id="polygon139" />
+	<path
+   fill="#070909"
+   d="M92.391,48.327c-5.82,0-10.537,4.718-10.537,10.537c0,1.264,0.257,2.459,0.667,3.582l-0.034-0.005   c0,0-8.805,5.423-15.253,8.916c-4.226-4.474-13.706-4.282-13.706-4.282c-10.811,1.505-11.221,9.168-11.221,9.168   c-0.958,17.79,23.126,35.031,34.21,28.326s3.147-19.158,3.147-19.158c4.105,9.168-1.095,13.821-1.095,13.821   c-9.989,6.158-22.442-11.905-22.442-11.905c-1.915,16.011-10.263-5.61-10.263-5.61c-0.958-7.252,6.842,0.821,6.842,0.821   c-5.884-8.758-2.873-12.042-2.873-12.042c5.469-4.375,17.383,0.854,17.396,0.861c-2.694,1.461-4.99,2.592-6.038,2.834   c-3.558,0.821-4.105,1.095-4.105,1.095c3.147,7.39,4.242,2.189,12.727-1.095s4.652,2.053,4.652,2.053s-10.126,9.989-10.536,10.263   c-0.411,0.273,3.831,0.273,5.884,0.547c2.053,0.273-0.547,5.747,3.199,6.705c3.745,0.958,2.274-6.158,2.274-6.158l13.958-18.679   v-0.053c1.001,0.315,2.044,0.532,3.147,0.532c5.82,0,10.536-4.718,10.536-10.537S98.211,48.327,92.391,48.327z"
+   id="path141" />
+</g>
+<path
+   fill="#010101"
+   d="M72.001,0C32.235,0,0,32.236,0,72s32.235,72,72.001,72c39.765,0,72-32.236,72-72S111.766,0,72.001,0z   M72.001,132.501c-33.414,0-60.501-27.087-60.501-60.5s27.087-60.5,60.501-60.5c33.413,0,60.5,27.087,60.5,60.5  S105.414,132.501,72.001,132.501z"
+   id="path145" />
+</svg>
