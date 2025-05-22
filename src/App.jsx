@@ -360,25 +360,6 @@ export default function App() {
               >
                 ⏹ End Section
               </button>
-              <button
-                className="bg-blue-600 text-white px-4 py-2 rounded mb-2"
-                onClick={() => {
-                  const geo = navigator.geolocation;
-                  if (!geo) {
-                    console.error("❌ Geolocation not supported");
-                    return;
-                  }
-                  geo.getCurrentPosition(
-                    (pos) => {
-                      const { latitude, longitude } = pos.coords;
-                      setStartGPS({ lat: latitude, lon: longitude });
-                      setCurrentGPS({ lat: latitude, lon: longitude });
-                    },
-                    (err) => console.error("❌ Could not access GPS", err),
-                    { enableHighAccuracy: true, timeout: 10000 }
-                  );
-                }}
-              ></button>
             </div>
             <p className="text-sm text-gray-500">📅 {todayDate}</p>
           </div>
