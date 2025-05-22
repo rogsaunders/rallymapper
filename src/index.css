@@ -1,7 +1,10 @@
+@import "@fontsource/bebas-neue";
+@import "leaflet/dist/leaflet.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  font-family: sans-serif;
+  font-family: "Bebas Neue", sans-serif;
 }

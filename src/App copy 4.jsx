@@ -58,16 +58,6 @@ const iconCategories = {
 // Flattened icon array for easier searching
 const allIcons = Object.values(iconCategories).flat();
 
-function RecenterMapToStart({ lat, lon }) {
-  const map = useMap();
-  useEffect(() => {
-    if (lat && lon) {
-      map.setView([lat, lon], 14);
-    }
-  }, [lat, lon]);
-  return null;
-}
-
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth's radius in km
@@ -81,7 +71,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 export default function App() {
-  const [startGPS, setStartGPS] = useState(null);
+  const [startGPS, setStartGPS] = useState({ lat: -34.9285, lon: 138.6007 });
   const [sections, setSections] = useState([]);
   const [sectionName, setSectionName] = useState("Section 1");
   const [waypoints, setWaypoints] = useState([]);
@@ -99,20 +89,6 @@ export default function App() {
   //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
   useEffect(() => {
-    const geo = navigator.geolocation;
-    if (geo) {
-      geo.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setCurrentGPS({ lat: latitude, lon: longitude });
-        },
-        (err) => console.error("❌ Could not access GPS", err),
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
-  }, []);
-
-  useEffect(() => {
     const now = new Date();
     const formattedDate = now.toISOString().split("T")[0];
     setTodayDate(formattedDate);
@@ -121,7 +97,6 @@ export default function App() {
   useEffect(() => {
     console.log("Waypoints changed:", waypoints);
   }, [waypoints]);
-
   const handleAddWaypoint = () => {
     if (!selectedIcon || !currentGPS) return;
 
@@ -149,58 +124,32 @@ export default function App() {
       poi,
     };
 
+    const handleStartSection = () => {
+      const nextNum = parseInt(sectionName.match(/\d+/)?.[0] || "1") + 1;
+      setSectionName(`Section ${nextNum}`);
+      setWaypoints([]);
+    };
+
+    const handleEndSection = () => {
+      const sectionName = `${todayDate}/Section ${sectionCount}`;
+      const sectionData = { name: sectionName, waypoints };
+
+      // Save the section in state
+      setSections((prev) => [...prev, sectionData]);
+
+      // Trigger auto-export
+      exportAsJSON(waypoints, sectionName);
+      exportAsGPX(waypoints, sectionName);
+
+      // Reset for next section
+      setSectionCount(sectionCount + 1);
+      setWaypoints([]);
+    };
+
     console.log("Waypoint added:", waypoint); // ✅ add this line
     setWaypoints((prev) => [...prev, waypoint]);
     setPoi("");
-  };
-
-  const handleStartSection = () => {
-    const geo = navigator.geolocation;
-    if (!geo) {
-      console.error("❌ Geolocation not supported");
-      return;
-    }
-
-    geo.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const newGPS = { lat: latitude, lon: longitude };
-        setStartGPS(newGPS);
-        setCurrentGPS(newGPS);
-
-        const sectionName = `${todayDate}/Section ${sectionCount}`;
-        setSections((prev) => [...prev, { name: sectionName, waypoints: [] }]);
-        setSectionName(sectionName);
-        setSectionCount((prev) => prev + 1);
-
-        console.log("✅ Start Section Initialized:", sectionName, newGPS);
-      },
-      (err) => {
-        console.error("❌ Failed to get GPS:", err);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
-  const handleEndSection = () => {
-    const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
-    const currentSection = { name: sectionNameFormatted, waypoints };
-    const summary = {
-      name: sectionNameFormatted,
-      waypointCount: waypoints.length,
-      startTime: waypoints[0]?.timestamp || "N/A",
-      endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
-      totalDistance: waypoints
-        .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
-        .toFixed(2),
-      pois: waypoints.map((wp) => wp.poi).filter(Boolean),
-    };
-    setSectionSummaries((prev) => [...prev, summary]);
-    setSections((prev) => [...prev, currentSection]);
-    exportAsJSON(waypoints, sectionNameFormatted);
-    exportAsGPX(waypoints, sectionNameFormatted);
-    setSectionCount(sectionCount + 1);
-    setWaypoints([]);
+    console.log("Waypoint added:", waypoint);
   };
 
   const startVoiceInput = () => {
@@ -281,6 +230,55 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  const handleStartSection = () => {
+    if (waypoints.length > 0) {
+      setSections((prev) => [
+        ...prev,
+        { name: sectionName || `Section ${prev.length + 1}`, waypoints },
+      ]);
+      setWaypoints([]);
+      setSectionName("");
+    }
+  };
+
+  const handleEndSection = () => {
+    const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
+    const currentSection = { name: sectionNameFormatted, waypoints };
+    const summary = {
+      name: sectionName,
+      waypointCount: waypoints.length,
+      startTime: waypoints[0]?.timestamp || "N/A",
+      endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
+      totalDistance: waypoints
+        .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
+        .toFixed(2),
+      pois: waypoints.map((wp) => wp.poi).filter(Boolean),
+    };
+    setSectionSummaries((prev) => [...prev, summary]);
+    setSections((prev) => [...prev, currentSection]);
+    exportAsJSON(waypoints, sectionNameFormatted);
+    exportAsGPX(waypoints, sectionNameFormatted);
+    setSectionCount(sectionCount + 1);
+    setWaypoints([]);
+  };
+  <section className="mt-6">
+    <h2 className="text-lg font-semibold mb-2">📋 Section Summaries</h2>
+    {sectionSummaries.length === 0 ? (
+      <p className="text-gray-500">No sections completed yet.</p>
+    ) : (
+      sectionSummaries.map((summary, idx) => (
+        <div key={idx} className="bg-white shadow rounded p-3 mb-2">
+          <h3 className="font-bold text-blue-700">{summary.name}</h3>
+          <p>Waypoints: {summary.waypointCount}</p>
+          <p>Start: {summary.startTime}</p>
+          <p>End: {summary.endTime}</p>
+          <p>Total Distance: {summary.totalDistance} km</p>
+          {summary.pois.length > 0 && <p>POIs: {summary.pois.join(", ")}</p>}
+        </div>
+      ))
+    )}
+  </section>;
+
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
@@ -308,8 +306,8 @@ export default function App() {
         {showMap && (
           <div className={fullScreenMap ? "h-[80vh]" : "h-[260px] mb-4"}>
             <MapContainer
-              center={currentGPS ? [currentGPS.lat, currentGPS.lon] : [0, 0]}
-              zoom={currentGPS ? 14 : 2}
+              center={[startGPS.lat, startGPS.lon]}
+              zoom={14}
               scrollWheelZoom
               className="h-full w-full"
             >
@@ -327,7 +325,6 @@ export default function App() {
                     popupAnchor: [0, -32],
                   })}
                 >
-                  <RecenterMapToStart lat={startGPS.lat} lon={startGPS.lon} />
                   <Popup>
                     <strong>Start Point</strong>
                     <br />
@@ -335,6 +332,25 @@ export default function App() {
                   </Popup>
                 </Marker>
               )}
+              {waypoints.map((wp, idx) => (
+                <Marker
+                  key={idx}
+                  position={[wp.lat, wp.lon]}
+                  icon={L.icon({ iconUrl: wp.iconSrc, iconSize: [32, 32] })}
+                >
+                  <Popup>
+                    <strong>{wp.name}</strong>
+                    <br />
+                    Time: {wp.timestamp}
+                    <br />
+                    GPS: {wp.lat}, {wp.lon}
+                    <br />
+                    Dist: {wp.distance} km
+                    <br />
+                    {wp.poi && <>POI: {wp.poi}</>}
+                  </Popup>
+                </Marker>
+              ))}
             </MapContainer>
           </div>
         )}
@@ -359,6 +375,27 @@ export default function App() {
                 onClick={handleEndSection}
               >
                 ⏹ End Section
+              </button>
+              <button
+                className="bg-blue-600 text-white px-4 py-2 rounded mb-2"
+                onClick={() => {
+                  const geo = navigator.geolocation;
+                  if (!geo) {
+                    console.error("❌ Geolocation not supported");
+                    return;
+                  }
+                  geo.getCurrentPosition(
+                    (pos) => {
+                      const { latitude, longitude } = pos.coords;
+                      setStartGPS({ lat: latitude, lon: longitude });
+                      setCurrentGPS({ lat: latitude, lon: longitude });
+                    },
+                    (err) => console.error("❌ Could not access GPS", err),
+                    { enableHighAccuracy: true, timeout: 10000 }
+                  );
+                }}
+              >
+                📍 Set Start Point
               </button>
             </div>
             <p className="text-sm text-gray-500">📅 {todayDate}</p>
@@ -449,8 +486,8 @@ export default function App() {
               Export JSON
             </button>
             <button
+              onClick={exportAsGPX}
               className="bg-blue-700 text-white px-4 py-2 rounded"
-              onClick={() => exportAsGPX(waypoints, sectionName)}
             >
               Export GPX
             </button>

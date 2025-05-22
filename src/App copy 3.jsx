@@ -7,6 +7,25 @@ import stopSound from "./assets/sounds/stop.wav";
 
 // Icon categories (merged cleanly)
 const iconCategories = {
+  "On Track": [
+    { name: "Bump", src: "/icons/bump.svg" },
+    { name: "Dip Hole", src: "/icons/dip-hole.svg" },
+    { name: "Ditch", src: "/icons/ditch.svg" },
+    { name: "Hole", src: "/icons/hole.svg" },
+    { name: "Summit", src: "/icons/summit.svg" },
+    { name: "Up hill", src: "/icons/uphill.svg" },
+    { name: "Down hill", src: "/icons/downhill.svg" },
+    { name: "Fence gate", src: "/icons/fence-gate.svg" },
+    { name: "Water crossing", src: "/icons/wading.svg" },
+    { name: "Grid", src: "/icons/grid.svg" },
+    { name: "Fence", src: "/icons/fence.svg" },
+    { name: "Rail road", src: "/icons/railroad.svg" },
+    { name: "Twisty", src: "/icons/twisty.svg" },
+    { name: "Bumpy", src: "/icons/bumpy.svg" },
+    { name: "Bumpy Broken", src: "/icons/bumpy_broken.svg" },
+    { name: "Tree", src: "/icons/tree_5.svg" },
+    { name: "Petrol Station", src: "/icons/petrol_station.svg" },
+  ],
   Abbreviations: [
     { name: "Left", src: "/icons/left.svg" },
     { name: "Right", src: "/icons/right.svg" },
@@ -19,26 +38,6 @@ const iconCategories = {
     { name: "On Right", src: "/icons/on-right.svg" },
     { name: "Bad", src: "/icons/bad.svg" },
   ],
-  "On Track": [
-    { name: "Bump", src: "/icons/bump.svg" },
-    { name: "Bumpy", src: "/icons/bumpy.svg" },
-    { name: "Bumpy Broken", src: "/icons/bumpy_broken.svg" },
-    { name: "Dip Hole", src: "/icons/dip-hole.svg" },
-    { name: "Ditch", src: "/icons/ditch.svg" },
-    { name: "Summit", src: "/icons/summit.svg" },
-    { name: "Hole", src: "/icons/hole.svg" },
-    { name: "Up hill", src: "/icons/uphill.svg" },
-    { name: "Down hill", src: "/icons/downhill.svg" },
-    { name: "Fence gate", src: "/icons/fence-gate.svg" },
-    { name: "Water crossing", src: "/icons/wading.svg" },
-    { name: "Grid", src: "/icons/grid.svg" },
-    { name: "Fence", src: "/icons/fence.svg" },
-    { name: "Rail road", src: "/icons/railroad.svg" },
-    { name: "Twisty", src: "/icons/twisty.svg" },
-    { name: "Tree", src: "/icons/tree_5.svg" },
-    { name: "Petrol Station", src: "/icons/petrol_station.svg" },
-  ],
-
   Controls: [
     { name: "Stop for Restart", src: "/icons/stop_for_restart.svg" },
     {
@@ -58,16 +57,6 @@ const iconCategories = {
 // Flattened icon array for easier searching
 const allIcons = Object.values(iconCategories).flat();
 
-function RecenterMapToStart({ lat, lon }) {
-  const map = useMap();
-  useEffect(() => {
-    if (lat && lon) {
-      map.setView([lat, lon], 14);
-    }
-  }, [lat, lon]);
-  return null;
-}
-
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth's radius in km
@@ -81,7 +70,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 export default function App() {
-  const [startGPS, setStartGPS] = useState(null);
+  const [startGPS, setStartGPS] = useState({ lat: -34.9285, lon: 138.6007 });
   const [sections, setSections] = useState([]);
   const [sectionName, setSectionName] = useState("Section 1");
   const [waypoints, setWaypoints] = useState([]);
@@ -94,23 +83,7 @@ export default function App() {
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
-  const [sectionSummaries, setSectionSummaries] = useState([]);
-  const isoTime = new Date().toISOString();
-  //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-
-  useEffect(() => {
-    const geo = navigator.geolocation;
-    if (geo) {
-      geo.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setCurrentGPS({ lat: latitude, lon: longitude });
-        },
-        (err) => console.error("❌ Could not access GPS", err),
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
-  }, []);
+  //const todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
   useEffect(() => {
     const now = new Date();
@@ -121,7 +94,6 @@ export default function App() {
   useEffect(() => {
     console.log("Waypoints changed:", waypoints);
   }, [waypoints]);
-
   const handleAddWaypoint = () => {
     if (!selectedIcon || !currentGPS) return;
 
@@ -149,58 +121,29 @@ export default function App() {
       poi,
     };
 
+    const handleStartSection = () => {
+      const nextNum = parseInt(sectionName.match(/\d+/)?.[0] || "1") + 1;
+      setSectionName(`Section ${nextNum}`);
+      setWaypoints([]);
+    };
+
+    const handleEndSection = () => {
+      if (waypoints.length === 0) {
+        alert("No waypoints to export.");
+        return;
+      }
+
+      exportAsJSON(waypoints, sectionName);
+      exportAsGPX(waypoints, sectionName);
+
+      // Optional: clear after export
+      setWaypoints([]);
+    };
+
     console.log("Waypoint added:", waypoint); // ✅ add this line
     setWaypoints((prev) => [...prev, waypoint]);
     setPoi("");
-  };
-
-  const handleStartSection = () => {
-    const geo = navigator.geolocation;
-    if (!geo) {
-      console.error("❌ Geolocation not supported");
-      return;
-    }
-
-    geo.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const newGPS = { lat: latitude, lon: longitude };
-        setStartGPS(newGPS);
-        setCurrentGPS(newGPS);
-
-        const sectionName = `${todayDate}/Section ${sectionCount}`;
-        setSections((prev) => [...prev, { name: sectionName, waypoints: [] }]);
-        setSectionName(sectionName);
-        setSectionCount((prev) => prev + 1);
-
-        console.log("✅ Start Section Initialized:", sectionName, newGPS);
-      },
-      (err) => {
-        console.error("❌ Failed to get GPS:", err);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
-  const handleEndSection = () => {
-    const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
-    const currentSection = { name: sectionNameFormatted, waypoints };
-    const summary = {
-      name: sectionNameFormatted,
-      waypointCount: waypoints.length,
-      startTime: waypoints[0]?.timestamp || "N/A",
-      endTime: waypoints[waypoints.length - 1]?.timestamp || "N/A",
-      totalDistance: waypoints
-        .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
-        .toFixed(2),
-      pois: waypoints.map((wp) => wp.poi).filter(Boolean),
-    };
-    setSectionSummaries((prev) => [...prev, summary]);
-    setSections((prev) => [...prev, currentSection]);
-    exportAsJSON(waypoints, sectionNameFormatted);
-    exportAsGPX(waypoints, sectionNameFormatted);
-    setSectionCount(sectionCount + 1);
-    setWaypoints([]);
+    console.log("Waypoint added:", waypoint);
   };
 
   const startVoiceInput = () => {
@@ -238,45 +181,73 @@ export default function App() {
     recognition.start();
   };
 
+  const handleStartSection = () => {
+    if (waypoints.length > 0) {
+      setSections((prev) => [
+        ...prev,
+        { name: sectionName || `Section ${prev.length + 1}`, waypoints },
+      ]);
+      setWaypoints([]);
+      setSectionName("");
+    }
+  };
+
+  const handleEndSection = () => {
+    const sectionName = `${todayDate}/Section ${sectionCount}`;
+    setSections((prev) => [...prev, { name: sectionName, waypoints }]);
+    setSectionCount(sectionCount + 1);
+    setWaypoints([]);
+  };
+
   const exportAsJSON = (data, name = "section") => {
+    if (!data || data.length === 0) {
+      alert("No waypoints to export.");
+      return;
+    }
+
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${name}.json`;
+    a.download = `${name.replace(/\s+/g, "_").toLowerCase()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const exportAsGPX = (data, name = "section") => {
-    const formatToISO = (timestamp) => {
-      const now = new Date();
-      const [hours, minutes, seconds] = timestamp.split(":");
-      now.setHours(hours, minutes, seconds, 0);
-      return now.toISOString();
-    };
+    if (!data || data.length === 0) {
+      alert("No waypoints to export.");
+      return;
+    }
 
-    const gpx = `<?xml version="1.0"?>
-  <gpx version="1.1" creator="Rally Mapper" xmlns="http://www.topografix.com/GPX/1/1">
-  ${data
-    .map(
-      (wp) => `<wpt lat="${wp.lat}" lon="${wp.lon}">
-    <name>${wp.name}</name>
-    <desc>${wp.poi || ""}</desc>
-    <sym>Waypoint</sym>
-    <time>${formatToISO(wp.timestamp)}</time>
-  </wpt>`
-    )
-    .join("\n")}
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+  <gpx version="1.1" creator="RallyRouteMapper" xmlns="http://www.topografix.com/GPX/1/1">
+    <metadata>
+      <name>${name}</name>
+      <time>${new Date().toISOString()}</time>
+    </metadata>
+    ${data
+      .map(
+        (wp) => `
+    <wpt lat="${wp.lat}" lon="${wp.lon}">
+      <name>${wp.name}</name>
+      <time>${new Date().toISOString()}</time>
+      <sym>${wp.name}</sym>
+      <desc>${wp.poi || ""}</desc>
+      <time>${new Date().toISOString()}</time>
+      <sym>Flag</sym>
+    </wpt>`
+      )
+      .join("\n")}
   </gpx>`;
 
     const blob = new Blob([gpx], { type: "application/gpx+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${name}.gpx`;
+    a.download = `${name.replace(/\s+/g, "_").toLowerCase()}.gpx`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -289,6 +260,7 @@ export default function App() {
             <img src="/RRM Logo 64x64.png" className="w-8 h-8" />
             Rally Route Mapper
           </h1>
+          <p className="text-sm text-gray-500 mt-1">📅 {todayDate}</p>
         </div>
       </div>
 
@@ -302,14 +274,26 @@ export default function App() {
         <button onClick={() => setFullScreenMap((prev) => !prev)}>
           {fullScreenMap ? "Exit Full Screen" : "Full Screen Map"}
         </button>
+        <input
+          className="p-2 border rounded"
+          placeholder="Section Number"
+          value={sectionName}
+          onChange={(e) => setSectionName(e.target.value)}
+        />
+        <button className="bg-blue-600 text-white px-4 py-2 rounded">
+          ▶️ Start Section
+        </button>
+        <button className="bg-red-600 text-white px-4 py-2 rounded">
+          ⏹ End Section
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {showMap && (
           <div className={fullScreenMap ? "h-[80vh]" : "h-[260px] mb-4"}>
             <MapContainer
-              center={currentGPS ? [currentGPS.lat, currentGPS.lon] : [0, 0]}
-              zoom={currentGPS ? 14 : 2}
+              center={[startGPS.lat, startGPS.lon]}
+              zoom={14}
               scrollWheelZoom
               className="h-full w-full"
             >
@@ -317,89 +301,71 @@ export default function App() {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution="&copy; OpenStreetMap contributors"
               />
-              {startGPS && (
+              <Marker
+                position={[startGPS.lat, startGPS.lon]}
+                icon={L.icon({
+                  iconUrl: "/icons/start-flag.svg",
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 32],
+                  popupAnchor: [0, -32],
+                })}
+              >
+                <Popup>
+                  <strong>Start Point</strong>
+                  <br />
+                  GPS: {startGPS.lat.toFixed(5)}, {startGPS.lon.toFixed(5)}
+                </Popup>
+              </Marker>
+              {waypoints.map((wp, idx) => (
                 <Marker
-                  position={[startGPS.lat, startGPS.lon]}
-                  icon={L.icon({
-                    iconUrl: "/icons/start-flag.svg",
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 32],
-                    popupAnchor: [0, -32],
-                  })}
+                  key={idx}
+                  position={[wp.lat, wp.lon]}
+                  icon={L.icon({ iconUrl: wp.iconSrc, iconSize: [32, 32] })}
                 >
-                  <RecenterMapToStart lat={startGPS.lat} lon={startGPS.lon} />
                   <Popup>
-                    <strong>Start Point</strong>
+                    <strong>{wp.name}</strong>
                     <br />
-                    GPS: {startGPS.lat.toFixed(5)}, {startGPS.lon.toFixed(5)}
+                    Time: {wp.timestamp}
+                    <br />
+                    GPS: {wp.lat}, {wp.lon}
+                    <br />
+                    Dist: {wp.distance} km
+                    <br />
+                    {wp.poi && <>POI: {wp.poi}</>}
                   </Popup>
                 </Marker>
-              )}
+              ))}
             </MapContainer>
           </div>
         )}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold mb-2">📝 Route Info</h2>
-            <div className="flex gap-4 mb-4">
-              <input
-                className="p-2 border rounded"
-                placeholder="Section Number"
-                value={sectionName}
-                onChange={(e) => setSectionName(e.target.value)}
-              />
-              <button
-                className="bg-red-1200 text-white px-4 py-2 rounded"
-                onClick={handleStartSection}
-              >
-                ▶️ Start Section
-              </button>
-              <button
-                className="bg-red-600 text-white px-4 py-2 rounded"
-                onClick={handleEndSection}
-              >
-                ⏹ End Section
-              </button>
-            </div>
-            <p className="text-sm text-gray-500">📅 {todayDate}</p>
-          </div>
 
+        <div>
+          <h2 className="text-lg font-semibold mb-2">📝 Route Info</h2>
           <div className="flex flex-wrap gap-2 mb-2">
-            <input
-              className="flex-1 p-2 rounded bg-gray-100"
-              placeholder="Route Name"
-            />
-            <input
-              className="flex-1 p-2 rounded bg-gray-100"
-              placeholder="Start Location"
-            />
-            <input
-              className="flex-1 p-2 rounded bg-gray-100"
-              placeholder="End Location"
-            />
+            <input className="flex-1 p-2 rounded bg-gray-100" placeholder="Route Name" />
+            <input className="flex-1 p-2 rounded bg-gray-100" placeholder="Start Location" />
+            <input className="flex-1 p-2 rounded bg-gray-100" placeholder="End Location" />
           </div>
         </div>
 
         <div>
           <h2 className="text-lg font-semibold mb-2">Waypoint Entry</h2>
-          <div className="mb-2">
-            <label className="block text-sm font-medium mb-1">Category</label>
-            <div className="flex flex-wrap gap-5">
-              {Object.keys(iconCategories).map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`px-3 py-1 rounded border transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none ${
-                    activeCategory === category
-                      ? "bg-yellow-400 text-black shadow"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-5 mb-2">
+            {Object.keys(iconCategories).map((category) => (
+              <button
+                key={category}
+                onClick={() => setActiveCategory(category)}
+                className={`px-3 py-1 rounded border transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none ${
+                  activeCategory === category
+                    ? "bg-yellow-400 text-black shadow"
+                    : "bg-gray-100 text-gray-800"
+                }`}
+              >
+                {category}
+              </button>
+            ))}
           </div>
+
           <div className="grid grid-cols-6 gap-2 mb-4">
             {iconCategories[activeCategory].map((icon) => (
               <button
@@ -420,19 +386,14 @@ export default function App() {
               </button>
             ))}
           </div>
+
           <textarea
             placeholder="Point of Interest (POI)"
             className="w-full border p-2 rounded mb-2"
             value={poi}
             onChange={(e) => setPoi(e.target.value)}
           />
-          <button
-            className="bg-gray-300 hover:bg-gray-400 text-black px-3 py-1 rounded mt-2"
-            onClick={startVoiceInput}
-            type="button"
-          >
-            🎤 {recognitionActive ? "Listening..." : "Voice Input"}
-          </button>
+
           <button
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
             onClick={handleAddWaypoint}
@@ -440,22 +401,7 @@ export default function App() {
           >
             ➕ Add Waypoint
           </button>
-          <p></p>
-          <div className="flex gap-4 mt-4">
-            <button
-              onClick={exportAsJSON}
-              className="bg-gray-700 text-white px-4 py-2 rounded"
-            >
-              Export JSON
-            </button>
-            <button
-              className="bg-blue-700 text-white px-4 py-2 rounded"
-              onClick={() => exportAsGPX(waypoints, sectionName)}
-            >
-              Export GPX
-            </button>
-          </div>
-          {/* ✅ Current Section Waypoints */}
+
           <section className="mt-6">
             <h2 className="text-lg font-semibold mb-2">
               🧭 Current Section Waypoints
@@ -488,3 +434,5 @@ export default function App() {
     </div>
   );
 }
+
+export default App;
