@@ -58,16 +58,6 @@ const iconCategories = {
 // Flattened icon array for easier searching
 const allIcons = Object.values(iconCategories).flat();
 
-function RecenterMapToStart({ lat, lon }) {
-  const map = useMap();
-  useEffect(() => {
-    if (lat && lon) {
-      map.setView([lat, lon], 14);
-    }
-  }, [lat, lon]);
-  return null;
-}
-
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth's radius in km
@@ -81,7 +71,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 export default function App() {
-  const [startGPS, setStartGPS] = useState(null);
+  const [startGPS, setStartGPS] = useState({ lat: -34.9285, lon: 138.6007 });
   const [sections, setSections] = useState([]);
   const [sectionName, setSectionName] = useState("Section 1");
   const [waypoints, setWaypoints] = useState([]);
@@ -308,8 +298,8 @@ export default function App() {
         {showMap && (
           <div className={fullScreenMap ? "h-[80vh]" : "h-[260px] mb-4"}>
             <MapContainer
-              center={currentGPS ? [currentGPS.lat, currentGPS.lon] : [0, 0]}
-              zoom={currentGPS ? 14 : 2}
+              center={[startGPS.lat, startGPS.lon]}
+              zoom={14}
               scrollWheelZoom
               className="h-full w-full"
             >
@@ -327,7 +317,6 @@ export default function App() {
                     popupAnchor: [0, -32],
                   })}
                 >
-                  <RecenterMapToStart lat={startGPS.lat} lon={startGPS.lon} />
                   <Popup>
                     <strong>Start Point</strong>
                     <br />
@@ -335,6 +324,25 @@ export default function App() {
                   </Popup>
                 </Marker>
               )}
+              {waypoints.map((wp, idx) => (
+                <Marker
+                  key={idx}
+                  position={[wp.lat, wp.lon]}
+                  icon={L.icon({ iconUrl: wp.iconSrc, iconSize: [32, 32] })}
+                >
+                  <Popup>
+                    <strong>{wp.name}</strong>
+                    <br />
+                    Time: {wp.timestamp}
+                    <br />
+                    GPS: {wp.lat}, {wp.lon}
+                    <br />
+                    Dist: {wp.distance} km
+                    <br />
+                    {wp.poi && <>POI: {wp.poi}</>}
+                  </Popup>
+                </Marker>
+              ))}
             </MapContainer>
           </div>
         )}
@@ -378,7 +386,9 @@ export default function App() {
                     { enableHighAccuracy: true, timeout: 10000 }
                   );
                 }}
-              ></button>
+              >
+                📍 Set Start Point
+              </button>
             </div>
             <p className="text-sm text-gray-500">📅 {todayDate}</p>
           </div>
@@ -468,8 +478,8 @@ export default function App() {
               Export JSON
             </button>
             <button
+              onClick={exportAsGPX}
               className="bg-blue-700 text-white px-4 py-2 rounded"
-              onClick={() => exportAsGPX(waypoints, sectionName)}
             >
               Export GPX
             </button>
