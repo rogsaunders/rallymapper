@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="_x35_0m" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="144px" height="144px" viewBox="0 0 144 144" enable-background="new 0 0 144 144" xml:space="preserve">
+<g>
+	<g>
+		<g>
+			<defs>
+				<polygon id="SVGID_5_" points="-213.87,-213.87 -212.87,-213.87 -213.87,-212.87 				"/>
+			</defs>
+			<defs>
+				<polygon id="SVGID_6_" points="-215.87,-215.87 -216.87,-215.87 -215.87,-216.87 				"/>
+			</defs>
+			<clipPath id="SVGID_4_">
+				<use xlink:href="#SVGID_5_"  overflow="visible"/>
+			</clipPath>
+			<clipPath id="SVGID_7_" clip-path="url(#SVGID_4_)">
+				<use xlink:href="#SVGID_6_"  overflow="visible"/>
+			</clipPath>
+		</g>
+	</g>
+</g>
+<g>
+	<g>
+		<g>
+			<defs>
+				<polygon id="SVGID_31_" points="-213.87,-213.87 -212.87,-213.87 -213.87,-212.87 				"/>
+			</defs>
+			<defs>
+				<polygon id="SVGID_32_" points="-215.87,-215.87 -216.87,-215.87 -215.87,-216.87 				"/>
+			</defs>
+			<clipPath id="SVGID_8_">
+				<use xlink:href="#SVGID_31_"  overflow="visible"/>
+			</clipPath>
+			<clipPath id="SVGID_11_" clip-path="url(#SVGID_8_)">
+				<use xlink:href="#SVGID_32_"  overflow="visible"/>
+			</clipPath>
+		</g>
+	</g>
+</g>
+<g>
+	<polygon fill="#020202" points="138.522,120.17 138.522,74.22 94.291,74.22 94.291,55.585 46.045,76.054 46.045,55.585 
+		5.478,73.852 5.478,120.17 0,120.17 0,126.859 144,126.859 144,120.17 	"/>
+	<polygon fill="#AEAEAE" points="134.994,17.141 95.881,17.141 95.881,26.85 99.905,26.85 99.905,69.399 130.969,69.399 
+		130.969,26.85 134.994,26.85 	"/>
+	<polygon fill="#AEAEAE" points="90.762,17.141 51.66,17.141 51.66,26.85 57.506,26.85 57.506,66.299 86.748,54.121 86.748,26.85 
+		90.762,26.85 	"/>
+	<polygon fill="#AEAEAE" points="15.844,64.649 9.261,67.993 9.261,36.629 15.844,36.629 	"/>
+	<polygon fill="#AEAEAE" points="25.704,59.933 19.13,62.943 19.13,36.629 25.704,36.629 	"/>
+	<rect x="91.106" y="99.576" fill="#FFFFFF" width="37.396" height="21.286"/>
+	<rect x="15.844" y="89.279" fill="#FFFFFF" width="8.729" height="8.729"/>
+	<rect x="29.681" y="89.279" fill="#FFFFFF" width="8.729" height="8.729"/>
+	<rect x="43.529" y="89.279" fill="#FFFFFF" width="8.729" height="8.729"/>
+	<rect x="57.378" y="89.279" fill="#FFFFFF" width="8.729" height="8.729"/>
+	<rect x="15.844" y="103.14" fill="#FFFFFF" width="8.729" height="8.729"/>
+	<rect x="29.681" y="103.14" fill="#FFFFFF" width="8.729" height="8.729"/>
+	<rect x="43.529" y="103.14" fill="#FFFFFF" width="8.729" height="8.729"/>
+	<rect x="57.378" y="103.14" fill="#FFFFFF" width="8.729" height="8.729"/>
+</g>
+</svg>

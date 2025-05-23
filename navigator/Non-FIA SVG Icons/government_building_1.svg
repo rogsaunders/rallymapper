@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.1"
+   id="_x35_0m"
+   x="0px"
+   y="0px"
+   width="144px"
+   height="144px"
+   viewBox="0 0 144 144"
+   enable-background="new 0 0 144 144"
+   xml:space="preserve"
+   sodipodi:docname="government_building_1.svg"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs21" /><sodipodi:namedview
+   id="namedview19"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="true"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="5.4722222"
+   inkscape:cx="51.807107"
+   inkscape:cy="71.543147"
+   inkscape:window-width="1920"
+   inkscape:window-height="986"
+   inkscape:window-x="-11"
+   inkscape:window-y="-11"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="_x35_0m" />
+<rect
+   style="fill:#ffffff;stroke:#000000;stroke-width:0"
+   id="rect309"
+   width="64.690353"
+   height="54.274113"
+   x="41.664974"
+   y="80.40609" /><g
+   id="g16">
+	<polygon
+   fill="#020202"
+   points="80.591,24.923 76.332,24.923 76.332,17.426 97.57,17.426 97.57,0.678 69.832,0.678 69.832,13.933    69.832,17.426 69.832,24.923 62.347,24.923 17.362,59.673 25.102,68.666 66.095,36.425 76.843,36.425 118.579,68.666    127.074,59.915  "
+   id="polygon2" />
+	<polygon
+   fill="#AEAEAE"
+   points="31.833,68.666 66.16,40.724 77.279,40.724 111.605,68.666  "
+   id="polygon4" />
+	<path
+   fill="#020202"
+   d="M127.713,137.551v-5.757h-18.987v-47.16h4.798v-9.968H29.337v9.968h5.95v47.173H16.299v5.757H0v5.761   h16.299h111.401H144v-5.761h-16.287V137.551z M98.952,131.794h-5.759v-47.16h5.759V131.794z M45.062,84.634h4.798v47.173h-4.798   V84.634z M67.118,89.612v42.182h-7.47v-47.16h23.771v47.173h-6.525V89.612H67.118z"
+   id="path6" />
+	<polygon
+   fill="#020202"
+   points="29.913,89.035 11.898,89.035 11.898,84.634 2.303,84.634 2.303,89.035 2.303,127.394    2.303,133.523 11.898,133.523 11.898,127.394 29.913,127.394  "
+   id="polygon8" />
+	<rect
+   x="6.908"
+   y="104.376"
+   fill="#FFFFFF"
+   width="18.027"
+   height="7.664"
+   id="rect10" />
+	<polygon
+   fill="#020202"
+   points="113.27,89.035 131.295,89.035 131.295,84.634 140.879,84.634 140.879,89.035 140.879,127.394    140.879,133.523 131.295,133.523 131.295,127.394 113.27,127.394  "
+   id="polygon12" />
+	<rect
+   x="118.256"
+   y="104.391"
+   fill="#FFFFFF"
+   width="18.026"
+   height="7.664"
+   id="rect14" />
+</g>
+</svg>

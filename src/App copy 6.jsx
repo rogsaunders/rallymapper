@@ -83,7 +83,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 export default function App() {
   const [startGPS, setStartGPS] = useState(null);
   const [sections, setSections] = useState([]);
-  const [sectionSummaries, setSectionSummaries] = useState([]);
   const [sectionName, setSectionName] = useState("Section 1");
   const [waypoints, setWaypoints] = useState([]);
   const [activeCategory, setActiveCategory] = useState("On Track");
@@ -95,8 +94,8 @@ export default function App() {
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
-  // Removed unused 'sectionSummaries' state variable
-  const ISO_TIME = new Date().toISOString();
+  const [sectionSummaries, setSectionSummaries] = useState([]);
+  const isoTime = new Date().toISOString();
   //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
   useEffect(() => {
@@ -185,8 +184,6 @@ export default function App() {
   };
 
   const handleEndSection = () => {
-    const sectionData = { name: sectionName, waypoints };
-    setSections((prev) => [...prev, sectionData]);
     const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
     const currentSection = { name: sectionNameFormatted, waypoints };
     const summary = {
@@ -203,7 +200,7 @@ export default function App() {
     setSections((prev) => [...prev, currentSection]);
     exportAsJSON(waypoints, sectionNameFormatted);
     exportAsGPX(waypoints, sectionNameFormatted);
-    setSectionCount((prev) => prev + 1);
+    setSectionCount(sectionCount + 1);
     setWaypoints([]);
   };
 
@@ -254,7 +251,7 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const exportAsGPX = (data) => {
+  const exportAsGPX = (data, name = "section") => {
     const formatToISO = (timestamp) => {
       const now = new Date();
       const [h, m, s] = timestamp.split(":");
@@ -276,17 +273,13 @@ export default function App() {
     .join("\n")}
   </gpx>`;
 
-    // Removed unused 'base64Data' variable assignment
-    // Removed unused 'dataUri' variable assignment
-
-    // ✅ Open in new tab — more likely to work on iOS
-    const newTab = window.open();
-    if (newTab) {
-      newTab.document.write(`<pre>${gpx}</pre>`);
-      newTab.document.close();
-    } else {
-      alert("Unable to open GPX. Please allow popups for this site.");
-    }
+    const blob = new Blob([gpx], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.gpx`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -486,25 +479,6 @@ export default function App() {
                   </p>
                   {wp.poi && (
                     <p className="text-sm text-gray-600">POI: {wp.poi}</p>
-                  )}
-                </div>
-              ))
-            )}
-          </section>
-          <section className="mt-6">
-            <h2 className="text-lg font-semibold mb-2">📋 Section Summaries</h2>
-            {sectionSummaries.length === 0 ? (
-              <p className="text-gray-500">No sections completed yet.</p>
-            ) : (
-              sectionSummaries.map((summary, idx) => (
-                <div key={idx} className="bg-white shadow rounded p-3 mb-2">
-                  <h3 className="font-bold text-blue-700">{summary.name}</h3>
-                  <p>Waypoints: {summary.waypointCount}</p>
-                  <p>Start: {summary.startTime}</p>
-                  <p>End: {summary.endTime}</p>
-                  <p>Total Distance: {summary.totalDistance} km</p>
-                  {summary.pois.length > 0 && (
-                    <p>POIs: {summary.pois.join(", ")}</p>
                   )}
                 </div>
               ))

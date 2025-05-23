@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.1"
+   id="_x35_0m"
+   x="0px"
+   y="0px"
+   width="144px"
+   height="144px"
+   viewBox="0 0 144 144"
+   enable-background="new 0 0 144 144"
+   xml:space="preserve"
+   sodipodi:docname="parking.svg"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs305" /><sodipodi:namedview
+   id="namedview303"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="5.4722222"
+   inkscape:cx="54.639594"
+   inkscape:cy="72"
+   inkscape:window-width="1920"
+   inkscape:window-height="986"
+   inkscape:window-x="-11"
+   inkscape:window-y="-11"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="_x35_0m" />
+<path
+   fill="#E32526"
+   d="M71.999,144.157c-9.719,0-19.148-1.9-28.029-5.66c-8.57-3.63-16.27-8.82-22.879-15.43  c-6.611-6.61-11.801-14.311-15.432-22.881c-3.748-8.879-5.658-18.309-5.658-28.029c0-9.72,1.898-19.15,5.658-28.029  c3.631-8.57,8.82-16.271,15.432-22.881c6.609-6.61,14.309-11.8,22.879-15.43c8.881-3.76,18.311-5.66,28.029-5.66  c9.721,0,19.15,1.9,28.031,5.66c8.57,3.63,16.27,8.819,22.881,15.43c6.609,6.609,11.799,14.311,15.43,22.881  c3.758,8.879,5.658,18.31,5.658,28.029c0,9.721-1.9,19.15-5.658,28.029c-3.631,8.57-8.82,16.271-15.43,22.881  c-6.611,6.609-14.311,11.8-22.881,15.43C91.149,142.257,81.72,144.157,71.999,144.157z"
+   id="path298" />
+<path
+   fill="#FFFFFF"
+   d="M71.999,10.427c-16.488,0-31.988,6.421-43.648,18.08c-11.66,11.66-18.08,27.16-18.08,43.65  s6.42,31.989,18.08,43.65c11.66,11.66,27.16,18.079,43.648,18.079c16.49,0,31.99-6.419,43.652-18.079  c11.658-11.661,18.078-27.16,18.078-43.65s-6.42-31.99-18.078-43.65C103.989,16.848,88.489,10.427,71.999,10.427z"
+   id="path300" /><path
+   fill="#010101"
+   d="m 79.232064,84.413002 h -18.848 V 116.335 h -18.444 V 27.664998 h 38.61 c 8.917998,0 16.011998,2.33 21.280996,6.891 5.269,4.561004 7.904,11.654004 7.904,21.280004 0,10.438 -2.635,17.836 -7.904,22.192 -5.268998,4.256 -12.869998,6.385 -22.598996,6.385 z m 8.613998,-18.443 c 2.432,-2.128 3.648,-5.472 3.648,-10.134 0,-4.661 -1.216,-7.904 -3.648,-9.83 -2.432,-1.925 -5.876998,-2.938 -10.233998,-2.938 h -17.228 v 26.145 h 17.228 c 4.356,0 7.801998,-1.115 10.233998,-3.243 z"
+   id="path819" />
+</svg>

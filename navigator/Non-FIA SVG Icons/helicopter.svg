@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.1"
+   id="_x35_0m"
+   x="0px"
+   y="0px"
+   width="144px"
+   height="144px"
+   viewBox="0 0 144 144"
+   enable-background="new 0 0 144 144"
+   xml:space="preserve"
+   sodipodi:docname="helicopter.svg"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs196" /><sodipodi:namedview
+   id="namedview194"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="5.4722222"
+   inkscape:cx="55.461929"
+   inkscape:cy="72"
+   inkscape:window-width="1920"
+   inkscape:window-height="986"
+   inkscape:window-x="-11"
+   inkscape:window-y="-11"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="_x35_0m" />
+<g
+   id="g167"
+   transform="translate(-16.446701,-4.2030457)">
+	<g
+   id="g165">
+		<g
+   id="g163">
+			<defs
+   id="defs152">
+				<polygon
+   id="SVGID_5_"
+   points="-212.87,-428.74 -213.87,-427.74 -213.87,-428.74 " />
+			</defs>
+			<defs
+   id="defs155">
+				<polygon
+   id="SVGID_6_"
+   points="-216.87,-430.74 -215.87,-431.74 -215.87,-430.74 " />
+			</defs>
+			<clipPath
+   id="SVGID_4_">
+				<use
+   xlink:href="#SVGID_5_"
+   overflow="visible"
+   id="use157" />
+			</clipPath>
+			<clipPath
+   id="SVGID_7_"
+   clip-path="url(#SVGID_4_)">
+				<use
+   xlink:href="#SVGID_6_"
+   overflow="visible"
+   id="use160" />
+			</clipPath>
+		</g><path
+   fill="#ffffff"
+   d="m 84.60864,11.251527 c -36.015,0 -65.317001,29.302 -65.317001,65.317 0,36.015003 29.302001,65.317003 65.317001,65.317003 36.01599,0 65.31799,-29.303 65.31799,-65.317003 0,-36.014 -29.30199,-65.317 -65.31799,-65.317 z"
+   id="path255" />
+	</g>
+</g>
+<g
+   id="g185">
+	<g
+   id="g183">
+		<g
+   id="g181">
+			<defs
+   id="defs170">
+				<polygon
+   id="SVGID_31_"
+   points="-213.87,-428.74 -212.87,-428.74 -213.87,-427.74     " />
+			</defs>
+			<defs
+   id="defs173">
+				<polygon
+   id="SVGID_32_"
+   points="-215.87,-430.74 -216.87,-430.74 -215.87,-431.74     " />
+			</defs>
+			<clipPath
+   id="SVGID_8_">
+				<use
+   xlink:href="#SVGID_31_"
+   overflow="visible"
+   id="use175" />
+			</clipPath>
+			<clipPath
+   id="SVGID_11_"
+   clip-path="url(#SVGID_8_)">
+				<use
+   xlink:href="#SVGID_32_"
+   overflow="visible"
+   id="use178" />
+			</clipPath>
+		</g>
+	</g>
+</g>
+<g
+   id="g191">
+	<path
+   fill="#0B0A0A"
+   d="M71.999,144c-9.72,0-19.149-1.9-28.029-5.66c-8.569-3.629-16.27-8.82-22.88-15.43S9.29,108.6,5.66,100.029   C1.9,91.15,0,81.721,0,72c0-9.719,1.9-19.15,5.66-28.029c3.63-8.57,8.819-16.271,15.43-22.881S35.4,9.291,43.97,5.66   C52.85,1.9,62.279,0,71.999,0c9.721,0,19.151,1.9,28.03,5.66c8.57,3.631,16.271,8.82,22.88,15.43   c6.61,6.609,11.801,14.311,15.43,22.881C142.1,52.85,144,62.281,144,72c0,9.721-1.9,19.15-5.661,28.029   c-3.629,8.57-8.819,16.271-15.43,22.881c-6.609,6.609-14.31,11.801-22.88,15.43C91.15,142.1,81.72,144,71.999,144z M71.999,10.27   c-16.489,0-31.989,6.422-43.649,18.08C16.69,40.01,10.27,55.51,10.27,72s6.421,31.99,18.08,43.65   c11.66,11.66,27.16,18.08,43.649,18.08c16.491,0,31.99-6.42,43.65-18.08s18.08-27.16,18.08-43.65s-6.42-31.99-18.08-43.65   C103.989,16.691,88.49,10.27,71.999,10.27z"
+   id="path187" />
+	<path
+   fill="#010101"
+   d="M19.83,99.43c0,1.41,1.149,2.561,2.56,2.561H81.99c1.409,0,2.56-1.15,2.56-2.561   c0-1.408-1.15-2.559-2.56-2.559h-7.25l-5.23-10.74h6.53c2.899,0,5.26-2.35,5.26-5.26V73.18l35.77-5.449   c0.26,0,0.51-0.051,0.75-0.119c1.43,1.709,3.59,2.799,5.99,2.799c4.31,0,7.811-3.51,7.811-7.811c0-4.309-3.511-7.818-7.811-7.818   c-2.99,0-5.591,1.689-6.91,4.17H81.3v-1.15c0-2.9-2.35-5.262-5.26-5.262H62.739V47.35H88.49c1.329,0,2.409-1.08,2.409-2.408   c0-1.332-1.08-2.41-2.409-2.41H32.83c-1.33,0-2.41,1.078-2.41,2.41c0,1.328,1.08,2.408,2.41,2.408h25.75v5.189h-5.62   c-32.43,0-30.97,28.342-30.97,28.342c0,2.9,2.35,5.26,5.26,5.26h7.68L29.7,96.871h-7.32C20.97,96.871,19.83,98.021,19.83,99.43z    M119.869,63.131V62.1c0.26-1.959,1.92-3.48,3.94-3.48c2.2,0,4,1.791,4,4.002c0,2.199-1.79,3.988-4,3.988   C121.779,66.609,120.119,65.09,119.869,63.131z M55.399,72.871c0,1.588-1.289,2.879-2.88,2.879H32.32   c-1.591,0-2.88-1.291-2.88-2.879c0,0-0.801-15.502,16.939-15.502h6.14c1.591,0,2.88,1.291,2.88,2.881V72.871z M35.39,96.871   l5.23-10.74h23.22l5.229,10.74H35.39z"
+   id="path189" />
+</g>
+</svg>
