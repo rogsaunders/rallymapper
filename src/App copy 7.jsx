@@ -4,7 +4,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import startSound from "./assets/sounds/start.wav";
 import stopSound from "./assets/sounds/stop.wav";
-import JSZip from "jszip";
 
 // Icon categories (merged cleanly)
 const iconCategories = {
@@ -96,9 +95,9 @@ export default function App() {
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
-
+  // Removed unused 'sectionSummaries' state variable
   const ISO_TIME = new Date().toISOString();
-  const [refreshKey, setRefreshKey] = useState(0);
+  //const [refreshKey, setRefreshKey] = useState(0);
   //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
   useEffect(() => {
@@ -236,11 +235,11 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const exportAsGPXAndShare = async (data, name = "section") => {
+  const exportAsGPX = (data, name = "section") => {
     const formatToISO = (timestamp) => {
       const now = new Date();
-      const [hours, minutes, seconds] = timestamp.split(":");
-      now.setHours(hours, minutes, seconds, 0);
+      const [h, m, s] = timestamp.split(":");
+      now.setHours(h, m, s, 0);
       return now.toISOString();
     };
 
@@ -258,27 +257,24 @@ export default function App() {
     .join("\n")}
   </gpx>`;
 
-    const zip = new JSZip();
-    zip.file(`${name}.gpx`, gpx);
-
-    const blob = await zip.generateAsync({ type: "blob" });
-
-    const file = new File([blob], `${name}.zip`, {
-      type: "application/zip",
+    const blob = new Blob([gpx], { type: "application/gpx+xml" });
+    const file = new File([blob], `${name}.gpx`, {
+      type: "application/gpx+xml",
     });
 
-    if (navigator.share && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          title: "Rally Mapper GPX",
-          text: "Download GPX section data",
-          files: [file],
-        });
-      } catch (err) {
-        console.error("Share failed:", err);
-      }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({
+        title: "Export GPX",
+        text: "Download your GPX file",
+        files: [file],
+      });
     } else {
-      console.warn("File sharing not supported.");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name}.gpx`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -308,7 +304,7 @@ export default function App() {
     setSections((prev) => [...prev, currentSection]);
     setSectionSummaries((prev) => [...prev, summary]);
     exportAsJSON(waypoints, sectionNameFormatted);
-    exportAsGPXAndShare(waypoints, sectionNameFormatted);
+    exportAsGPX(waypoints, sectionNameFormatted);
     setSectionCount((prev) => prev + 1);
     setWaypoints([]);
     setSectionName(`Section ${sectionCount + 1}`);
@@ -487,7 +483,7 @@ export default function App() {
             </button>
             <button
               className="bg-blue-700 text-white px-4 py-2 rounded"
-              onClick={() => exportAsGPXAndShare(waypoints, sectionName)}
+              onClick={() => exportAsGPX(waypoints, sectionName)}
             >
               Export GPX
             </button>

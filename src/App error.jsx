@@ -4,7 +4,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import startSound from "./assets/sounds/start.wav";
 import stopSound from "./assets/sounds/stop.wav";
-import JSZip from "jszip";
 
 // Icon categories (merged cleanly)
 const iconCategories = {
@@ -59,16 +58,6 @@ const iconCategories = {
 // Flattened icon array for easier searching
 const allIcons = Object.values(iconCategories).flat();
 
-function RecenterMapToStart({ lat, lon }) {
-  const map = useMap();
-  useEffect(() => {
-    if (lat && lon) {
-      map.setView([lat, lon], 14);
-    }
-  }, [lat, lon]);
-  return null;
-}
-
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth's radius in km
@@ -83,7 +72,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 export default function App() {
   const [startGPS, setStartGPS] = useState(null);
-  const [sections, setSections] = useState([]);
+  const [showMap, setShowMap] = useState(true);
   const [sectionSummaries, setSectionSummaries] = useState([]);
   const [sectionName, setSectionName] = useState("Section 1");
   const [waypoints, setWaypoints] = useState([]);
@@ -92,13 +81,11 @@ export default function App() {
   const [poi, setPoi] = useState("");
   const [recognitionActive, setRecognitionActive] = useState(false);
   const [currentGPS, setCurrentGPS] = useState(null);
-  const [showMap, setShowMap] = useState(true);
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
-
+  // Removed unused 'sectionSummaries' state variable
   const ISO_TIME = new Date().toISOString();
-  const [refreshKey, setRefreshKey] = useState(0);
   //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
   useEffect(() => {
@@ -163,8 +150,6 @@ export default function App() {
     const geo = navigator.geolocation;
     if (!geo) {
       console.error("❌ Geolocation not supported");
-      setWaypoints([]);
-      setRefreshKey((prev) => prev + 1);
       return;
     }
 
@@ -236,7 +221,7 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const exportAsGPXAndShare = async (data, name = "section") => {
+  const exportAsGPX = async (data, name = "section") => {
     const formatToISO = (timestamp) => {
       const now = new Date();
       const [hours, minutes, seconds] = timestamp.split(":");
@@ -245,41 +230,47 @@ export default function App() {
     };
 
     const gpx = `<?xml version="1.0"?>
-  <gpx version="1.1" creator="Rally Mapper" xmlns="http://www.topografix.com/GPX/1/1">
-  ${data
-    .map(
-      (wp) => `<wpt lat="${wp.lat}" lon="${wp.lon}">
-    <name>${wp.name}</name>
-    <desc>${wp.poi || ""}</desc>
-    <sym>Waypoint</sym>
-    <time>${formatToISO(wp.timestamp)}</time>
-  </wpt>`
-    )
-    .join("\n")}
-  </gpx>`;
+<gpx version="1.1" creator="Rally Mapper" xmlns="http://www.topografix.com/GPX/1/1">
+${data
+  .map(
+    (wp) => `<wpt lat="${wp.lat}" lon="${wp.lon}">
+  <name>${wp.name}</name>
+  <desc>${wp.poi || ""}</desc>
+  <sym>Waypoint</sym>
+  <time>${formatToISO(wp.timestamp)}</time>
+</wpt>`
+  )
+  .join("\n")}
+</gpx>`;
 
-    const zip = new JSZip();
-    zip.file(`${name}.gpx`, gpx);
+    const blob = new Blob([gpx], { type: "application/gpx+xml" });
+    const url = URL.createObjectURL(blob);
 
-    const blob = await zip.generateAsync({ type: "blob" });
-
-    const file = new File([blob], `${name}.zip`, {
-      type: "application/zip",
-    });
-
-    if (navigator.share && navigator.canShare({ files: [file] })) {
+    if (
+      navigator.share &&
+      navigator.canShare &&
+      navigator.canShare({ files: [new File([blob], `${name}.gpx`)] })
+    ) {
       try {
-        await navigator.share({
-          title: "Rally Mapper GPX",
-          text: "Download GPX section data",
-          files: [file],
+        const file = new File([blob], `${name}.gpx`, {
+          type: "application/gpx+xml",
         });
-      } catch (err) {
-        console.error("Share failed:", err);
+        await navigator.share({
+          files: [file],
+          title: "GPX Export",
+          text: `Section export: ${name}`,
+        });
+        return;
+      } catch (error) {
+        console.error("Share failed", error);
       }
-    } else {
-      console.warn("File sharing not supported.");
     }
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.gpx`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleEndSection = () => {
@@ -295,37 +286,50 @@ export default function App() {
         .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
         .toFixed(2),
       pois: waypoints.map((wp) => wp.poi).filter(Boolean),
-      startCoords: waypoints[0]
-        ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
-        : "N/A",
-      endCoords: waypoints[waypoints.length - 1]
-        ? `${waypoints[waypoints.length - 1].lat.toFixed(5)}, ${waypoints[
-            waypoints.length - 1
-          ].lon.toFixed(5)}`
-        : "N/A",
     };
 
     setSections((prev) => [...prev, currentSection]);
     setSectionSummaries((prev) => [...prev, summary]);
     exportAsJSON(waypoints, sectionNameFormatted);
-    exportAsGPXAndShare(waypoints, sectionNameFormatted);
+    exportAsGPX(waypoints, sectionNameFormatted);
     setSectionCount((prev) => prev + 1);
     setWaypoints([]);
-    setSectionName(`Section ${sectionCount + 1}`);
-    setRefreshKey((prev) => prev + 1);
-
-    // ✅ Confirm to console
-    console.log("✅ Ended section and cleared waypoints");
   };
+
+  function RecenterMapToStart({ lat, lon }) {
+    const map = useMap();
+    useEffect(() => {
+      if (lat && lon) {
+        map.setView([lat, lon], 14);
+      }
+    }, [lat, lon]);
+    return null;
+  }
 
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
-            <img src="/RRM Logo 64x64.png" className="w-8 h-8" />
-            Rally Route Mapper
-          </h1>
+          <h1>Rally Route Mapper</h1>
+          <button onClick={handleEndSection}>End Section</button>
+          <button onClick={() => exportAsJSON(waypoints, sectionName)}>
+            Export JSON
+          </button>
+          <button onClick={() => exportAsGPX(waypoints, sectionName)}>
+            Export GPX
+          </button>
+          {showMap && (
+            <MapContainer
+              center={[startGPS.lat, startGPS.lon]}
+              zoom={13}
+              className="h-[400px] w-full"
+            >
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <Marker position={[startGPS.lat, startGPS.lon]}>
+                <Popup>Start Point</Popup>
+              </Marker>
+            </MapContainer>
+          )}
         </div>
       </div>
 
@@ -342,39 +346,6 @@ export default function App() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {showMap && (
-          <div className={fullScreenMap ? "h-[80vh]" : "h-[260px] mb-4"}>
-            <MapContainer
-              center={currentGPS ? [currentGPS.lat, currentGPS.lon] : [0, 0]}
-              zoom={currentGPS ? 14 : 2}
-              scrollWheelZoom
-              className="h-full w-full"
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution="&copy; OpenStreetMap contributors"
-              />
-              {startGPS && (
-                <Marker
-                  position={[startGPS.lat, startGPS.lon]}
-                  icon={L.icon({
-                    iconUrl: "/icons/start-flag.svg",
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 32],
-                    popupAnchor: [0, -32],
-                  })}
-                >
-                  <RecenterMapToStart lat={startGPS.lat} lon={startGPS.lon} />
-                  <Popup>
-                    <strong>Start Point</strong>
-                    <br />
-                    GPS: {startGPS.lat.toFixed(5)}, {startGPS.lon.toFixed(5)}
-                  </Popup>
-                </Marker>
-              )}
-            </MapContainer>
-          </div>
-        )}
         <div>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold mb-2">📝 Route Info</h2>
@@ -487,7 +458,7 @@ export default function App() {
             </button>
             <button
               className="bg-blue-700 text-white px-4 py-2 rounded"
-              onClick={() => exportAsGPXAndShare(waypoints, sectionName)}
+              onClick={() => exportAsGPX(waypoints, sectionName)}
             >
               Export GPX
             </button>
@@ -529,8 +500,6 @@ export default function App() {
                 <div key={idx} className="bg-white shadow rounded p-3 mb-2">
                   <h3 className="font-bold text-blue-700">{summary.name}</h3>
                   <p>Waypoints: {summary.waypointCount}</p>
-                  <p>Start GPS: {summary.startCoords}</p>
-                  <p>End GPS: {summary.endCoords}</p>
                   <p>Start: {summary.startTime}</p>
                   <p>End: {summary.endTime}</p>
                   <p>Total Distance: {summary.totalDistance} km</p>
