@@ -248,7 +248,17 @@ export default function App() {
     recognition.start();
   };
 
-if (navigator.canShare && navigator.canShare({ files: [file] })) {
+  const exportAsJSON = async (data, name = "section") => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+
+    const file = new File([blob], `${name}.json`, {
+      type: "application/json",
+    });
+
+    // Try using native share if supported
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
           files: [file],
