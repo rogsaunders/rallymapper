@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rally Mapper JSON to GPX/KML Converter</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background: #f0f4f8;
+      }
+      h1 {
+        color: #333;
+      }
+      #drop-zone {
+        border: 3px dashed #888;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        background: #fff;
+        width: 80%;
+        max-width: 500px;
+      }
+      input[type="file"] {
+        display: none;
+      }
+      label.button {
+        display: inline-block;
+        padding: 10px 20px;
+        margin-top: 20px;
+        background: #007bff;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Rally Mapper JSON to GPX/KML</h1>
+    <div id="drop-zone">
+      <p>Drop your Rally Mapper .json file here</p>
+      <label class="button" for="fileInput">Or select a file</label>
+      <input type="file" id="fileInput" accept="application/json" />
+    </div>
+
+    <script>
+      const dropZone = document.getElementById("drop-zone");
+      const fileInput = document.getElementById("fileInput");
+
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.style.background = "#e0f7fa";
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.style.background = "#fff";
+      });
+
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.style.background = "#fff";
+        const file = e.dataTransfer.files[0];
+        if (file && file.type === "application/json") {
+          convertFile(file);
+        }
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file && file.type === "application/json") {
+          convertFile(file);
+        }
+      });
+
+      function convertFile(file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const data = JSON.parse(e.target.result);
+          const baseName = file.name.replace(/\.json$/, "");
+          exportAsGPX(data, baseName);
+          exportAsKML(data, baseName);
+        };
+        reader.readAsText(file);
+      }
+
+      function exportAsGPX(data, name) {
+        const gpxPoints = data
+          .map(
+            (wp) => `
+<wpt lat="${wp.lat}" lon="${wp.lon}">
+  <name>${wp.name}</name>
+  <desc>${wp.poi || ""}</desc>
+  <time>${new Date().toISOString()}</time>
+</wpt>`
+          )
+          .join("\n");
+
+        const gpx = `<?xml version="1.0"?>
+<gpx version="1.1" creator="Rally Mapper">
+${gpxPoints}
+</gpx>`;
+
+        downloadFile(gpx, `${name}.gpx`, "application/gpx+xml");
+      }
+
+      function exportAsKML(data, name) {
+        const placemarks = data
+          .map(
+            (wp) => `
+<Placemark>
+  <name>${wp.name}</name>
+  <description>${wp.poi || ""}</description>
+  <Point><coordinates>${wp.lon},${wp.lat},0</coordinates></Point>
+</Placemark>`
+          )
+          .join("\n");
+
+        const kml = `<?xml version="1.0"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+${placemarks}
+</Document>
+</kml>`;
+
+        downloadFile(
+          kml,
+          `${name}.kml`,
+          "application/vnd.google-earth.kml+xml"
+        );
+      }
+
+      function downloadFile(content, filename, type) {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    </script>
+  </body>
+</html>

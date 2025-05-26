@@ -79,7 +79,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export default function App() {
@@ -101,16 +101,11 @@ export default function App() {
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
-  //const poiRef = useRef(null);
+  const poiRef = useRef(null);
 
   const ISO_TIME = new Date().toISOString();
   const [refreshKey, setRefreshKey] = useState(0);
   //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-
-  useEffect(() => {
-    const saved = localStorage.getItem("unsavedWaypoints");
-    if (saved) setWaypoints(JSON.parse(saved));
-  }, []);
 
   useEffect(() => {
     const geo = navigator.geolocation;
@@ -174,7 +169,7 @@ export default function App() {
       lat,
       lon,
       timestamp,
-      distance: Number(distance).toFixed(2),
+      distance: distance.toFixed(2),
       poi,
     };
 
@@ -260,6 +255,52 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  const exportAsGPXAndShare = async (data, name = "section") => {
+    const formatToISO = (timestamp) => {
+      const now = new Date();
+      const [hours, minutes, seconds] = timestamp.split(":");
+      now.setHours(hours, minutes, seconds, 0);
+      return now.toISOString();
+    };
+
+    const gpx = `<?xml version="1.0"?>
+  <gpx version="1.1" creator="Rally Mapper" xmlns="http://www.topografix.com/GPX/1/1">
+  ${data
+    .map(
+      (wp) => `<wpt lat="${wp.lat}" lon="${wp.lon}">
+    <name>${wp.name}</name>
+    <desc>${wp.poi || ""}</desc>
+    <sym>Waypoint</sym>
+    <time>${formatToISO(wp.timestamp)}</time>
+  </wpt>`
+    )
+    .join("\n")}
+  </gpx>`;
+
+    const zip = new JSZip();
+    zip.file(`${name}.gpx`, gpx);
+
+    const blob = await zip.generateAsync({ type: "blob" });
+
+    const file = new File([blob], `${name}.zip`, {
+      type: "application/zip",
+    });
+
+    if (navigator.share && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: "Rally Mapper GPX",
+          text: "Download GPX section data",
+          files: [file],
+        });
+      } catch (err) {
+        console.error("Share failed:", err);
+      }
+    } else {
+      console.warn("File sharing not supported.");
+    }
+  };
+
   const handleEndSection = () => {
     const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
     const currentSection = { name: sectionNameFormatted, waypoints };
@@ -286,6 +327,7 @@ export default function App() {
     setSections((prev) => [...prev, currentSection]);
     setSectionSummaries((prev) => [...prev, summary]);
     exportAsJSON(waypoints, sectionNameFormatted);
+    exportAsGPXAndShare(waypoints, sectionNameFormatted);
     setSectionCount((prev) => prev + 1);
     setWaypoints([]);
     setSectionName(`Section ${sectionCount + 1}`);
@@ -397,7 +439,7 @@ export default function App() {
 
         <div>
           <h2 className="text-lg font-semibold mb-2">Waypoint Entry</h2>
-          <div className="flex flex-wrap gap-2 mb-2">
+          <div className="mb-2">
             <label className="block text-sm font-medium mb-1">Category</label>
             <div className="flex flex-wrap gap-5">
               {Object.keys(iconCategories).map((category) => (
@@ -458,10 +500,16 @@ export default function App() {
           <p></p>
           <div className="flex gap-4 mt-4">
             <button
-              className="bg-gray-700 text-white px-4 py-2 rounded"
               onClick={exportAsJSON}
+              className="bg-gray-700 text-white px-4 py-2 rounded"
             >
               Export JSON
+            </button>
+            <button
+              className="bg-blue-700 text-white px-4 py-2 rounded"
+              onClick={() => exportAsGPXAndShare(waypoints, sectionName)}
+            >
+              Export GPX
             </button>
           </div>
           {/* ✅ Current Section Waypoints */}
