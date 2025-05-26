@@ -248,16 +248,28 @@ export default function App() {
     recognition.start();
   };
 
-  const exportAsJSON = (data, name = "section") => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
+if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Rally Mapper Export",
+          text: "Section data as JSON",
+        });
+        console.log("✅ Shared via iOS share sheet");
+        return;
+      } catch (err) {
+        console.warn("Share failed or cancelled", err);
+      }
+    }
+
+    // Fallback for desktop
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `${name}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    console.log("⬇️ Download triggered (fallback)");
   };
 
   const handleEndSection = () => {
