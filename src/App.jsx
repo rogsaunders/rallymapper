@@ -114,17 +114,22 @@ export default function App() {
 
   useEffect(() => {
     const geo = navigator.geolocation;
-    if (!geo) return;
+    if (!geo) {
+      console.error("Geolocation is not supported.");
+      return;
+    }
 
     const watchId = geo.watchPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords; // ✅ safely extracted
+        const { latitude, longitude } = pos.coords;
         const gps = { lat: latitude, lon: longitude };
         setCurrentGPS(gps);
-        setStartGPS(gps);
+        console.log("📍 GPS Updated:", gps); // ✅ Confirm it's changing
       },
-      (err) => console.error("❌ GPS error", err),
-      { enableHighAccuracy: true, timeout: 10000 }
+      (err) => {
+        console.error("❌ GPS error", err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
     );
 
     return () => geo.clearWatch(watchId);
