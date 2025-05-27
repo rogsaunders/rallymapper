@@ -114,19 +114,23 @@ export default function App() {
 
   useEffect(() => {
     const geo = navigator.geolocation;
-    if (geo) {
-      geo.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          const gps = { lat: latitude, lon: longitude };
-          setStartGPS(gps);
-          setCurrentGPS(gps);
-        },
-        (err) => console.error("❌ Could not access GPS", err),
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
+    if (!geo) return;
+
+    const watchId = geo.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords; // ✅ safely extracted
+        const gps = { lat: latitude, lon: longitude };
+        setCurrentGPS(gps);
+        setStartGPS(gps);
+      },
+      (err) => console.error("❌ GPS error", err),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+
+    return () => geo.clearWatch(watchId);
   }, []);
+
+  console.log("📍 GPS updated:", currentGPS?.lat, currentGPS?.lon);
 
   useEffect(() => {
     const now = new Date();
