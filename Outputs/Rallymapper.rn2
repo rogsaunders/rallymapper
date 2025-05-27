@@ -1,0 +1,27 @@
+{
+  "route": {
+    "version": 4,
+    "name": "",
+    "description": "",
+    "startlocation": "",
+    "endlocation": "",
+    "current_style": "cross_country",
+    "waypoints": [],
+    "activeDraggingIcon": {},
+    "settings": {
+      "units": "metric",
+      "coordFormat": 1,
+      "showHighlight": true,
+      "showDistanceTickMark": true,
+      "showCoordinates": true,
+      "showHeadings": true,
+      "showCustomUrlInputModal": false,
+      "showAlternateDistance": false,
+      "showControlPointDetails": false,
+      "showControlPointOrdinals": true,
+      "hundredthsStyle": "on",
+      "trackColor": 0,
+      "defaultTrackType": 17
+    }
+  }
+}

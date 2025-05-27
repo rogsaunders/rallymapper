@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Rally Mapper">
+
+<wpt lat="-35.03321482356183" lon="138.7469429593972">
+  <name>Keep straight</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.425Z</time>
+</wpt>
+
+<wpt lat="-35.034223780257946" lon="138.74757508458012">
+  <name>Keep to the right</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.034344003175356" lon="138.7461582893477">
+  <name>Right</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.03255470525639" lon="138.74426728691338">
+  <name>Right</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.02413269608206" lon="138.75489821982703">
+  <name>Left</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.01747242725603" lon="138.74979468715358">
+  <name>Right</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.01052013431116" lon="138.7492997720912">
+  <name>Left</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+
+<wpt lat="-35.01214833277562" lon="138.74370761767582">
+  <name>Left</name>
+  <desc></desc>
+  <time>2025-05-27T05:31:21.426Z</time>
+</wpt>
+</gpx>
