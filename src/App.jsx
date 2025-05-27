@@ -82,6 +82,31 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
 }
 
+function buildGPX(waypoints, name = "Route") {
+  const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${name}</name>
+    <trkseg>`;
+
+  const gpxPoints = waypoints
+    .map(
+      (wp) => `
+      <trkpt lat="${wp.lat}" lon="${wp.lon}">
+        <time>${new Date().toISOString()}</time>
+        <desc>${wp.name}${wp.poi ? ` - ${wp.poi}` : ""}</desc>
+      </trkpt>`
+    )
+    .join("");
+
+  const gpxFooter = `
+    </trkseg>
+  </trk>
+</gpx>`;
+
+  return gpxHeader + gpxPoints + gpxFooter;
+}
+
 export default function App() {
   const [routeName, setRouteName] = useState("");
   const [startGPS, setStartGPS] = useState(null);
@@ -281,6 +306,17 @@ export default function App() {
     console.log("⬇️ Download triggered (fallback)");
   };
 
+  const exportAsGPX = (waypoints, name = "route") => {
+    const gpxContent = buildGPX(waypoints, name);
+    const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.gpx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleEndSection = () => {
     const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
     const currentSection = { name: sectionNameFormatted, waypoints };
@@ -370,6 +406,23 @@ export default function App() {
                     <strong>Start Point</strong>
                     <br />
                     GPS: {startGPS.lat.toFixed(5)}, {startGPS.lon.toFixed(5)}
+                  </Popup>
+                </Marker>
+              )}
+              {currentGPS && (
+                <Marker
+                  position={[currentGPS.lat, currentGPS.lon]}
+                  icon={L.icon({
+                    iconUrl: "/icons/current-position.svg", // use a different icon than the start flag
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                  })}
+                >
+                  <Popup>
+                    <strong>Current Location</strong>
+                    <br />
+                    GPS: {currentGPS.lat.toFixed(5)},{" "}
+                    {currentGPS.lon.toFixed(5)}
                   </Popup>
                 </Marker>
               )}
@@ -485,7 +538,14 @@ export default function App() {
             >
               Export JSON
             </button>
+            <button
+              className="bg-blue-700 text-white px-4 py-2 rounded"
+              onClick={() => exportAsGPX(waypoints, routeName || sectionName)}
+            >
+              Export GPX
+            </button>
           </div>
+
           {/* ✅ Current Section Waypoints */}
           <section className="mt-6">
             <h2 className="text-lg font-semibold mb-2">
