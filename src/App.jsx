@@ -83,16 +83,13 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 export default function App() {
-  const [date, setDate] = useState(
-    () => new Date().toISOString().split("T")[0]
-  );
   const [routeName, setRouteName] = useState("");
   const [startGPS, setStartGPS] = useState(null);
   const [sections, setSections] = useState([]);
   const [sectionSummaries, setSectionSummaries] = useState([]);
   const [sectionName, setSectionName] = useState("Section 1");
   const [waypoints, setWaypoints] = useState([]);
-  const [activeCategory, setActiveCategory] = useState("On Track");
+  const [activeCategory, setActiveCategory] = useState("Abbreviations");
   const [selectedIcon, setSelectedIcon] = useState(null);
   const [poi, setPoi] = useState("");
   const [recognitionActive, setRecognitionActive] = useState(false);
@@ -103,7 +100,7 @@ export default function App() {
   const [fullScreenMap, setFullScreenMap] = useState(false);
   //const poiRef = useRef(null);
 
-  const ISO_TIME = new Date().toISOString();
+  //const ISO_TIME = new Date().toISOString();
   const [refreshKey, setRefreshKey] = useState(0);
   //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
 
@@ -150,13 +147,6 @@ export default function App() {
   }, [waypoints]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("unsavedWaypoints");
-    if (saved) {
-      setWaypoints(JSON.parse(saved));
-    }
-  }, []);
-
-  useEffect(() => {
     console.log("Waypoints changed:", waypoints);
   }, [waypoints]);
 
@@ -183,7 +173,7 @@ export default function App() {
       lat,
       lon,
       timestamp,
-      distance: Number(distance).toFixed(2),
+      distance: distance,
       poi,
     };
 
@@ -285,7 +275,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${name}.json`;
+    a.download = `${routeName || name}.json`;
     a.click();
     URL.revokeObjectURL(url);
     console.log("⬇️ Download triggered (fallback)");
@@ -303,7 +293,7 @@ export default function App() {
       totalDistance: waypoints
         .reduce((sum, wp) => sum + parseFloat(wp.distance || 0), 0)
         .toFixed(2),
-      pois: waypoints.map((wp) => wp.poi).filter(Boolean),
+      pois: [...new Set(waypoints.map((wp) => wp.poi).filter(Boolean))],
       startCoords: waypoints[0]
         ? `${waypoints[0].lat.toFixed(5)}, ${waypoints[0].lon.toFixed(5)}`
         : "N/A",
@@ -312,11 +302,13 @@ export default function App() {
             waypoints.length - 1
           ].lon.toFixed(5)}`
         : "N/A",
+      routeName: routeName || "Unnamed Route",
     };
 
     setSections((prev) => [...prev, currentSection]);
+
     setSectionSummaries((prev) => [...prev, summary]);
-    exportAsJSON(waypoints, sectionNameFormatted);
+    exportAsJSON(waypoints, routeName || sectionNameFormatted);
     setSectionCount((prev) => prev + 1);
     setWaypoints([]);
     setSectionName(`Section ${sectionCount + 1}`);
@@ -429,16 +421,15 @@ export default function App() {
         <div>
           <h2 className="text-lg font-semibold mb-2">Waypoint Entry</h2>
           <div className="flex flex-wrap gap-2 mb-2">
-            <label className="block text-sm font-medium mb-1">Category</label>
             <div className="flex flex-wrap gap-5">
               {Object.keys(iconCategories).map((category) => (
                 <button
                   key={category}
                   onClick={() => setActiveCategory(category)}
-                  className={`px-3 py-1 rounded border transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none ${
+                  className={`px-3 py-1 rounded border-2 font-semibold transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none ${
                     activeCategory === category
-                      ? "bg-yellow-400 text-black shadow"
-                      : "bg-gray-100 text-gray-800"
+                      ? "bg-yellow-300 border-yellow-500 text-black shadow"
+                      : "bg-white border-gray-300 text-gray-600"
                   }`}
                 >
                   {category}
@@ -531,6 +522,11 @@ export default function App() {
               sectionSummaries.map((summary, idx) => (
                 <div key={idx} className="bg-white shadow rounded p-3 mb-2">
                   <h3 className="font-bold text-blue-700">{summary.name}</h3>
+                  {summary.routeName && (
+                    <p className="text-sm text-gray-600">
+                      Route: {summary.routeName}
+                    </p>
+                  )}
                   <p>Waypoints: {summary.waypointCount}</p>
                   <p>Start GPS: {summary.startCoords}</p>
                   <p>End GPS: {summary.endCoords}</p>
