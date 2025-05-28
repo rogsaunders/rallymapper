@@ -623,32 +623,28 @@ export default function App() {
             <h2 className="text-lg font-semibold mb-2">
               🧭 Current Section Waypoints
             </h2>
-            <div className="max-h-64 overflow-y-auto pr-1 space-y-2">
-              {waypoints.length === 0 ? (
-                <p className="text-gray-500">No waypoints added yet.</p>
-              ) : (
-                waypoints.map((wp, idx) => (
-                  <div key={idx} className="bg-gray-100 p-3 rounded">
-                    <div className="flex items-center gap-2">
-                      <img src={wp.iconSrc} className="w-6 h-6" alt={wp.name} />
-                      <p className="font-semibold">{wp.name}</p>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Time: {wp.timestamp}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      GPS: {wp.lat}, {wp.lon}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Distance: {wp.distance} km
-                    </p>
-                    {wp.poi && (
-                      <p className="text-sm text-gray-600">POI: {wp.poi}</p>
-                    )}
+            {waypoints.length === 0 ? (
+              <p className="text-gray-500">No waypoints added yet.</p>
+            ) : (
+              waypoints.map((wp, idx) => (
+                <div key={idx} className="bg-gray-100 p-3 rounded mb-2">
+                  <div className="flex items-center gap-2">
+                    <img src={wp.iconSrc} className="w-6 h-6" alt={wp.name} />
+                    <p className="font-semibold">{wp.name}</p>
                   </div>
-                ))
-              )}
-            </div>
+                  <p className="text-sm text-gray-600">Time: {wp.timestamp}</p>
+                  <p className="text-sm text-gray-600">
+                    GPS: {wp.lat}, {wp.lon}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Distance: {wp.distance} km
+                  </p>
+                  {wp.poi && (
+                    <p className="text-sm text-gray-600">POI: {wp.poi}</p>
+                  )}
+                </div>
+              ))
+            )}
           </section>
           <section className="mt-6">
             <h2 className="text-lg font-semibold mb-2">📋 Section Summaries</h2>

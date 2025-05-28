@@ -422,13 +422,15 @@ export default function App() {
   };
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
-            <img src="/RRM Logo 64x64.png" className="w-8 h-8" />
-            Rally Route Mapper
-          </h1>
+    <div className="flex flex-col h-screen">
+      {/* Top Area: Map + Route Info + Icons */}
+      <div
+        className={`flex-none ${
+          showMap ? "h-[75vh]" : "h-[45vh]"
+        } overflow-hidden`}
+      >
+        <div className="p-4">
+          {/* Your existing Map + Route Info + Icon Picker */}
         </div>
       </div>
 
@@ -618,64 +620,73 @@ export default function App() {
             </button>
           </div>
 
-          {/* ✅ Current Section Waypoints */}
-          <section className="mt-6">
-            <h2 className="text-lg font-semibold mb-2">
-              🧭 Current Section Waypoints
-            </h2>
-            <div className="max-h-64 overflow-y-auto pr-1 space-y-2">
-              {waypoints.length === 0 ? (
-                <p className="text-gray-500">No waypoints added yet.</p>
-              ) : (
-                waypoints.map((wp, idx) => (
-                  <div key={idx} className="bg-gray-100 p-3 rounded">
-                    <div className="flex items-center gap-2">
-                      <img src={wp.iconSrc} className="w-6 h-6" alt={wp.name} />
-                      <p className="font-semibold">{wp.name}</p>
+          {/* Scrollable Waypoints + Summaries */}
+          <div className="flex-1 overflow-y-auto p-4 bg-white">
+            <section>
+              <h2 className="text-lg font-semibold mb-2">
+                🧭 Current Section Waypoints
+              </h2>
+              <div className="space-y-2">
+                {waypoints.length === 0 ? (
+                  <p className="text-gray-500">No waypoints added yet.</p>
+                ) : (
+                  waypoints.map((wp, idx) => (
+                    <div key={idx} className="bg-gray-100 p-3 rounded">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={wp.iconSrc}
+                          className="w-6 h-6"
+                          alt={wp.name}
+                        />
+                        <p className="font-semibold">{wp.name}</p>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        Time: {wp.timestamp}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        GPS: {wp.lat}, {wp.lon}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Distance: {wp.distance} km
+                      </p>
+                      {wp.poi && (
+                        <p className="text-sm text-gray-600">POI: {wp.poi}</p>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-600">
-                      Time: {wp.timestamp}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      GPS: {wp.lat}, {wp.lon}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Distance: {wp.distance} km
-                    </p>
-                    {wp.poi && (
-                      <p className="text-sm text-gray-600">POI: {wp.poi}</p>
+                  ))
+                )}
+              </div>
+            </section>
+
+            <section className="mt-6">
+              <h2 className="text-lg font-semibold mb-2">
+                📋 Section Summaries
+              </h2>
+              {sectionSummaries.length === 0 ? (
+                <p className="text-gray-500">No sections completed yet.</p>
+              ) : (
+                sectionSummaries.map((summary, idx) => (
+                  <div key={idx} className="bg-white shadow rounded p-3 mb-2">
+                    <h3 className="font-bold text-blue-700">{summary.name}</h3>
+                    {summary.routeName && (
+                      <p className="text-sm text-gray-600">
+                        Route: {summary.routeName}
+                      </p>
+                    )}
+                    <p>Waypoints: {summary.waypointCount}</p>
+                    <p>Start GPS: {summary.startCoords}</p>
+                    <p>End GPS: {summary.endCoords}</p>
+                    <p>Start: {summary.startTime}</p>
+                    <p>End: {summary.endTime}</p>
+                    <p>Total Distance: {summary.totalDistance} km</p>
+                    {summary.pois.length > 0 && (
+                      <p>POIs: {summary.pois.join(", ")}</p>
                     )}
                   </div>
                 ))
               )}
-            </div>
-          </section>
-          <section className="mt-6">
-            <h2 className="text-lg font-semibold mb-2">📋 Section Summaries</h2>
-            {sectionSummaries.length === 0 ? (
-              <p className="text-gray-500">No sections completed yet.</p>
-            ) : (
-              sectionSummaries.map((summary, idx) => (
-                <div key={idx} className="bg-white shadow rounded p-3 mb-2">
-                  <h3 className="font-bold text-blue-700">{summary.name}</h3>
-                  {summary.routeName && (
-                    <p className="text-sm text-gray-600">
-                      Route: {summary.routeName}
-                    </p>
-                  )}
-                  <p>Waypoints: {summary.waypointCount}</p>
-                  <p>Start GPS: {summary.startCoords}</p>
-                  <p>End GPS: {summary.endCoords}</p>
-                  <p>Start: {summary.startTime}</p>
-                  <p>End: {summary.endTime}</p>
-                  <p>Total Distance: {summary.totalDistance} km</p>
-                  {summary.pois.length > 0 && (
-                    <p>POIs: {summary.pois.join(", ")}</p>
-                  )}
-                </div>
-              ))
-            )}
-          </section>
+            </section>
+          </div>
         </div>
       </div>
     </div>
