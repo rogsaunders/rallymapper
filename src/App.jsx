@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import MapView from "./components/MapView";
 import L from "leaflet";
@@ -123,6 +123,7 @@ export default function App() {
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
+
   //const poiRef = useRef(null);
 
   //const ISO_TIME = new Date().toISOString();
@@ -623,6 +624,7 @@ export default function App() {
             <h2 className="text-lg font-semibold mb-2">
               🧭 Current Section Waypoints
             </h2>
+            {/* ✅ Scrollable list container */}
             <div className="max-h-64 overflow-y-auto pr-1 space-y-2">
               {waypoints.length === 0 ? (
                 <p className="text-gray-500">No waypoints added yet.</p>
