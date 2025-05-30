@@ -114,6 +114,7 @@ export default function App() {
   const [sectionSummaries, setSectionSummaries] = useState([]);
   const [sectionName, setSectionName] = useState("Section 1");
   const [waypoints, setWaypoints] = useState([]);
+  const waypointListRef = useRef(null);
   const [activeCategory, setActiveCategory] = useState("Abbreviations");
   const [selectedIcon, setSelectedIcon] = useState(null);
   const [poi, setPoi] = useState("");
@@ -175,6 +176,42 @@ export default function App() {
   useEffect(() => {
     console.log("Waypoints changed:", waypoints);
   }, [waypoints]);
+
+  useEffect(() => {
+    if (waypointListRef.current) {
+      waypointListRef.current.scrollTop = waypointListRef.current.scrollHeight;
+    }
+  }, [waypoints]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (currentGPS) {
+        const timestamp = new Date().toLocaleTimeString();
+
+        const waypoint = {
+          name: "AutoTrack",
+          iconSrc: "/icons/dot.svg", // use a simple icon
+          lat: currentGPS.lat,
+          lon: currentGPS.lon,
+          timestamp,
+          distance:
+            waypoints.length > 0
+              ? calculateDistance(
+                  waypoints[waypoints.length - 1].lat,
+                  waypoints[waypoints.length - 1].lon,
+                  currentGPS.lat,
+                  currentGPS.lon
+                )
+              : 0,
+          poi: "",
+        };
+
+        setWaypoints((prev) => [...prev, waypoint]);
+      }
+    }, 5000); // every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [currentGPS]);
 
   const handleAddWaypoint = () => {
     if (!selectedIcon || !currentGPS) return;
@@ -625,7 +662,10 @@ export default function App() {
               🧭 Current Section Waypoints
             </h2>
             {/* ✅ Scrollable list container */}
-            <div className="max-h-64 overflow-y-auto pr-1 space-y-2">
+            <div
+              ref={waypointListRef}
+              className="max-h-64 overflow-y-auto pr-1 space-y-2"
+            >
               {waypoints.length === 0 ? (
                 <p className="text-gray-500">No waypoints added yet.</p>
               ) : (

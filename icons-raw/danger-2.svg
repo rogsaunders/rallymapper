@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 16.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.1"
+   id="_x35_0m"
+   x="0px"
+   y="0px"
+   
+   
+   viewBox="0 0 144 144"
+   enable-background="new 0 0 144 144"
+   xml:space="preserve"
+   sodipodi:docname="danger_2.svg"
+   inkscape:version="1.2.1 (9c6d41e410, 2022-07-14)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"   width="12" height="12"><defs
+   id="defs19" /><sodipodi:namedview
+   id="namedview17"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="5.2434576"
+   inkscape:cx="72.089837"
+   inkscape:cy="71.899123"
+   inkscape:window-width="1920"
+   inkscape:window-height="986"
+   inkscape:window-x="-11"
+   inkscape:window-y="-11"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="_x35_0m" />
+<g
+   id="g14"
+   transform="matrix(1.5438604,0,0,1.5438604,-39.158446,-39.176433)">
+	<path
+   fill="#ec2227"
+   d="M 60.574,118.571 H 48.009 c -2.274,0 -4.114,-1.842 -4.114,-4.115 v -12.563 c 0,-2.274 1.84,-4.116 4.114,-4.116 h 12.564 c 2.274,0 4.115,1.842 4.115,4.116 v 12.563 c 10e-4,2.273 -1.84,4.115 -4.114,4.115 z"
+   id="path2" />
+	<g
+   id="g12">
+		<path
+   fill="#ec2227"
+   d="m 38.849,28.136 4.982,63.468 c 0.108,1.299 2.274,3.032 3.682,3.032 h 13.971 c 1.301,0 2.816,-1.841 3.033,-3.141 l 5.09,-63.251 c 0.218,-1.516 -0.974,-2.815 -2.489,-2.815 h -25.67 c -1.516,0 -2.708,1.19 -2.599,2.707 z"
+   id="path4" />
+		<g
+   id="g10">
+			<path
+   fill="#ec2227"
+   d="m 74.373,28.136 4.981,63.468 c 0.109,1.299 2.275,3.032 3.684,3.032 H 97.01 c 1.3,0 2.815,-1.841 3.032,-3.141 l 5.091,-63.251 c 0.217,-1.516 -0.976,-2.815 -2.491,-2.815 h -25.67 c -1.516,0 -2.707,1.19 -2.599,2.707 z"
+   id="path6" />
+			<path
+   fill="#ec2227"
+   d="M 96.034,118.571 H 83.471 c -2.274,0 -4.117,-1.842 -4.117,-4.115 v -12.563 c 0,-2.274 1.843,-4.116 4.117,-4.116 h 12.563 c 2.275,0 4.115,1.842 4.115,4.116 v 12.563 c 0,2.273 -1.84,4.115 -4.115,4.115 z"
+   id="path8" />
+		</g>
+	</g>
+</g>
+</svg>

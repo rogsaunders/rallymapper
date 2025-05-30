@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const inputDir = path.join(__dirname, "icons-raw");
+const inputDir = path.join(__dirname, "icons-new");
 const outputDir = path.join(__dirname, "public/icons");
 
 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
@@ -22,7 +22,7 @@ fs.readdirSync(inputDir).forEach((file) => {
         .replace(/width="[^"]*"/, "")
         .replace(/height="[^"]*"/, "");
 
-      return `<svg${cleaned} width="40" height="40">`;
+      return `<svg${cleaned} width="12" height="12">`;
     });
 
     fs.writeFileSync(path.join(outputDir, file), content, "utf8");
