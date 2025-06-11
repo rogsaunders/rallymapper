@@ -12,8 +12,8 @@ const iconCategories = {
   Abbreviations: [
     { name: "Left", src: "/icons/left.svg" },
     { name: "Right", src: "/icons/right.svg" },
-    { name: "Left and Right", src: "/icons/left_and_right.svg" },
-    { name: "Right and Left", src: "/icons/right_and_left.svg" },
+    // { name: "Left and Right", src: "/icons/left_and_right.svg" },
+    // { name: "Right and Left", src: "/icons/right_and_left.svg" },
     { name: "Keep to the left", src: "/icons/keep-left.svg" },
     { name: "Keep to the right", src: "/icons/keep-right.svg" },
     { name: "Keep straight", src: "/icons/keep-straight.svg" },

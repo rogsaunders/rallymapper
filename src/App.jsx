@@ -10,8 +10,8 @@ const iconCategories = {
   Abbreviations: [
     { name: "Left", src: "/icons/left.svg" },
     { name: "Right", src: "/icons/right.svg" },
-    { name: "Left and Right", src: "/icons/left_and_right.svg" },
-    { name: "Right and Left", src: "/icons/right_and_left.svg" },
+    // { name: "Left and Right", src: "/icons/left_and_right.svg" },
+    // { name: "Right and Left", src: "/icons/right_and_left.svg" },
     { name: "Keep to the left", src: "/icons/keep-left.svg" },
     { name: "Keep to the right", src: "/icons/keep-right.svg" },
     { name: "Keep straight", src: "/icons/keep-straight.svg" },
@@ -22,7 +22,7 @@ const iconCategories = {
   "On Track": [
     { name: "Bump", src: "/icons/bump.svg" },
     { name: "Bumpy", src: "/icons/bumpy.svg" },
-    { name: "Bumpy Broken", src: "/icons/bumpy_broken.svg" },
+    // { name: "Bumpy Broken", src: "/icons/bumpy_broken.svg" },
     { name: "Dip Hole", src: "/icons/dip-hole.svg" },
     { name: "Ditch", src: "/icons/ditch.svg" },
     { name: "Summit", src: "/icons/summit.svg" },
@@ -123,8 +123,12 @@ function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
 
   return gpxHeader + waypointEntries + trackingSegment + gpxFooter;
 }
-
+const libraries = []; // declared outside the component or at top level
 export default function App() {
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8",
+    libraries,
+  });
   const [routeName, setRouteName] = useState("");
   const [startGPS, setStartGPS] = useState(null);
   const [sections, setSections] = useState([]);
@@ -144,12 +148,8 @@ export default function App() {
   const [fullScreenMap, setFullScreenMap] = useState(false);
   const [isTracking, setIsTracking] = useState(false);
   const [sectionStarted, setSectionStarted] = useState(false);
-
-  //const poiRef = useRef(null);
-
-  //const ISO_TIME = new Date().toISOString();
   const [refreshKey, setRefreshKey] = useState(0);
-  //const [todayDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+  const [totalDistance, setTotalDistance] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("unsavedWaypoints");
@@ -182,9 +182,7 @@ export default function App() {
   console.log("📍 GPS updated:", currentGPS?.lat, currentGPS?.lon);
 
   useEffect(() => {
-    const now = new Date();
-    const formattedDate = now.toISOString().split("T")[0];
-    setTodayDate(formattedDate);
+    setTodayDate(new Date().toISOString().split("T")[0]);
   }, []);
 
   useEffect(() => {
@@ -207,48 +205,82 @@ export default function App() {
     if (!isTracking || !currentGPS?.lat || !currentGPS?.lon) return;
 
     const interval = setInterval(() => {
-      const trackingPoint = {
+      const newPoint = {
         lat: currentGPS.lat,
         lon: currentGPS.lon,
         timestamp: new Date().toISOString(),
       };
-      setTrackingPoints((prev) => [...prev, trackingPoint]);
-      console.log("📍 Auto-tracked:", trackingPoint);
-    }, 10000); // ✅ adjust interval as needed
+
+      setTrackingPoints((prev) => {
+        if (prev.length > 0) {
+          const last = prev[prev.length - 1];
+          const dist = parseFloat(
+            calculateDistance(last.lat, last.lon, newPoint.lat, newPoint.lon)
+          );
+          setTotalDistance((td) => parseFloat((td + dist).toFixed(2)));
+        }
+        return [...prev, newPoint];
+      });
+
+      console.log("📍 Auto-tracked:", newPoint);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [isTracking, currentGPS]);
 
   const handleAddWaypoint = () => {
-    if (!selectedIcon || !currentGPS) return;
-
-    const icon = allIcons.find((i) => i.name === selectedIcon);
-    const { lat, lon } = currentGPS;
+    if (!currentGPS) return;
     const timestamp = new Date().toLocaleTimeString();
-
     const distance =
       waypoints.length > 0
         ? calculateDistance(
             waypoints[waypoints.length - 1].lat,
             waypoints[waypoints.length - 1].lon,
-            lat,
-            lon
+            currentGPS.lat,
+            currentGPS.lon
           )
         : 0;
-
     const waypoint = {
-      name: icon?.name || selectedIcon,
-      iconSrc: icon?.src,
-      lat,
-      lon,
+      name: "Unnamed",
+      // iconSrc: "",
+      lat: currentGPS.lat,
+      lon: currentGPS.lon,
       timestamp,
-      distance: distance,
-      poi,
+      distance,
+      poi: "",
     };
-
-    console.log("Waypoint added:", waypoint); // ✅ add this line
     setWaypoints((prev) => [...prev, waypoint]);
-    setPoi("");
+  };
+
+  const handleIconSelect = (iconName) => {
+    setSelectedIcon(iconName);
+    setWaypoints((prev) => {
+      if (prev.length === 0) return prev;
+      const updated = [...prev];
+      const icon = allIcons.find((i) => i.name === iconName);
+      const last = { ...updated[updated.length - 1] };
+      last.name = icon?.name || iconName;
+      last.iconSrc = icon?.src || "";
+      updated[updated.length - 1] = last;
+      return updated;
+    });
+    if (navigator.vibrate) navigator.vibrate(30);
+  };
+
+  const updateLastWaypointIcon = (iconName) => {
+    const icon = allIcons.find((i) => i.name === iconName);
+    setWaypoints((prev) => {
+      const updated = [...prev];
+      const last = updated.length - 1;
+      if (last >= 0) {
+        updated[last] = {
+          ...updated[last],
+          name: icon?.name || iconName,
+          iconSrc: icon?.src,
+        };
+      }
+      return updated;
+    });
   };
 
   const handleStartSection = () => {
@@ -256,6 +288,7 @@ export default function App() {
     setIsTracking(true); // ✅ Start tracking immediately
     setTrackingPoints([]); // ✅ Reset previous tracking points
     setWaypoints([]); // Optional: also reset waypoints if needed
+    setTotalDistance(0);
 
     const geo = navigator.geolocation;
     if (!geo) {
@@ -293,11 +326,6 @@ export default function App() {
   const mapCenter = currentGPS
     ? { lat: currentGPS.lat, lng: currentGPS.lon }
     : { lat: -35.0, lng: 138.75 }; // fallback if GPS isn't ready
-
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8", // 🔐 replace with your actual key
-    libraries: [], // minimal mode
-  });
 
   const startVoiceInput = () => {
     const SpeechRecognition =
@@ -377,21 +405,6 @@ export default function App() {
     console.log("⬇️ Download triggered (fallback)");
   };
 
-  const exportAsGPX = (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "route"
-  ) => {
-    const gpxContent = buildGPX(waypointsData, trackingData, name);
-    const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${name}.gpx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
     const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
   <gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1">
@@ -400,6 +413,27 @@ export default function App() {
       <time>${new Date().toISOString()}</time>
     </metadata>
   `;
+
+    const exportAsGPX = (
+      waypointsData = waypoints,
+      trackingData = trackingPoints,
+      name = "route"
+    ) => {
+      const gpxContent = buildGPX(waypointsData, trackingData, name);
+      const blob = new Blob([gpxContent], { type: "application/octet-stream" });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = `${name}.gpx`; // ✅ Ensure .gpx extension is present
+      document.body.appendChild(a); // ✅ Append to DOM
+      a.click(); // ✅ Trigger download
+      document.body.removeChild(a); // ✅ Clean up
+      window.URL.revokeObjectURL(url); // ✅ Free memory
+
+      console.log("⬇️ Forced GPX download triggered");
+    };
 
     const waypointEntries = waypoints
       .map(
@@ -480,9 +514,9 @@ export default function App() {
     exportAsJSON(waypoints, routeName || sectionNameFormatted);
     exportAsGPX(waypoints, routeName || sectionNameFormatted);
     exportAsKML(waypoints, routeName || sectionNameFormatted);
-    setSectionCount((prev) => prev + 1);
-    setWaypoints([]);
-    setSectionName(`Section ${sectionCount + 1}`);
+    //setSectionCount((prev) => prev + 1);
+    //setWaypoints([]);
+    //setSectionName(`Section ${sectionCount + 1}`);
     setRefreshKey((prev) => prev + 1);
     setIsTracking(false);
     localStorage.removeItem("unsavedWaypoints");
@@ -524,68 +558,47 @@ export default function App() {
       </div>
 
       {showMap && (
-        <div className={fullScreenMap ? "h-[80vh]" : "h-[260px] mb-4"}>
+        <div
+          className={
+            fullScreenMap ? "relative h-[80vh]" : "relative h-[260px] mb-4"
+          }
+        >
           {isLoaded && (
-            <GoogleMap
-              mapContainerStyle={containerStyle}
-              center={mapCenter}
-              zoom={14}
-            >
-              {startGPS && (
-                <Marker
-                  position={{ lat: startGPS.lat, lng: startGPS.lon }}
-                  icon={{
-                    url: "/icons/start-flag.svg",
-                    scaledSize: new window.google.maps.Size(32, 32),
-                  }}
-                />
-              )}
-              {currentGPS && (
-                <Marker
-                  position={{ lat: currentGPS.lat, lng: currentGPS.lon }}
-                  icon={{
-                    url: "/icons/current-position.svg",
-                    scaledSize: new window.google.maps.Size(24, 24),
-                  }}
-                />
-              )}
-            </GoogleMap>
+            <>
+              <GoogleMap
+                mapContainerStyle={{ width: "100%", height: "100%" }}
+                center={mapCenter}
+                zoom={14}
+              >
+                {startGPS && (
+                  <Marker
+                    position={{ lat: startGPS.lat, lng: startGPS.lon }}
+                    icon={{
+                      url: "/icons/start-flag.svg",
+                      scaledSize: new window.google.maps.Size(32, 32),
+                    }}
+                  />
+                )}
+                {currentGPS && (
+                  <Marker
+                    position={{ lat: currentGPS.lat, lng: currentGPS.lon }}
+                    icon={{
+                      url: "/icons/dot.svg",
+                      scaledSize: new window.google.maps.Size(24, 24),
+                    }}
+                  />
+                )}
+              </GoogleMap>
+            </>
           )}
         </div>
       )}
-
+      <p></p>
       {/* Route Info */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold mb-2">📝 Route Info</h2>
-          <div className="flex gap-4 mb-4">
-            <input
-              className="p-2 border rounded"
-              placeholder="Section Number"
-              value={sectionName}
-              onChange={(e) => setSectionName(e.target.value)}
-            />
-            <button
-              className="bg-red-600 text-white px-4 py-2 rounded"
-              onClick={handleStartSection}
-            >
-              ▶️ Start Section
-            </button>
-            <button
-              className="bg-red-600 text-white px-4 py-2 rounded"
-              onClick={handleEndSection}
-            >
-              ⏹ End Section
-            </button>
-          </div>
-          <p className="text-sm text-gray-500">📅 {todayDate}</p>
-          {isTracking && (
-            <p className="text-green-600 font-bold animate-pulse mt-2">
-              📍 Tracking...
-            </p>
-          )}
-        </div>
-
+        <h2 className="text-lg font-semibold mb-2">
+          📝 Route Info: {todayDate}
+        </h2>
         <div className="flex flex-wrap gap-2 mb-2">
           <input
             className="flex-1 p-2 rounded bg-gray-100"
@@ -594,19 +607,54 @@ export default function App() {
             onChange={(e) => setRouteName(e.target.value)}
           />
           <input
-            className="flex-1 p-2 rounded bg-gray-100"
-            placeholder="Start Location"
+            className="p-2 border rounded"
+            placeholder="Section Number"
+            value={sectionName}
+            onChange={(e) => setSectionName(e.target.value)}
           />
-          <input
-            className="flex-1 p-2 rounded bg-gray-100"
-            placeholder="End Location"
-          />
+          <button
+            className="bg-red-600 text-white px-4 py-2 rounded"
+            onClick={handleStartSection}
+          >
+            ▶️ Start Section
+          </button>
+          <button
+            className="bg-red-600 text-white px-4 py-2 rounded"
+            onClick={handleEndSection}
+          >
+            ⏹ End Section
+          </button>
         </div>
       </div>
 
       {/* Waypoint Entry */}
       <div>
-        <h2 className="text-lg font-semibold mb-2">Waypoint Entry</h2>
+        {/* Centered button + meter container */}
+        <div className="flex justify-center items-center gap-8 mx-auto">
+          {/* Add Waypoint Button */}
+          <button
+            onClick={handleAddWaypoint}
+            disabled={!currentGPS}
+            style={{ color: "#16a34a", fontWeight: "800" }} // text-green-600 fallback
+            className="flex flex-col items-center justify-center w-40 h-24 bg-white border-4 border-blue-900 rounded-md px-6 py-4 text-green-600 font-extrabold text-2xl text-center leading-tight transition-transform transform active:scale-95"
+          >
+            ADD
+            <br />
+            WAYPOINT
+          </button>
+
+          {/* Distance Meter */}
+          <div className="flex flex-col items-center justify-center w-40 h-24 bg-white border-4 border-blue-900 text-black font-bold rounded shadow">
+            <span className="text-xs tracking-widest">KILOMETERS</span>
+            <span className="text-3xl">{totalDistance.toFixed(2)}</span>
+          </div>
+          {isTracking && (
+            <p className="text-green-600 font-bold animate-pulse mt-2">
+              📍 Tracking...
+            </p>
+          )}
+        </div>
+
         <div className="flex flex-wrap gap-2 mb-2">
           <div className="flex flex-wrap gap-5">
             {Object.keys(iconCategories).map((category) => (
@@ -624,15 +672,11 @@ export default function App() {
             ))}
           </div>
         </div>
-
-        <div className="grid grid-cols-6 gap-2 mb-4">
+        <div className="grid grid-cols-10 gap-2 mb-4">
           {iconCategories[activeCategory].map((icon) => (
             <button
               key={icon.name}
-              onClick={() => {
-                setSelectedIcon(icon.name);
-                if (navigator.vibrate) navigator.vibrate(30);
-              }}
+              onClick={() => handleIconSelect(icon.name)}
               className={`w-20 h-20 flex flex-col items-center justify-center border-2 rounded-lg transition transform hover:scale-105 active:scale-95 ${
                 selectedIcon === icon.name
                   ? "border-yellow-500 bg-yellow-100"
@@ -644,7 +688,6 @@ export default function App() {
             </button>
           ))}
         </div>
-
         <textarea
           placeholder="Point of Interest (POI)"
           className="w-full border p-2 rounded mb-2"
@@ -658,34 +701,6 @@ export default function App() {
         >
           🎤 {recognitionActive ? "Listening..." : "Voice Input"}
         </button>
-        <button
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded ml-2"
-          onClick={handleAddWaypoint}
-          disabled={!selectedIcon}
-        >
-          ➕ Add Waypoint
-        </button>
-
-        <div className="flex gap-4 mt-4">
-          <button
-            className="bg-gray-700 text-white px-4 py-2 rounded"
-            onClick={() => exportAsJSON(waypoints, routeName || sectionName)}
-          >
-            Export JSON
-          </button>
-          <button
-            className="bg-blue-700 text-white px-4 py-2 rounded"
-            onClick={() => exportAsGPX(waypoints, routeName || sectionName)}
-          >
-            Export GPX
-          </button>
-          <button
-            className="bg-green-700 text-white px-4 py-2 rounded"
-            onClick={() => exportAsKML(waypoints, routeName || sectionName)}
-          >
-            Export KML
-          </button>
-        </div>
 
         {/* Waypoints List */}
         <section className="mt-6">
