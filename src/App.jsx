@@ -205,24 +205,36 @@ export default function App() {
     if (!isTracking || !currentGPS?.lat || !currentGPS?.lon) return;
 
     const interval = setInterval(() => {
-      const newPoint = {
-        lat: currentGPS.lat,
-        lon: currentGPS.lon,
-        timestamp: new Date().toISOString(),
-      };
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          const newPoint = {
+            lat: latitude,
+            lon: longitude,
+            timestamp: new Date().toISOString(),
+          };
 
-      setTrackingPoints((prev) => {
-        if (prev.length > 0) {
-          const last = prev[prev.length - 1];
-          const dist = parseFloat(
-            calculateDistance(last.lat, last.lon, newPoint.lat, newPoint.lon)
-          );
-          setTotalDistance((td) => parseFloat((td + dist).toFixed(2)));
-        }
-        return [...prev, newPoint];
-      });
+          setTrackingPoints((prev) => {
+            if (prev.length > 0) {
+              const last = prev[prev.length - 1];
+              const dist = parseFloat(
+                calculateDistance(
+                  last.lat,
+                  last.lon,
+                  newPoint.lat,
+                  newPoint.lon
+                )
+              );
+              setTotalDistance((td) => parseFloat((td + dist).toFixed(2)));
+            }
+            return [...prev, newPoint];
+          });
 
-      console.log("📍 Auto-tracked:", newPoint);
+          console.log("📍 Auto-tracked:", newPoint);
+        },
+        (err) => console.error("❌ GPS error during tracking:", err),
+        { enableHighAccuracy: true }
+      );
     }, 10000);
 
     return () => clearInterval(interval);
@@ -353,6 +365,17 @@ export default function App() {
     recognition.onresult = (event) => {
       const spokenText = event.results[0][0].transcript;
       setPoi(spokenText);
+
+      // Add POI to the most recent waypoint
+      setWaypoints((prevWaypoints) => {
+        if (prevWaypoints.length === 0) return prevWaypoints;
+        const updated = [...prevWaypoints];
+        updated[updated.length - 1].poi = spokenText;
+        return updated;
+      });
+
+      // Clear the POI field
+      setPoi("");
     };
 
     recognition.onerror = (event) => {
@@ -630,30 +653,47 @@ export default function App() {
       {/* Waypoint Entry */}
       <div>
         {/* Centered button + meter container */}
-        <div className="flex justify-center items-center gap-8 mx-auto">
+        <div className="flex justify-center items-center gap-8 my-4">
+          {/* KM Display */}
+          <div className="w-32 h-32 flex flex-col items-center justify-center bg-white border-2 border-blue-900 text-black font-bold rounded-lg shadow">
+            <span className="text-xs tracking-widest">KILOMETERS</span>
+            <span className="text-2xl">{totalDistance.toFixed(2)} km</span>
+          </div>
+
           {/* Add Waypoint Button */}
-          <button
-            onClick={handleAddWaypoint}
-            disabled={!currentGPS}
-            style={{ color: "#16a34a", fontWeight: "800" }} // text-green-600 fallback
-            className="flex flex-col items-center justify-center w-40 h-24 bg-white border-4 border-blue-900 rounded-md px-6 py-4 text-green-600 font-extrabold text-2xl text-center leading-tight transition-transform transform active:scale-95"
-          >
-            ADD
-            <br />
-            WAYPOINT
+
+          <button onClick={handleAddWaypoint} type="button">
+            📷 {"Add Waypoint"}
           </button>
 
-          {/* Distance Meter */}
-          <div className="flex flex-col items-center justify-center w-40 h-24 bg-white border-4 border-blue-900 text-black font-bold rounded shadow">
-            <span className="text-xs tracking-widest">KILOMETERS</span>
-            <span className="text-3xl">{totalDistance.toFixed(2)}</span>
-          </div>
+          <button
+            className="bg-gray-300 hover:bg-gray-400 text-black px-3 py-1 rounded mt-2"
+            onClick={() => alert("Photo feature not yet implemented")}
+            type="button"
+          >
+            📷 {"Photo"}
+          </button>
+
+          <button
+            className="bg-gray-300 hover:bg-gray-400 text-black px-3 py-1 rounded mt-2"
+            onClick={startVoiceInput}
+            type="button"
+          >
+            🎤 {recognitionActive ? "Listening..." : "Voice Input"}
+          </button>
+
           {isTracking && (
             <p className="text-green-600 font-bold animate-pulse mt-2">
               📍 Tracking...
             </p>
           )}
         </div>
+        <textarea
+          placeholder="Point of Interest (POI)"
+          className="w-full border p-2 rounded mb-2"
+          value={poi}
+          onChange={(e) => setPoi(e.target.value)}
+        />
 
         <div className="flex flex-wrap gap-2 mb-2">
           <div className="flex flex-wrap gap-5">
@@ -688,19 +728,6 @@ export default function App() {
             </button>
           ))}
         </div>
-        <textarea
-          placeholder="Point of Interest (POI)"
-          className="w-full border p-2 rounded mb-2"
-          value={poi}
-          onChange={(e) => setPoi(e.target.value)}
-        />
-        <button
-          className="bg-gray-300 hover:bg-gray-400 text-black px-3 py-1 rounded mt-2"
-          onClick={startVoiceInput}
-          type="button"
-        >
-          🎤 {recognitionActive ? "Listening..." : "Voice Input"}
-        </button>
 
         {/* Waypoints List */}
         <section className="mt-6">
