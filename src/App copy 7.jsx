@@ -62,8 +62,15 @@ const iconCategories = {
 // Flattened icon array for easier searching
 const allIcons = Object.values(iconCategories).flat();
 
-// Removed invalid or misplaced code
-// Removed invalid or misplaced code
+function RecenterMapToStart({ lat, lon }) {
+  const map = useMap();
+  useEffect(() => {
+    if (lat && lon) {
+      map.setView([lat, lon], 14);
+    }
+  }, [lat, lon]);
+  return null;
+}
 
 // Haversine distance calculator
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -177,7 +184,9 @@ export default function App() {
     return () => geo.clearWatch(watchId);
   }, []);
 
-  // HOOK-SAFE RETURN MOVED TO BOTTOM — SEE BELOW
+  if (!isLoaded || !currentGPS) {
+    return <div>Loading map…</div>;
+  }
 
   console.log("📍 GPS updated:", currentGPS?.lat, currentGPS?.lon);
 
@@ -330,6 +339,11 @@ export default function App() {
     );
   };
 
+  const containerStyle = {
+    width: "100%",
+    height: "100vh",
+  };
+
   const mapCenter = currentGPS
     ? { lat: currentGPS.lat, lng: currentGPS.lon }
     : { lat: -35.0, lng: 138.75 }; // fallback if GPS isn't ready
@@ -423,19 +437,41 @@ export default function App() {
     console.log("⬇️ Download triggered (fallback)");
   };
 
-  const buildGPX = (waypoints = [], trackingPoints = [], name = "route") => {
+  function buildGPX(waypoints = [], trackingPoints = [], name = "Route") {
     const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
   <gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1">
     <metadata>
       <name>${name}</name>
       <time>${new Date().toISOString()}</time>
-    </metadata>`;
+    </metadata>
+  `;
+
+    const exportAsGPX = (
+      waypointsData = waypoints,
+      trackingData = trackingPoints,
+      name = "route"
+    ) => {
+      const gpxContent = buildGPX(waypointsData, trackingData, name);
+      const blob = new Blob([gpxContent], { type: "application/octet-stream" });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = `${name}.gpx`; // ✅ Ensure .gpx extension is present
+      document.body.appendChild(a); // ✅ Append to DOM
+      a.click(); // ✅ Trigger download
+      document.body.removeChild(a); // ✅ Clean up
+      window.URL.revokeObjectURL(url); // ✅ Free memory
+
+      console.log("⬇️ Forced GPX download triggered");
+    };
 
     const waypointEntries = waypoints
       .map(
         (wp) => `
     <wpt lat="${wp.lat}" lon="${wp.lon}">
-      <name>${wp.name || "Waypoint"}</name>
+      <name>${wp.name}</name>
       <desc>${wp.poi || ""}</desc>
       <time>${wp.timestamp || new Date().toISOString()}</time>
     </wpt>`
@@ -452,7 +488,7 @@ export default function App() {
           .map(
             (pt) => `
         <trkpt lat="${pt.lat}" lon="${pt.lon}">
-          <time>${pt.timestamp || new Date().toISOString()}</time>
+          <time>${pt.timestamp}</time>
         </trkpt>`
           )
           .join("")}
@@ -464,26 +500,19 @@ export default function App() {
   </gpx>`;
 
     return gpxHeader + waypointEntries + trackingSegment + gpxFooter;
-  };
+  }
 
-  const exportAsGPX = (
-    waypointsData = waypoints,
-    trackingData = trackingPoints,
-    name = "route"
-  ) => {
-    const gpxContent = buildGPX(waypointsData, trackingData, name);
-    const blob = new Blob([gpxContent], { type: "application/gpx+xml" });
-    const url = window.URL.createObjectURL(blob);
+  const exportAsKML = (waypoints, name = "route") => {
+    const kmlContent = buildKML(waypoints, name);
+    const blob = new Blob([kmlContent], {
+      type: "application/vnd.google-earth.kml+xml",
+    });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-
     a.href = url;
-    a.download = `${name}.gpx`;
-    document.body.appendChild(a);
+    a.download = `${name}.kml`;
     a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    console.log("⬇️ Forced GPX download triggered");
+    URL.revokeObjectURL(url);
   };
 
   const handleEndSection = () => {
@@ -512,17 +541,21 @@ export default function App() {
     };
 
     setSections((prev) => [...prev, currentSection]);
+
     setSectionSummaries((prev) => [...prev, summary]);
-
     exportAsJSON(waypoints, routeName || sectionNameFormatted);
-    exportAsGPX(waypoints, trackingPoints, routeName || sectionNameFormatted); // ✅ FIXED
+    exportAsGPX(waypoints, routeName || sectionNameFormatted);
     exportAsKML(waypoints, routeName || sectionNameFormatted);
-
+    //setSectionCount((prev) => prev + 1);
+    //setWaypoints([]);
+    //setSectionName(`Section ${sectionCount + 1}`);
     setRefreshKey((prev) => prev + 1);
     setIsTracking(false);
     localStorage.removeItem("unsavedWaypoints");
 
+    // ✅ Confirm to console
     console.log("Section ended and unsaved waypoints cleared.");
+    // Optional: export trackingPoints separately if needed
     console.log("Tracking points recorded:", trackingPoints);
   };
 
@@ -531,10 +564,6 @@ export default function App() {
 
   //export default function App() {
   // ... all your useState and useEffect hooks remain unchanged
-
-  if (!isLoaded || !currentGPS) {
-    return <div>Loading map…</div>;
-  }
 
   return (
     <div className="p-4">
@@ -561,11 +590,15 @@ export default function App() {
       </div>
 
       {showMap && (
-        <div className="h-[200px] w-full mb-2">
+        <div
+          className={
+            fullScreenMap ? "relative h-[80vh]" : "relative h-[260px] mb-4"
+          }
+        >
           {isLoaded && (
             <>
               <GoogleMap
-                mapContainerStyle={{ width: "100%", height: "100%" }}
+                mapContainerStyle={containerStyle}
                 center={{ lat: currentGPS.lat, lng: currentGPS.lon }}
                 zoom={15}
               >
@@ -690,7 +723,6 @@ export default function App() {
             </p>
           )}
         </div>
-
         <textarea
           placeholder="Point of Interest (POI)"
           className="w-full border p-2 rounded mb-2"
