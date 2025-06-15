@@ -8,6 +8,7 @@ import startSound from "./assets/sounds/start.wav";
 import stopSound from "./assets/sounds/stop.wav";
 import JSZip from "jszip";
 import React, { useEffect, useRef, useState } from "react";
+import ReplayRoute from "./ReplayRoute";
 
 // Icon categories (merged cleanly)
 const iconCategories = {
@@ -133,6 +134,7 @@ export default function App() {
   const [sectionName, setSectionName] = useState("Section 1");
   const [trackingPoints, setTrackingPoints] = useState([]);
   const [waypoints, setWaypoints] = useState([]);
+  const [showReplay, setShowReplay] = useState(false);
   const waypointListRef = useRef(null);
   const [activeCategory, setActiveCategory] = useState("Abbreviations");
   const [selectedIcon, setSelectedIcon] = useState(null);
@@ -148,6 +150,13 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [totalDistance, setTotalDistance] = useState(0);
   const [selectedWaypoint, setSelectedWaypoint] = useState(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("unsavedWaypoints");
+    if (stored) {
+      setWaypoints(JSON.parse(stored));
+    }
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("unsavedWaypoints");
@@ -558,6 +567,14 @@ export default function App() {
         >
           {fullScreenMap ? "Exit Full Screen" : "Full Screen Map"}
         </button>
+        <button
+          onClick={() => setShowReplay((prev) => !prev)}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          {showReplay ? "Hide" : "Show"} Route Replay
+        </button>
+
+        {showReplay && <ReplayRoute waypoints={waypoints} />}
       </div>
 
       {showMap && (
