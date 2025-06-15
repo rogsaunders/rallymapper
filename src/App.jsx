@@ -405,7 +405,7 @@ export default function App() {
         await navigator.share({
           files: [file],
           title: "Rally Mapper Export",
-          text: "Section data (waypoints + tracking)",
+          // text: "Section data (waypoints + tracking)",
         });
         console.log("✅ Shared via iOS share sheet");
         return;
