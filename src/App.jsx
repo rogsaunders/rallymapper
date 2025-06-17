@@ -211,7 +211,7 @@ export default function App() {
   const [poi, setPoi] = useState("");
   const [recognitionActive, setRecognitionActive] = useState(false);
   const [currentGPS, setCurrentGPS] = useState(null);
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(true);
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
@@ -352,7 +352,7 @@ export default function App() {
         (err) => console.error("❌ GPS error", err),
         { enableHighAccuracy: true, timeout: 10000 }
       );
-    }, 120000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [isTracking]);
@@ -459,7 +459,7 @@ export default function App() {
         setGpsError("Failed to get starting GPS position. Please try again.");
         setSectionLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   };
 
