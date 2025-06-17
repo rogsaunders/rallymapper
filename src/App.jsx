@@ -211,7 +211,7 @@ export default function App() {
   const [poi, setPoi] = useState("");
   const [recognitionActive, setRecognitionActive] = useState(false);
   const [currentGPS, setCurrentGPS] = useState(null);
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   const [todayDate, setTodayDate] = useState("");
   const [sectionCount, setSectionCount] = useState(1);
   const [fullScreenMap, setFullScreenMap] = useState(false);
@@ -352,7 +352,7 @@ export default function App() {
         (err) => console.error("❌ GPS error", err),
         { enableHighAccuracy: true, timeout: 10000 }
       );
-    }, 10000);
+    }, 120000);
 
     return () => clearInterval(interval);
   }, [isTracking]);
@@ -380,6 +380,7 @@ export default function App() {
       iconSrc: "",
     };
     setWaypoints((prev) => [...prev, waypoint]);
+
     // Visual feedback for successful waypoint addition
     setWaypointAdded(true);
     setTimeout(() => setWaypointAdded(false), 2000);
