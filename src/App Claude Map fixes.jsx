@@ -80,27 +80,23 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 // Calculate cumulative distance from section start
 function calculateCumulativeDistance(waypoints, currentLat, currentLon) {
   if (waypoints.length === 0) return 0;
-
+  
   let totalDistance = 0;
   let prevLat = waypoints[0].lat;
   let prevLon = waypoints[0].lon;
-
+  
   // Sum distances between all previous waypoints
   for (let i = 1; i < waypoints.length; i++) {
-    totalDistance += parseFloat(
-      calculateDistance(prevLat, prevLon, waypoints[i].lat, waypoints[i].lon)
-    );
+    totalDistance += parseFloat(calculateDistance(prevLat, prevLon, waypoints[i].lat, waypoints[i].lon));
     prevLat = waypoints[i].lat;
     prevLon = waypoints[i].lon;
   }
-
+  
   // Add distance from last waypoint to current position
   if (waypoints.length > 0) {
-    totalDistance += parseFloat(
-      calculateDistance(prevLat, prevLon, currentLat, currentLon)
-    );
+    totalDistance += parseFloat(calculateDistance(prevLat, prevLon, currentLat, currentLon));
   }
-
+  
   return parseFloat(totalDistance.toFixed(2));
 }
 
@@ -177,9 +173,7 @@ function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
       <name>${name} - Track</name>
       <LineString>
         <coordinates>
-          ${trackingPoints
-            .map((pt) => `${pt.lon},${pt.lat},0`)
-            .join("\n          ")}
+          ${trackingPoints.map(pt => `${pt.lon},${pt.lat},0`).join('\n          ')}
         </coordinates>
       </LineString>
     </Placemark>`
@@ -191,7 +185,13 @@ function buildKML(waypoints = [], trackingPoints = [], name = "Route") {
 
   return kmlHeader + waypointPlacemarks + trackingPath + kmlFooter;
 }
+
 const libraries = []; // declared outside the component or at top level
+
+
+
+
+
 export default function App() {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: "AIzaSyCYZchsHu_Sd4KMNP1b6Dq30XzWWOuFPO8",
@@ -220,14 +220,14 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [totalDistance, setTotalDistance] = useState(0);
   const [selectedWaypoint, setSelectedWaypoint] = useState(null);
-
+  
   // Visual feedback states
   const [gpsAccuracy, setGpsAccuracy] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(true);
   const [gpsError, setGpsError] = useState(null);
   const [waypointAdded, setWaypointAdded] = useState(false);
   const [sectionLoading, setSectionLoading] = useState(false);
-
+  
   // Map enhancement states
   const [mapType, setMapType] = useState("roadmap");
   const [showRouteStats, setShowRouteStats] = useState(false);
@@ -270,9 +270,9 @@ export default function App() {
     const handleError = (err) => {
       console.error("❌ GPS error", err);
       setGpsLoading(false);
-
+      
       // User-friendly error messages
-      switch (err.code) {
+      switch(err.code) {
         case err.PERMISSION_DENIED:
           setGpsError("GPS access denied. Please enable location permissions.");
           break;
@@ -287,11 +287,11 @@ export default function App() {
       }
     };
 
-    const watchId = geo.watchPosition(handleSuccess, handleError, {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 5000,
-    });
+    const watchId = geo.watchPosition(
+      handleSuccess,
+      handleError,
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    );
 
     return () => geo.clearWatch(watchId);
   }, []);
@@ -362,31 +362,31 @@ export default function App() {
       setGpsError("No GPS signal available. Please wait for GPS to be ready.");
       return;
     }
-
+    
     const timestamp = new Date().toLocaleTimeString();
-
+    
     // Calculate cumulative distance from section start (or from start GPS if no waypoints)
-    const cumulativeDistance = startGPS
-      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon)
+    const cumulativeDistance = startGPS 
+      ? calculateCumulativeDistance(waypoints, currentGPS.lat, currentGPS.lon) 
       : 0;
-
+    
     const waypoint = {
       name: "Unnamed",
-      lat: currentGPS.lat, // ✅ Store coordinates directly
-      lon: currentGPS.lon, // ✅ Store coordinates directly
+      lat: currentGPS.lat,  // ✅ Store coordinates directly
+      lon: currentGPS.lon,  // ✅ Store coordinates directly  
       timestamp,
       distance: cumulativeDistance, // ✅ Use cumulative distance
       poi: "",
       iconSrc: "",
     };
     setWaypoints((prev) => [...prev, waypoint]);
-    // Visual feedback for successful waypoint addition
+        // Visual feedback for successful waypoint addition
     setWaypointAdded(true);
     setTimeout(() => setWaypointAdded(false), 2000);
-
+    
     // Haptic feedback if available
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-
+    
     console.log("✅ Waypoint added:", waypoint);
   };
 
@@ -575,15 +575,13 @@ export default function App() {
     console.log("⬇️ Forced GPX download triggered");
   };
 
-  const exportAsKML = (
+    const exportAsKML = (
     waypointsData = waypoints,
     trackingData = trackingPoints,
     name = "route"
   ) => {
     const kmlContent = buildKML(waypointsData, trackingData, name);
-    const blob = new Blob([kmlContent], {
-      type: "application/vnd.google-earth.kml+xml",
-    });
+    const blob = new Blob([kmlContent], { type: "application/vnd.google-earth.kml+xml" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
 
@@ -597,6 +595,8 @@ export default function App() {
     console.log("⬇️ KML download triggered");
   };
 
+  
+  
   const handleEndSection = () => {
     setSectionStarted(false);
     const sectionNameFormatted = `${todayDate}/Section ${sectionCount}`;
@@ -627,7 +627,7 @@ export default function App() {
 
     exportAsJSON(waypoints, trackingPoints, routeName || sectionNameFormatted);
     exportAsGPX(waypoints, trackingPoints, routeName || sectionNameFormatted);
-    exportAsKML(waypoints, trackingPoints, routeName || sectionNameFormatted);
+    exportAsKML(waypoints, trackingPoints, routeName || sectionNameFormatted); // ✅ Now works
 
     setRefreshKey((prev) => prev + 1);
     setIsTracking(false);
@@ -654,40 +654,28 @@ export default function App() {
         <div className="text-center">
           <div className="animate-pulse rounded-full h-12 w-12 bg-blue-600 mx-auto mb-4"></div>
           <p className="text-lg text-gray-600">Acquiring GPS signal...</p>
-          <p className="text-sm text-gray-500">
-            Please ensure location services are enabled
-          </p>
+          <p className="text-sm text-gray-500">Please ensure location services are enabled</p>
         </div>
       </div>
     );
   }
 
+
+  
   // Create polyline path from waypoints for route visualization
-  const routePath = waypoints.map((wp) => ({
+  const routePath = waypoints.map(wp => ({
     lat: wp.lat,
-    lng: wp.lon,
+    lng: wp.lon
   }));
 
   // Calculate route statistics
   const routeStats = {
     totalWaypoints: waypoints.length,
-    routeDistance:
-      waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0,
-    avgSpeed:
-      isTracking && trackingPoints.length > 1
-        ? (
-            routeStats?.routeDistance /
-            ((Date.now() - new Date(trackingPoints[0].timestamp).getTime()) /
-              3600000)
-          ).toFixed(1)
-        : 0,
-    duration:
-      trackingPoints.length > 0
-        ? (
-            (Date.now() - new Date(trackingPoints[0].timestamp).getTime()) /
-            60000
-          ).toFixed(1)
-        : 0,
+    routeDistance: waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0,
+    avgSpeed: isTracking && trackingPoints.length > 1 ? 
+      (routeStats?.routeDistance / ((Date.now() - new Date(trackingPoints[0].timestamp).getTime()) / 3600000)).toFixed(1) : 0,
+    duration: trackingPoints.length > 0 ? 
+      ((Date.now() - new Date(trackingPoints[0].timestamp).getTime()) / 60000).toFixed(1) : 0
   };
 
   // Map type options
@@ -695,7 +683,7 @@ export default function App() {
     { key: "roadmap", label: "Road", icon: "🗺️" },
     { key: "satellite", label: "Satellite", icon: "🛰️" },
     { key: "terrain", label: "Terrain", icon: "⛰️" },
-    { key: "hybrid", label: "Hybrid", icon: "🔀" },
+    { key: "hybrid", label: "Hybrid", icon: "🔀" }
   ];
 
   // GPS Status Component
@@ -707,8 +695,8 @@ export default function App() {
             <span className="text-red-500 mr-2">⚠️</span>
             <div>
               <strong>GPS Error:</strong> {gpsError}
-              <button
-                onClick={() => window.location.reload()}
+              <button 
+                onClick={() => window.location.reload()} 
                 className="ml-2 text-red-600 underline hover:text-red-800"
               >
                 Retry
@@ -738,21 +726,13 @@ export default function App() {
             <span>GPS Active</span>
           </div>
           <div className="text-sm">
-            Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
-            <span
-              className={`ml-2 px-2 py-1 rounded text-xs ${
-                gpsAccuracy <= 10
-                  ? "bg-green-200 text-green-800"
-                  : gpsAccuracy <= 50
-                  ? "bg-yellow-200 text-yellow-800"
-                  : "bg-red-200 text-red-800"
-              }`}
-            >
-              {gpsAccuracy <= 10
-                ? "Excellent"
-                : gpsAccuracy <= 50
-                ? "Good"
-                : "Poor"}
+            Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : '?'}m
+            <span className={`ml-2 px-2 py-1 rounded text-xs ${
+              gpsAccuracy <= 10 ? 'bg-green-200 text-green-800' :
+              gpsAccuracy <= 50 ? 'bg-yellow-200 text-yellow-800' :
+              'bg-red-200 text-red-800'
+            }`}>
+              {gpsAccuracy <= 10 ? 'Excellent' : gpsAccuracy <= 50 ? 'Good' : 'Poor'}
             </span>
           </div>
         </div>
@@ -763,7 +743,7 @@ export default function App() {
   // Success notification for waypoint addition
   const WaypointSuccessNotification = () => {
     if (!waypointAdded) return null;
-
+    
     return (
       <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce">
         <div className="flex items-center">
@@ -776,56 +756,47 @@ export default function App() {
 
   // Map Controls Component
   const MapControls = () => (
-    <>
-      {/* Map Type Selector - Top Left */}
-      <div
-        style={{ position: "absolute", top: "8px", left: "8px", zIndex: 10 }}
-      >
-        <div className="bg-white rounded-lg shadow-lg p-2">
-          <div className="grid grid-cols-4 gap-1">
-            {mapTypes.map((type) => (
-              <button
-                key={type.key}
-                onClick={() => setMapType(type.key)}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
-                  mapType === type.key
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                }`}
-              >
-                <span className="mr-1">{type.icon}</span>
-                {type.label}
-              </button>
-            ))}
-          </div>
+    <div className="absolute top-4 left-4 z-10 space-y-2">
+      {/* Map Type Selector */}
+      <div className="bg-white rounded-lg shadow-lg p-2">
+        <div className="grid grid-cols-2 gap-1">
+          {mapTypes.map(type => (
+            <button
+              key={type.key}
+              onClick={() => setMapType(type.key)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                mapType === type.key 
+                  ? 'bg-blue-500 text-white' 
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
+            >
+              <span className="mr-1">{type.icon}</span>
+              {type.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Route Stats Toggle - Top Right */}
-      <div
-        style={{ position: "absolute", top: "8px", right: "8px", zIndex: 10 }}
+      {/* Route Stats Toggle */}
+      <button
+        onClick={() => setShowRouteStats(!showRouteStats)}
+        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          showRouteStats 
+            ? 'bg-blue-500 text-white' 
+            : 'bg-white text-gray-700 hover:bg-gray-100'
+        } shadow-lg`}
       >
-        <button
-          onClick={() => setShowRouteStats(!showRouteStats)}
-          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-            showRouteStats
-              ? "bg-blue-500 text-white"
-              : "bg-white text-gray-700 hover:bg-gray-100"
-          } shadow-lg`}
-        >
-          📊 Stats
-        </button>
-      </div>
-    </>
+        📊 Stats
+      </button>
+    </div>
   );
 
+  // Route Statistics Overlay
   const RouteStatsOverlay = () => {
-    if (!showRouteStats || waypoints.length === 0) {
-      return null;
-    }
-
+    if (!showRouteStats || waypoints.length === 0) return null;
+    
     return (
-      <div className="absolute bottom-4 left-4 bg-white bg-opacity-95 rounded-lg shadow-lg p-4 z-50 min-w-48">
+      <div className="absolute bottom-4 left-4 bg-white bg-opacity-95 rounded-lg shadow-lg p-4 z-10 min-w-48">
         <h3 className="font-bold text-gray-800 mb-2">Route Statistics</h3>
         <div className="space-y-1 text-sm text-gray-600">
           <div className="flex justify-between">
@@ -857,7 +828,7 @@ export default function App() {
     <div className="p-4">
       {/* Success notification overlay */}
       <WaypointSuccessNotification />
-
+      
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
           <img src="/RRM Logo 64x64.png" className="w-8 h-8" alt="RRM Logo" />
@@ -892,17 +863,9 @@ export default function App() {
       </div>
 
       {showMap && (
-        <div
-          className={`relative w-full mb-2 ${
-            fullScreenMap ? "h-screen" : "h-[200px]"
-          }`}
-        >
+        <div className="relative h-[400px] w-full mb-2">
           {isLoaded && currentGPS && (
             <>
-              {/* Map overlay controls */}
-              <MapControls />
-              <RouteStatsOverlay />
-
               <GoogleMap
                 mapContainerStyle={{ width: "100%", height: "100%" }}
                 center={{ lat: currentGPS.lat, lng: currentGPS.lon }}
@@ -916,7 +879,7 @@ export default function App() {
                   mapTypeControl: false, // We have our custom control
                   streetViewControl: false,
                   fullscreenControl: true,
-                  gestureHandling: "greedy",
+                  gestureHandling: 'greedy'
                 }}
               >
                 {/* Current location marker with enhanced styling */}
@@ -925,9 +888,9 @@ export default function App() {
                   icon={{
                     path: google.maps.SymbolPath.CIRCLE,
                     scale: 10,
-                    fillColor: "#4285F4",
+                    fillColor: '#4285F4',
                     fillOpacity: 1,
-                    strokeColor: "#ffffff",
+                    strokeColor: '#ffffff',
                     strokeWeight: 3,
                   }}
                   title="Current Location"
@@ -939,9 +902,9 @@ export default function App() {
                     center={{ lat: currentGPS.lat, lng: currentGPS.lon }}
                     radius={gpsAccuracy}
                     options={{
-                      fillColor: "#4285F4",
+                      fillColor: '#4285F4',
                       fillOpacity: 0.1,
-                      strokeColor: "#4285F4",
+                      strokeColor: '#4285F4',
                       strokeOpacity: 0.3,
                       strokeWeight: 1,
                     }}
@@ -951,40 +914,33 @@ export default function App() {
                 {/* Waypoint markers with custom icons */}
                 {waypoints.map((wp, index) => {
                   if (!wp.lat || !wp.lon) {
-                    console.warn(
-                      `⚠️ Skipping invalid waypoint at index ${index}`,
-                      wp
-                    );
+                    console.warn(`⚠️ Skipping invalid waypoint at index ${index}`, wp);
                     return null;
                   }
-
+                  
                   return (
                     <Marker
                       key={index}
                       position={{ lat: wp.lat, lng: wp.lon }}
                       onClick={() => setSelectedWaypoint(index)}
-                      icon={
-                        wp.iconSrc
-                          ? {
-                              url: wp.iconSrc,
-                              scaledSize: new google.maps.Size(40, 40),
-                              anchor: new google.maps.Point(20, 20),
-                            }
-                          : {
-                              path: google.maps.SymbolPath.CIRCLE,
-                              scale: 8,
-                              fillColor: "#FF0000",
-                              fillOpacity: 0.8,
-                              strokeColor: "#ffffff",
-                              strokeWeight: 2,
-                            }
-                      }
+                      icon={wp.iconSrc ? {
+                        url: wp.iconSrc,
+                        scaledSize: new google.maps.Size(40, 40),
+                        anchor: new google.maps.Point(20, 20),
+                      } : {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#FF0000',
+                        fillOpacity: 0.8,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                      }}
                       title={`${wp.name} (${wp.timestamp})`}
                       label={{
                         text: (index + 1).toString(),
-                        color: "white",
-                        fontSize: "12px",
-                        fontWeight: "bold",
+                        color: 'white',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
                       }}
                     />
                   );
@@ -995,7 +951,7 @@ export default function App() {
                   <Polyline
                     path={routePath}
                     options={{
-                      strokeColor: "#FF0000",
+                      strokeColor: '#FF0000',
                       strokeOpacity: 0.8,
                       strokeWeight: 4,
                       geodesic: true,
@@ -1006,12 +962,9 @@ export default function App() {
                 {/* Tracking polyline (auto-recorded GPS points) */}
                 {trackingPoints.length > 1 && (
                   <Polyline
-                    path={trackingPoints.map((pt) => ({
-                      lat: pt.lat,
-                      lng: pt.lon,
-                    }))}
+                    path={trackingPoints.map(pt => ({ lat: pt.lat, lng: pt.lon }))}
                     options={{
-                      strokeColor: "#00FF00",
+                      strokeColor: '#00FF00',
                       strokeOpacity: 0.6,
                       strokeWeight: 2,
                       geodesic: true,
@@ -1031,35 +984,20 @@ export default function App() {
                     <div className="p-2 max-w-xs">
                       <div className="flex items-center mb-2">
                         {waypoints[selectedWaypoint].iconSrc && (
-                          <img
-                            src={waypoints[selectedWaypoint].iconSrc}
+                          <img 
+                            src={waypoints[selectedWaypoint].iconSrc} 
                             alt={waypoints[selectedWaypoint].name}
                             className="w-6 h-6 mr-2"
                           />
                         )}
-                        <strong className="text-lg">
-                          {waypoints[selectedWaypoint].name}
-                        </strong>
+                        <strong className="text-lg">{waypoints[selectedWaypoint].name}</strong>
                       </div>
                       <div className="space-y-1 text-sm">
-                        <div>
-                          <strong>Time:</strong>{" "}
-                          {waypoints[selectedWaypoint].timestamp}
-                        </div>
-                        <div>
-                          <strong>Position:</strong>{" "}
-                          {waypoints[selectedWaypoint].lat.toFixed(6)},{" "}
-                          {waypoints[selectedWaypoint].lon.toFixed(6)}
-                        </div>
-                        <div>
-                          <strong>Distance from start:</strong>{" "}
-                          {waypoints[selectedWaypoint].distance} km
-                        </div>
+                        <div><strong>Time:</strong> {waypoints[selectedWaypoint].timestamp}</div>
+                        <div><strong>Position:</strong> {waypoints[selectedWaypoint].lat.toFixed(6)}, {waypoints[selectedWaypoint].lon.toFixed(6)}</div>
+                        <div><strong>Distance from start:</strong> {waypoints[selectedWaypoint].distance} km</div>
                         {waypoints[selectedWaypoint].poi && (
-                          <div>
-                            <strong>Notes:</strong>{" "}
-                            {waypoints[selectedWaypoint].poi}
-                          </div>
+                          <div><strong>Notes:</strong> {waypoints[selectedWaypoint].poi}</div>
                         )}
                       </div>
                       <button
@@ -1075,13 +1013,15 @@ export default function App() {
                   </InfoWindow>
                 )}
               </GoogleMap>
+
+              {/* Map overlay controls */}
+              <MapControls />
+              <RouteStatsOverlay />
             </>
           )}
         </div>
       )}
-
       <p></p>
-
       {/* Route Info */}
       <div>
         <h2 className="text-lg font-semibold mb-2">
@@ -1134,19 +1074,23 @@ export default function App() {
           </div>
 
           {/* Add Waypoint Button */}
-          <button
-            onClick={handleAddWaypoint}
+          <button 
+            onClick={handleAddWaypoint} 
             type="button"
             disabled={!currentGPS || !sectionStarted}
             className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 ${
-              !currentGPS || !sectionStarted
-                ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                : waypointAdded
-                ? "bg-green-600 text-white animate-pulse"
-                : "bg-blue-600 hover:bg-blue-700 text-white hover:scale-105"
+              !currentGPS || !sectionStarted 
+                ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                : waypointAdded 
+                  ? 'bg-green-600 text-white animate-pulse' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white hover:scale-105'
             }`}
           >
-            {waypointAdded ? <>✅ Added!</> : <>📍 Add Waypoint</>}
+            {waypointAdded ? (
+              <>✅ Added!</>
+            ) : (
+              <>📍 Add Waypoint</>
+            )}
           </button>
 
           <button
@@ -1160,9 +1104,9 @@ export default function App() {
 
           <button
             className={`px-3 py-1 rounded text-black transition-colors ${
-              recognitionActive
-                ? "bg-red-300 animate-pulse"
-                : "bg-gray-300 hover:bg-gray-400"
+              recognitionActive 
+                ? 'bg-red-300 animate-pulse' 
+                : 'bg-gray-300 hover:bg-gray-400'
             } disabled:bg-gray-200 disabled:cursor-not-allowed`}
             onClick={startVoiceInput}
             type="button"
@@ -1178,109 +1122,3 @@ export default function App() {
             </div>
           )}
         </div>
-
-        <textarea
-          placeholder="Point of Interest (POI)"
-          className="w-full border p-2 rounded mb-2"
-          value={poi}
-          onChange={(e) => setPoi(e.target.value)}
-        />
-
-        <div className="flex flex-wrap gap-2 mb-2">
-          <div className="flex flex-wrap gap-5">
-            {Object.keys(iconCategories).map((category) => (
-              <button
-                key={category}
-                onClick={() => setActiveCategory(category)}
-                className={`px-3 py-1 rounded border-2 font-semibold transition duration-200 ease-in-out transform hover:scale-105 focus:outline-none ${
-                  activeCategory === category
-                    ? "bg-yellow-300 border-yellow-500 text-black shadow"
-                    : "bg-white border-gray-300 text-gray-600"
-                }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-10 gap-2 mb-4">
-          {iconCategories[activeCategory].map((icon) => (
-            <button
-              key={icon.name}
-              onClick={() => handleIconSelect(icon.name)}
-              className={`w-20 h-20 flex flex-col items-center justify-center border-2 rounded-lg transition transform hover:scale-105 active:scale-95 ${
-                selectedIcon === icon.name
-                  ? "border-yellow-500 bg-yellow-100"
-                  : "border-gray-300 bg-white"
-              }`}
-            >
-              <img src={icon.src} alt={icon.name} className="w-8 h-8 mb-1" />
-              <p className="text-xs text-center font-medium">{icon.name}</p>
-            </button>
-          ))}
-        </div>
-
-        {/* Waypoints List */}
-        <section className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">
-            🧭 Current Section Waypoints
-          </h2>
-          <div
-            ref={waypointListRef}
-            className="max-h-[40vh] overflow-y-auto pr-1 space-y-2"
-          >
-            {waypoints.length === 0 ? (
-              <p className="text-gray-500">No waypoints added yet.</p>
-            ) : (
-              waypoints.map((wp, idx) => (
-                <div key={idx} className="bg-gray-100 p-3 rounded">
-                  <div className="flex items-center gap-2">
-                    <img src={wp.iconSrc} className="w-6 h-6" alt={wp.name} />
-                    <p className="font-semibold">{wp.name}</p>
-                  </div>
-                  <p className="text-sm text-gray-600">Time: {wp.timestamp}</p>
-                  <p className="text-sm text-gray-600">
-                    GPS: {wp.lat}, {wp.lon}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Distance: {wp.distance} km
-                  </p>
-                  {wp.poi && (
-                    <p className="text-sm text-gray-600">POI: {wp.poi}</p>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">📋 Section Summaries</h2>
-          {sectionSummaries.length === 0 ? (
-            <p className="text-gray-500">No sections completed yet.</p>
-          ) : (
-            sectionSummaries.map((summary, idx) => (
-              <div key={idx} className="bg-white shadow rounded p-3 mb-2">
-                <h3 className="font-bold text-blue-700">{summary.name}</h3>
-                {summary.routeName && (
-                  <p className="text-sm text-gray-600">
-                    Route: {summary.routeName}
-                  </p>
-                )}
-                <p>Waypoints: {summary.waypointCount}</p>
-                <p>Start GPS: {summary.startCoords}</p>
-                <p>End GPS: {summary.endCoords}</p>
-                <p>Start: {summary.startTime}</p>
-                <p>End: {summary.endTime}</p>
-                <p>Total Distance: {summary.totalDistance} km</p>
-                {summary.pois.length > 0 && (
-                  <p>POIs: {summary.pois.join(", ")}</p>
-                )}
-              </div>
-            ))
-          )}
-        </section>
-      </div>
-    </div>
-  );
-}
