@@ -75,6 +75,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2);
+// Ensure this closing brace matches the corresponding opening brace
 }
 
 // Calculate cumulative distance from section start
@@ -640,8 +641,9 @@ export default function App() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-lg text-gray-600">Loading Rally Mapper...</p>
-        </div>
       </div>
+          );
+        </div>
     );
   }
 
@@ -1123,3 +1125,5 @@ export default function App() {
             </div>
           )}
         </div>
+      </div>
+    </div>

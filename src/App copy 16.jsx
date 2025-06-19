@@ -220,13 +220,6 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [totalDistance, setTotalDistance] = useState(0);
   const [selectedWaypoint, setSelectedWaypoint] = useState(null);
-  const [showEndSectionConfirm, setShowEndSectionConfirm] = useState(false);
-  const [showStartSectionConfirm, setShowStartSectionConfirm] = useState(false);
-  // Add these new state variables for inline editing
-  const [editingWaypoint, setEditingWaypoint] = useState(null); // Index of waypoint being edited
-  const [editValues, setEditValues] = useState({ name: "", poi: "" }); // Temporary edit values
-  const [selectedWaypoints, setSelectedWaypoints] = useState(new Set()); // Set of selected waypoint indices
-  const [bulkSelectMode, setBulkSelectMode] = useState(false); // Whether bulk selection is active
 
   // Visual feedback states
   const [gpsAccuracy, setGpsAccuracy] = useState(null);
@@ -234,8 +227,6 @@ export default function App() {
   const [gpsError, setGpsError] = useState(null);
   const [waypointAdded, setWaypointAdded] = useState(false);
   const [sectionLoading, setSectionLoading] = useState(false);
-  const [showUndo, setShowUndo] = useState(false);
-  const [undoTimeLeft, setUndoTimeLeft] = useState(15);
 
   // Map enhancement states
   const [mapType, setMapType] = useState("roadmap");
@@ -299,7 +290,7 @@ export default function App() {
     const watchId = geo.watchPosition(handleSuccess, handleError, {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 10000,
+      maximumAge: 5000,
     });
 
     return () => geo.clearWatch(watchId);
@@ -331,58 +322,40 @@ export default function App() {
     if (!isTracking) return;
 
     const interval = setInterval(() => {
-      if (currentGPS?.lat && currentGPS?.lon) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const newPoint = {
-              lat: pos.coords.latitude,
-              lon: pos.coords.longitude,
-              timestamp: new Date().toISOString(),
-            };
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const newPoint = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            timestamp: new Date().toISOString(),
+          };
 
-            setTrackingPoints((prev) => {
-              if (prev.length > 0) {
-                const last = prev[prev.length - 1];
-                const dist = parseFloat(
-                  calculateDistance(
-                    last.lat,
-                    last.lon,
-                    newPoint.lat,
-                    newPoint.lon
-                  )
-                );
-                setTotalDistance((td) => parseFloat((td + dist).toFixed(2)));
-              }
-              return [...prev, newPoint];
-            });
+          setTrackingPoints((prev) => {
+            if (prev.length > 0) {
+              const last = prev[prev.length - 1];
+              const dist = parseFloat(
+                calculateDistance(
+                  last.lat,
+                  last.lon,
+                  newPoint.lat,
+                  newPoint.lon
+                )
+              );
+              setTotalDistance((td) => parseFloat((td + dist).toFixed(2)));
+            }
+            return [...prev, newPoint];
+          });
 
-            setCurrentGPS({ lat: newPoint.lat, lon: newPoint.lon }); // update live
-            console.log("📍 Auto-tracked:", newPoint);
-          },
-          (err) => console.error("❌ GPS error", err),
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      }
+          setCurrentGPS({ lat: newPoint.lat, lon: newPoint.lon }); // update live
+          console.log("📍 Auto-tracked:", newPoint);
+        },
+        (err) => console.error("❌ GPS error", err),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
     }, 10000);
 
     return () => clearInterval(interval);
   }, [isTracking]);
-
-  useEffect(() => {
-    if (!showUndo) return;
-
-    const interval = setInterval(() => {
-      setUndoTimeLeft((prev) => {
-        if (prev <= 1) {
-          setShowUndo(false);
-          return 15;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [showUndo]);
 
   const handleAddWaypoint = () => {
     if (!currentGPS) {
@@ -416,9 +389,6 @@ export default function App() {
     if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
 
     console.log("✅ Waypoint added:", waypoint);
-
-    setShowUndo(true);
-    setUndoTimeLeft(15);
   };
 
   const handleIconSelect = (iconName) => {
@@ -606,125 +576,6 @@ export default function App() {
     console.log("⬇️ Forced GPX download triggered");
   };
 
-  const handleUndoLastWaypoint = () => {
-    if (waypoints.length === 0) return;
-
-    // Remove last waypoint
-    setWaypoints((prev) => prev.slice(0, -1));
-
-    // Hide undo option
-    setShowUndo(false);
-    setUndoTimeLeft(10);
-
-    // Haptic feedback
-    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-
-    console.log("↩️ Last waypoint undone");
-  };
-
-  const startEditingWaypoint = (index) => {
-    setEditingWaypoint(index);
-    setEditValues({
-      name: waypoints[index].name,
-      poi: waypoints[index].poi || "",
-    });
-  };
-
-  const saveWaypointEdit = () => {
-    if (editingWaypoint === null) return;
-
-    setWaypoints((prev) => {
-      const updated = [...prev];
-      updated[editingWaypoint] = {
-        ...updated[editingWaypoint],
-        name: editValues.name.trim() || "Unnamed",
-        poi: editValues.poi.trim(),
-      };
-      return updated;
-    });
-
-    setEditingWaypoint(null);
-    setEditValues({ name: "", poi: "" });
-
-    // Haptic feedback
-    if (navigator.vibrate) navigator.vibrate([30]);
-
-    console.log("✅ Waypoint edited");
-  };
-
-  const cancelWaypointEdit = () => {
-    setEditingWaypoint(null);
-    setEditValues({ name: "", poi: "" });
-  };
-
-  const handleEditKeyPress = (e) => {
-    if (e.key === "Enter") {
-      saveWaypointEdit();
-    } else if (e.key === "Escape") {
-      cancelWaypointEdit();
-    }
-  };
-
-  const toggleBulkSelectMode = () => {
-    setBulkSelectMode(!bulkSelectMode);
-    setSelectedWaypoints(new Set()); // Clear selections when toggling mode
-  };
-
-  const toggleWaypointSelection = (index) => {
-    setSelectedWaypoints((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
-      } else {
-        newSet.add(index);
-      }
-      return newSet;
-    });
-  };
-
-  const selectAllWaypoints = () => {
-    if (selectedWaypoints.size === waypoints.length) {
-      // If all selected, deselect all
-      setSelectedWaypoints(new Set());
-    } else {
-      // Select all waypoints
-      setSelectedWaypoints(new Set(waypoints.map((_, index) => index)));
-    }
-  };
-
-  const deleteSelectedWaypoints = () => {
-    if (selectedWaypoints.size === 0) return;
-
-    // Show confirmation
-    const confirmDelete = window.confirm(
-      `Delete ${selectedWaypoints.size} selected waypoint${
-        selectedWaypoints.size !== 1 ? "s" : ""
-      }? This cannot be undone.`
-    );
-
-    if (!confirmDelete) return;
-
-    // Remove selected waypoints (in reverse order to maintain indices)
-    const indicesToDelete = Array.from(selectedWaypoints).sort((a, b) => b - a);
-
-    setWaypoints((prev) => {
-      let updated = [...prev];
-      indicesToDelete.forEach((index) => {
-        updated.splice(index, 1);
-      });
-      return updated;
-    });
-
-    // Clear selections and exit bulk mode
-    setSelectedWaypoints(new Set());
-    setBulkSelectMode(false);
-
-    // Haptic feedback
-    if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-
-    console.log(`🗑️ Deleted ${selectedWaypoints.size} waypoints`);
-  };
-
   const exportAsKML = (
     waypointsData = waypoints,
     trackingData = trackingPoints,
@@ -819,15 +670,14 @@ export default function App() {
   }));
 
   // Calculate route statistics
-  const routeDistance =
-    waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0;
   const routeStats = {
     totalWaypoints: waypoints.length,
-    routeDistance: routeDistance,
+    routeDistance:
+      waypoints.length > 0 ? waypoints[waypoints.length - 1].distance : 0,
     avgSpeed:
       isTracking && trackingPoints.length > 1
         ? (
-            routeDistance /
+            routeStats?.routeDistance /
             ((Date.now() - new Date(trackingPoints[0].timestamp).getTime()) /
               3600000)
           ).toFixed(1)
@@ -886,7 +736,7 @@ export default function App() {
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <span className="text-green-500 mr-2">📍</span>
-            <span>GPS Active:</span>
+            <span>GPS Active</span>
           </div>
           <div className="text-sm">
             Accuracy: ±{gpsAccuracy ? Math.round(gpsAccuracy) : "?"}m
@@ -920,186 +770,6 @@ export default function App() {
         <div className="flex items-center">
           <span className="text-xl mr-2">✅</span>
           <span>Waypoint Added!</span>
-        </div>
-      </div>
-    );
-  };
-
-  const EndSectionConfirmDialog = () => {
-    if (!showEndSectionConfirm) return null;
-
-    return (
-      <div
-        style={{
-          position: "fixed",
-          top: "0",
-          left: "0",
-          right: "0",
-          bottom: "0",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: "999",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "white",
-            borderRadius: "8px",
-            padding: "24px",
-            width: "320px",
-            maxWidth: "90vw",
-            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
-            margin: "20px",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "1.125rem",
-              fontWeight: "bold",
-              color: "#1F2937",
-              marginBottom: "16px",
-            }}
-          >
-            End Section?
-          </h3>
-          <p
-            style={{
-              color: "#6B7280",
-              marginBottom: "24px",
-              lineHeight: "1.5",
-            }}
-          >
-            This will export your route data and clear current waypoints. This
-            action cannot be undone.
-          </p>
-          <div style={{ display: "flex", gap: "12px" }}>
-            <button
-              onClick={() => setShowEndSectionConfirm(false)}
-              style={{
-                flex: "1",
-                padding: "10px 16px",
-                backgroundColor: "#D1D5DB",
-                color: "#374151",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                setShowEndSectionConfirm(false);
-                handleEndSection();
-              }}
-              style={{
-                flex: "1",
-                padding: "10px 16px",
-                backgroundColor: "#DC2626",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              End Section
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Start Section Confirmation Dialog
-  const StartSectionConfirmDialog = () => {
-    if (!showStartSectionConfirm) return null;
-
-    return (
-      <div
-        style={{
-          position: "fixed",
-          top: "0",
-          left: "0",
-          right: "0",
-          bottom: "0",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: "999",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "white",
-            borderRadius: "8px",
-            padding: "24px",
-            width: "320px",
-            maxWidth: "90vw",
-            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
-            margin: "20px",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "1.125rem",
-              fontWeight: "bold",
-              color: "#1F2937",
-              marginBottom: "16px",
-            }}
-          >
-            Start New Section?
-          </h3>
-          <p
-            style={{
-              color: "#6B7280",
-              marginBottom: "24px",
-              lineHeight: "1.5",
-            }}
-          >
-            This will clear your current {waypoints.length} waypoint
-            {waypoints.length !== 1 ? "s" : ""} and start fresh. Make sure
-            you've exported your current data first.
-          </p>
-          <div style={{ display: "flex", gap: "12px" }}>
-            <button
-              onClick={() => setShowStartSectionConfirm(false)}
-              style={{
-                flex: "1",
-                padding: "10px 16px",
-                backgroundColor: "#D1D5DB",
-                color: "#374151",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                setShowStartSectionConfirm(false);
-                handleStartSection();
-              }}
-              style={{
-                flex: "1",
-                padding: "10px 16px",
-                backgroundColor: "#DC2626",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              Start New Section
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -1188,10 +858,6 @@ export default function App() {
     <div className="p-4">
       {/* Success notification overlay */}
       <WaypointSuccessNotification />
-      {/* End Section Confirmation Dialog */}
-      <EndSectionConfirmDialog />
-      {/* Start Section Confirmation Dialog */}
-      <StartSectionConfirmDialog />
 
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-blue-800 flex items-center gap-2">
@@ -1437,13 +1103,7 @@ export default function App() {
           />
           <button
             className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-            onClick={() => {
-              if (waypoints.length > 0) {
-                setShowStartSectionConfirm(true);
-              } else {
-                handleStartSection();
-              }
-            }}
+            onClick={handleStartSection}
             disabled={sectionLoading || !currentGPS || sectionStarted}
           >
             {sectionLoading ? (
@@ -1457,7 +1117,7 @@ export default function App() {
           </button>
           <button
             className="bg-red-600 text-white px-4 py-2 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
-            onClick={() => setShowEndSectionConfirm(true)}
+            onClick={handleEndSection}
             disabled={!sectionStarted || waypoints.length === 0}
           >
             ⏹ End Section
@@ -1470,32 +1130,8 @@ export default function App() {
         {/* Centered button + meter container */}
         <div className="flex justify-center items-center gap-8 my-4">
           {/* KM Display */}
-          <div
-            style={{
-              width: "72px",
-              height: "18px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "white",
-              border: "2px solid #1e3a8a",
-              borderRadius: "8px",
-              fontWeight: "bold",
-              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-              padding: "4px",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "1.2rem",
-                textAlign: "center",
-                lineHeight: "1.2",
-                padding: "4px",
-              }}
-            >
-              {totalDistance.toFixed(2)} km
-            </span>
+          <div className="w-40 h-40 flex flex-col items-center justify-center bg-white border-2 border-blue-900 text-black font-bold rounded-lg shadow">
+            <span className="text-lg px-2">{totalDistance.toFixed(2)} km</span>
           </div>
 
           {/* Add Waypoint Button */}
@@ -1503,84 +1139,37 @@ export default function App() {
             onClick={handleAddWaypoint}
             type="button"
             disabled={!currentGPS || !sectionStarted}
-            style={{
-              padding: "4px 16px",
-              borderRadius: "8px",
-              // fontWeight: "600",
-              fontSize: "1.0rem",
-              transition: "all 0.2s",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              backgroundColor:
-                !currentGPS || !sectionStarted
-                  ? "#9CA3AF"
-                  : waypointAdded
-                  ? "#059669"
-                  : "#2563EB",
-              color: "white",
-              cursor:
-                !currentGPS || !sectionStarted ? "not-allowed" : "pointer",
-              border: "none",
-            }}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center gap-2 ${
+              !currentGPS || !sectionStarted
+                ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                : waypointAdded
+                ? "bg-green-600 text-white animate-pulse"
+                : "bg-blue-600 hover:bg-blue-700 text-white hover:scale-105"
+            }`}
           >
             {waypointAdded ? <>✅ Added!</> : <>📍 Add Waypoint</>}
           </button>
 
-          {showUndo && (
-            <button
-              onClick={handleUndoLastWaypoint}
-              type="button"
-              style={{
-                padding: "4px 16px",
-                borderRadius: "8px",
-                // fontWeight: "600",
-                fontSize: "1rem",
-                backgroundColor: "#EF4444",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              ↩️ Undo ({undoTimeLeft}s)
-            </button>
-          )}
-
           <button
-            style={{
-              padding: "4px 16px",
-              borderRadius: "6px",
-              fontSize: "1.0rem",
-              color: "black",
-              backgroundColor: recognitionActive ? "#FCA5A5" : "#D1D5DB",
-              border: "none",
-              cursor: "pointer",
-            }}
-            onClick={startVoiceInput}
-            type="button"
-            disabled={!sectionStarted || waypoints.length === 0}
-          >
-            🎤 {recognitionActive ? "Listening..." : "Voice Input"}
-          </button>
-
-          <button
-            style={{
-              padding: "4px 16px",
-              borderRadius: "6px",
-              fontSize: "1.0rem",
-              backgroundColor: !sectionStarted ? "#E5E7EB" : "#D1D5DB",
-              color: "black",
-              border: "none",
-              cursor: !sectionStarted ? "not-allowed" : "pointer",
-            }}
+            className="bg-gray-300 hover:bg-gray-400 text-black px-3 py-1 rounded disabled:bg-gray-200 disabled:cursor-not-allowed"
             onClick={() => alert("Photo feature not yet implemented")}
             type="button"
             disabled={!sectionStarted}
           >
             📷 Photo
+          </button>
+
+          <button
+            className={`px-3 py-1 rounded text-black transition-colors ${
+              recognitionActive
+                ? "bg-red-300 animate-pulse"
+                : "bg-gray-300 hover:bg-gray-400"
+            } disabled:bg-gray-200 disabled:cursor-not-allowed`}
+            onClick={startVoiceInput}
+            type="button"
+            disabled={!sectionStarted || waypoints.length === 0}
+          >
+            🎤 {recognitionActive ? "Listening..." : "Voice Input"}
           </button>
 
           {isTracking && (
@@ -1634,49 +1223,9 @@ export default function App() {
 
         {/* Waypoints List */}
         <section className="mt-6">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold">
-              🧭 Current Section Waypoints
-            </h2>
-
-            {waypoints.length > 0 && (
-              <div className="flex items-center gap-2">
-                {bulkSelectMode && (
-                  <>
-                    <span className="text-sm text-gray-600">
-                      {selectedWaypoints.size} selected
-                    </span>
-                    <button
-                      onClick={selectAllWaypoints}
-                      className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-                    >
-                      {selectedWaypoints.size === waypoints.length
-                        ? "Deselect All"
-                        : "Select All"}
-                    </button>
-                    {selectedWaypoints.size > 0 && (
-                      <button
-                        onClick={deleteSelectedWaypoints}
-                        className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                      >
-                        Delete ({selectedWaypoints.size})
-                      </button>
-                    )}
-                  </>
-                )}
-                <button
-                  onClick={toggleBulkSelectMode}
-                  className={`px-3 py-1 rounded text-sm ${
-                    bulkSelectMode
-                      ? "bg-gray-500 text-white hover:bg-gray-600"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
-                >
-                  {bulkSelectMode ? "Exit Select" : "Select Multiple"}
-                </button>
-              </div>
-            )}
-          </div>
+          <h2 className="text-lg font-semibold mb-2">
+            🧭 Current Section Waypoints
+          </h2>
           <div
             ref={waypointListRef}
             className="max-h-[40vh] overflow-y-auto pr-1 space-y-2"
@@ -1686,99 +1235,19 @@ export default function App() {
             ) : (
               waypoints.map((wp, idx) => (
                 <div key={idx} className="bg-gray-100 p-3 rounded">
-                  {/* Add checkbox for bulk selection */}
-                  {bulkSelectMode && (
-                    <div className="flex items-center mb-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedWaypoints.has(idx)}
-                        onChange={() => toggleWaypointSelection(idx)}
-                        className="mr-2 w-4 h-4"
-                      />
-                      <span className="text-sm text-gray-600">
-                        Select for bulk operations
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 mb-2">
-                    <img
-                      src={wp.iconSrc || "/icons/default.svg"}
-                      className="w-6 h-6"
-                      alt={wp.name}
-                    />
-                    {editingWaypoint === idx ? (
-                      <div className="flex-1 flex gap-2">
-                        <input
-                          value={editValues.name}
-                          onChange={(e) =>
-                            setEditValues((prev) => ({
-                              ...prev,
-                              name: e.target.value,
-                            }))
-                          }
-                          onKeyDown={handleEditKeyPress}
-                          className="flex-1 px-2 py-1 border rounded text-sm"
-                          placeholder="Waypoint name"
-                          autoFocus
-                        />
-                        <button
-                          onClick={saveWaypointEdit}
-                          className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          onClick={cancelWaypointEdit}
-                          className="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600"
-                        >
-                          ✗
-                        </button>
-                      </div>
-                    ) : (
-                      <p
-                        className="font-semibold cursor-pointer hover:bg-yellow-100 px-1 rounded flex-1"
-                        onClick={() => startEditingWaypoint(idx)}
-                        title="Click to edit"
-                      >
-                        {wp.name}
-                      </p>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <img src={wp.iconSrc} className="w-6 h-6" alt={wp.name} />
+                    <p className="font-semibold">{wp.name}</p>
                   </div>
-
                   <p className="text-sm text-gray-600">Time: {wp.timestamp}</p>
                   <p className="text-sm text-gray-600">
-                    GPS: {wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}
+                    GPS: {wp.lat}, {wp.lon}
                   </p>
                   <p className="text-sm text-gray-600">
                     Distance: {wp.distance} km
                   </p>
-
-                  {editingWaypoint === idx ? (
-                    <div className="mt-2">
-                      <textarea
-                        value={editValues.poi}
-                        onChange={(e) =>
-                          setEditValues((prev) => ({
-                            ...prev,
-                            poi: e.target.value,
-                          }))
-                        }
-                        onKeyDown={handleEditKeyPress}
-                        className="w-full px-2 py-1 border rounded text-sm"
-                        placeholder="POI notes (optional)"
-                        rows="2"
-                      />
-                    </div>
-                  ) : (
-                    wp.poi && (
-                      <p
-                        className="text-sm text-gray-600 cursor-pointer hover:bg-yellow-100 px-1 rounded mt-1"
-                        onClick={() => startEditingWaypoint(idx)}
-                        title="Click to edit"
-                      >
-                        POI: {wp.poi}
-                      </p>
-                    )
+                  {wp.poi && (
+                    <p className="text-sm text-gray-600">POI: {wp.poi}</p>
                   )}
                 </div>
               ))
