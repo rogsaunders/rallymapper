@@ -81,58 +81,80 @@
       function convertFile(file) {
         const reader = new FileReader();
         reader.onload = function (e) {
-          const data = JSON.parse(e.target.result);
-          const baseName = file.name.replace(/\.json$/, "");
-          exportAsGPX(data, baseName);
-          exportAsKML(data, baseName);
+          try {
+            const json = JSON.parse(e.target.result);
+            const waypoints = json.waypoints || [];
+            const tracking = json.tracking || [];
+            const baseName = file.name.replace(/\.json$/, "");
+
+            if (!waypoints.length && !tracking.length) {
+              alert("No waypoint or tracking data found.");
+              return;
+            }
+
+            exportAsGPX(waypoints, tracking, baseName);
+            exportAsKML(waypoints, baseName);
+          } catch (err) {
+            alert("Invalid JSON file.");
+          }
         };
         reader.readAsText(file);
       }
 
-      function exportAsGPX(data, name) {
-        const gpxPoints = data
-          .map(
-            (wp) => `
-<wpt lat="${wp.lat}" lon="${wp.lon}">
+      function exportAsGPX(waypoints, tracking, name) {
+        const wpts = waypoints
+          .map((wp) => {
+            const time = new Date().toISOString(); // fallback
+            return `<wpt lat="${wp.lat}" lon="${wp.lon}">
   <name>${wp.name}</name>
   <desc>${wp.poi || ""}</desc>
-  <time>${new Date().toISOString()}</time>
-</wpt>`
-          )
+  <time>${time}</time>
+</wpt>`;
+          })
           .join("\n");
 
-        const gpx = `<?xml version="1.0"?>
-<gpx version="1.1" creator="Rally Mapper">
-${gpxPoints}
+        const trkpts = tracking
+          .map((pt) => {
+            return `<trkpt lat="${pt.lat}" lon="${pt.lon}">
+  <time>${pt.timestamp}</time>
+</trkpt>`;
+          })
+          .join("\n");
+
+        const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RallyMapper" xmlns="http://www.topografix.com/GPX/1/1">
+${wpts}
+<trk>
+  <name>${name}</name>
+  <trkseg>
+    ${trkpts}
+  </trkseg>
+</trk>
 </gpx>`;
 
         downloadFile(gpx, `${name}.gpx`, "application/gpx+xml");
       }
 
-      function exportAsKML(data, name) {
-        const placemarks = data
-          .map(
-            (wp) => `
-<Placemark>
+      function exportAsKML(waypoints, name) {
+        const placemarks = waypoints
+          .map((wp) => {
+            return `<Placemark>
   <name>${wp.name}</name>
   <description>${wp.poi || ""}</description>
   <Point><coordinates>${wp.lon},${wp.lat},0</coordinates></Point>
-</Placemark>`
-          )
+</Placemark>`;
+          })
           .join("\n");
 
-        const kml = `<?xml version="1.0"?>
+        const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
-${placemarks}
-</Document>
+  <Document>
+    <name>${name}</name>
+    ${placemarks}
+  </Document>
 </kml>`;
 
-        downloadFile(
-          kml,
-          `${name}.kml`,
-          "application/vnd.google-earth.kml+xml"
-        );
+        downloadFile(kml, `${name}.kml`, "application/vnd.google-earth.kml+xml");
       }
 
       function downloadFile(content, filename, type) {

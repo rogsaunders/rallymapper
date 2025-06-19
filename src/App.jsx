@@ -15,13 +15,13 @@ import ReplayRoute from "./ReplayRoute";
 // Icon categories (merged cleanly)
 const iconCategories = {
   Abbreviations: [
+    { name: "Keep to the left", src: "/icons/keep-left.svg" },
+    { name: "Keep to the right", src: "/icons/keep-right.svg" },
+    { name: "Keep straight", src: "/icons/keep-straight.svg" },
     { name: "Left", src: "/icons/left.svg" },
     { name: "Right", src: "/icons/right.svg" },
     // { name: "Left and Right", src: "/icons/left_and_right.svg" },
     // { name: "Right and Left", src: "/icons/right_and_left.svg" },
-    { name: "Keep to the left", src: "/icons/keep-left.svg" },
-    { name: "Keep to the right", src: "/icons/keep-right.svg" },
-    { name: "Keep straight", src: "/icons/keep-straight.svg" },
     { name: "On Left", src: "/icons/on-left.svg" },
     { name: "On Right", src: "/icons/on-right.svg" },
     { name: "Bad", src: "/icons/bad.svg" },
@@ -235,7 +235,7 @@ export default function App() {
   const [waypointAdded, setWaypointAdded] = useState(false);
   const [sectionLoading, setSectionLoading] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
-  const [undoTimeLeft, setUndoTimeLeft] = useState(15);
+  const [undoTimeLeft, setUndoTimeLeft] = useState(5);
 
   // Map enhancement states
   const [mapType, setMapType] = useState("roadmap");
@@ -363,7 +363,7 @@ export default function App() {
           { enableHighAccuracy: true, timeout: 10000 }
         );
       }
-    }, 10000);
+    }, 20000);
 
     return () => clearInterval(interval);
   }, [isTracking]);
@@ -375,7 +375,7 @@ export default function App() {
       setUndoTimeLeft((prev) => {
         if (prev <= 1) {
           setShowUndo(false);
-          return 15;
+          return 5;
         }
         return prev - 1;
       });
@@ -418,7 +418,7 @@ export default function App() {
     console.log("✅ Waypoint added:", waypoint);
 
     setShowUndo(true);
-    setUndoTimeLeft(15);
+    setUndoTimeLeft(5);
   };
 
   const handleIconSelect = (iconName) => {
