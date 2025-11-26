@@ -86,7 +86,7 @@ a {
 
 /* Give the nav some left breathing room so the logo doesn't overlap menu links */
 .nav .nav-wrap {
-  padding-left: 150px; /* adjust to match your logo size */
+  padding-left: 100px; /* adjust to match your logo size */
 }
 
 /* Ensure hero text clears the overlay a bit */
@@ -108,7 +108,7 @@ a {
   }
 }
 .container {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 20px;
 }
@@ -257,7 +257,7 @@ h1 {
 .hero-image {
   position: relative;
   height: 70vh;
-  background: url("assets/hero.png") center center / cover no-repeat;
+  background: url("assets/hero11.png") center center / cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -524,8 +524,17 @@ h1 {
 .footer {
   border-top: 1px solid #0b1220;
   background: #0a0f1a;
+  width: 100%;
   padding: 26px 0;
 }
+.footer-container {
+  max-width: 1400px;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap; /* allows wrapping */
+  gap: 1rem;
+} 
 .foot-grid {
   display: flex;
   align-items: center;
