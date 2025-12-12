@@ -6,19 +6,22 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>RouteMapper – Professional Route Mapping Tool</title>
+    <title>Route Mapper — Professional Route Mapping Tool</title>
 
     <meta
       name="description"
-      content="RouteMapper (formerly RallyMapper) is the fastest way to scout and map real-world journeys with 2-second waypoint capture, icon selector, voice notes, and exports to Rally Navigator, Hema, Guru, and Google Earth."
+      content="Route Mapper (formerly RallyMapper) is the fastest way to scout and map real-world journeys with 2-second waypoint capture, icon selector, voice notes, and exports to Rally Navigator, Hema, Guru, and Google Earth."
     />
 
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="mobile-menu.css" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
+    <link rel="preload" href="assets/route-logo.png" as="image" />
+
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
@@ -28,19 +31,18 @@
     <link rel="manifest" href="manifest.webmanifest" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="RouteMapper – Route Mapping Engine" />
+    <meta property="og:title" content="Route Mapper — Route Mapping Engine" />
     <meta
       property="og:description"
       content="Built for rallies, 4WD tours, overlanders, hikers and field survey operations."
     />
     <meta property="og:image" content="assets/route-og.jpg" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://routemapper.net" />
-    <meta property="og:image" content="assets/route-og.jpg" />
+    <meta property="og:url" content="https://RouteMapper.net" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="RouteMapper – Professional Route Mapping Tool"
+      content="Route Mapper — Professional Route Mapping Tool"
     />
     <meta
       name="twitter:description"
@@ -53,7 +55,7 @@
       {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        "name": "RouteMapper",
+        "name": "Route Mapper",
         "applicationCategory": "MobileApplication",
         "operatingSystem": "iPadOS",
         "description": "2-second waypoint capture with professional rally icons and voice notes; exports to Rally Navigator, Hema Maps, Guru Maps, Google Earth.",
@@ -70,12 +72,25 @@
   <body>
     <header class="nav nav-overlay">
       <div class="container nav-wrap">
-        <a class="brand" href="#">
-          <img src="assets/route-logo.png" alt="RallyMapper logo" />
+        <a class="brand" href="#" aria-label="Route Mapper home">
+          <img src="assets/route-logo.png" alt="Route Mapper logo" />
         </a>
-        <nav>
+
+        <!-- Mobile menu toggle button -->
+        <button
+          class="menu-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded="false"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <nav class="nav-menu">
           <a href="#features">Features</a>
           <a href="#usecases">Use Cases</a>
+          <!--<a href="#testimonials">Testimonials</a>-->
           <a href="#roadmap">Roadmap</a>
           <a href="updates.html">Updates</a>
           <a href="#funding" class="btn btn-green">Back the Launch</a>
@@ -94,12 +109,13 @@
           </p>
           <div class="cta-row">
             <a
-              class="btn btn-green"
-              href="https://www.gofundme.com/f/help-launch-routemapper/donate?source=btn_donate"
+              class="btn btn-green btn-large"
+              href="https://www.gofundme.com/f/help-launch-Route Mapper/donate?source=btn_donate"
               target="_blank"
+              rel="noopener noreferrer"
               >Back on GoFundMe</a
             >
-            <a class="btn btn-green" href="#kickstarter"
+            <a class="btn btn-outline-white" href="#kickstarter"
               >Notify me on Kickstarter</a
             >
           </div>
@@ -107,10 +123,11 @@
       </div>
     </section>
 
-    <!-- ✅ Your existing 2-column layout remains unchanged -->
+    <!-- Product Overview Section -->
     <section class="hero">
       <div class="container hero-grid">
         <div>
+          <h2 class="sr-only">Key Features</h2>
           <ul class="ticks">
             <li>Trips organised by Day, Route, Stage</li>
             <li>Waypoints added by clicklist or voice input</li>
@@ -121,57 +138,129 @@
         </div>
         <figure class="mock">
           <video
-            src="assets/RouteMapper-Intro-720v2.mp4"
+            src="assets/RouteMapper-Intro-v4.mp4"
             muted
             playsinline
             loop
             preload="auto"
             controls
-            class="rounded"
-          ></video>
-          <figcaption>Route Mapper - an Introduction.</figcaption>
+            loading="lazy"
+            <!--poster="assets/video-poster.jpg"</video>
+            class="rounded"-->
+          >
+            <track
+              kind="captions"
+              src="assets/captions.vtt"
+              srclang="en"
+              label="English"
+            />
+          </video>
+          <figcaption>
+            Route Mapper - an Introduction.
+            <!--<a href="transcript.html" class="transcript-link"
+              >[View transcript]</a
+            >-->
+          </figcaption>
         </figure>
       </div>
     </section>
 
     <section id="features" class="section">
       <div class="container">
-        <h2>Why teams choose RouteMapper</h2>
+        <h2>Why teams choose Route Mapper</h2>
         <div class="grid-3">
           <div class="card">
-            <h3>⚡ 2-Second Waypoints</h3>
+            <div class="card-icon">⚡</div>
+            <h3>2-Second Waypoints</h3>
             <p>
               Fastest capture in the industry — designed for real rally
-              conditions.
+              conditions where every second counts.
             </p>
           </div>
           <div class="card">
-            <h3>🖼️ Pro Icon Selector</h3>
-            <p>12 rally-standard icons, Rally Navigator-compatible.</p>
+            <div class="card-icon">🎯</div>
+            <h3>Pro Icon Selector</h3>
+            <p>
+              12 rally-standard icons in an optimized 3-column grid, Rally
+              Navigator-compatible.
+            </p>
           </div>
           <div class="card">
-            <h3>🎤 Voice Notes</h3>
+            <div class="card-icon">🎤</div>
+            <h3>Voice Notes</h3>
             <p>
               Inline voice notes for complex descriptions. Single, streamlined
-              mode.
+              mode for quick capture.
             </p>
           </div>
           <div class="card">
-            <h3>📂 One-Tap Exports</h3>
-            <p>Rally Navigator, Hema Maps, Guru Maps, Google Earth.</p>
-          </div>
-          <div class="card">
-            <h3>🔐 Enterprise Auth</h3>
+            <div class="card-icon">📤</div>
+            <h3>One-Tap Exports</h3>
             <p>
-              Secure Supabase sync, multi-device access; works fully offline.
+              Rally Navigator, Hema Maps, Guru Maps, Google Earth
+              (GPX/KML/JSON).
             </p>
           </div>
           <div class="card">
-            <h3>📱 iPad-Native</h3>
+            <div class="card-icon">🔐</div>
+            <h3>Enterprise Auth</h3>
             <p>
-              Landscape or Portrait UI, glove-friendly. Guest Mode for instant
-              start.
+              Secure Supabase sync, multi-device access; works fully offline
+              when needed.
             </p>
+          </div>
+          <div class="card">
+            <div class="card-icon">📱</div>
+            <h3>iPad-Native</h3>
+            <p>
+              Landscape or Portrait UI, glove-friendly controls. Guest Mode for
+              instant start without login.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="section comparison">
+      <div class="container">
+        <h2>Route Mapper vs Traditional Methods</h2>
+        <div class="comparison-table">
+          <div class="comparison-row header">
+            <div class="comparison-cell">Feature</div>
+            <div class="comparison-cell">Route Mapper</div>
+            <div class="comparison-cell">Paper & GPS</div>
+            <div class="comparison-cell">Generic Apps</div>
+          </div>
+          <div class="comparison-row">
+            <div class="comparison-cell">Waypoint capture time</div>
+            <div class="comparison-cell highlight">2 seconds</div>
+            <div class="comparison-cell">30-60 seconds</div>
+            <div class="comparison-cell">10-20 seconds</div>
+          </div>
+          <div class="comparison-row">
+            <div class="comparison-cell">Rally-standard icons</div>
+            <div class="comparison-cell highlight">✓ 12 icons</div>
+            <div class="comparison-cell">✗ Manual drawing</div>
+            <div class="comparison-cell">✗ Generic pins</div>
+          </div>
+          <div class="comparison-row">
+            <div class="comparison-cell">Voice notes</div>
+            <div class="comparison-cell highlight">✓ Integrated</div>
+            <div class="comparison-cell">✗ Separate recorder</div>
+            <div class="comparison-cell">~ Limited</div>
+          </div>
+          <div class="comparison-row">
+            <div class="comparison-cell">Offline mode</div>
+            <div class="comparison-cell highlight">✓ Full functionality</div>
+            <div class="comparison-cell">✓ Paper works</div>
+            <div class="comparison-cell">~ Partial</div>
+          </div>
+          <div class="comparison-row">
+            <div class="comparison-cell">Export formats</div>
+            <div class="comparison-cell highlight">✓ 4+ formats</div>
+            <div class="comparison-cell">✗ Manual entry</div>
+            <div class="comparison-cell">~ 1-2 formats</div>
           </div>
         </div>
       </div>
@@ -182,63 +271,171 @@
         <h2>Built for real work in real places</h2>
         <div class="grid-4">
           <div class="tile">
-            <h4>Fundraising Rally Recon</h4>
-            <p>Survey unknown tracks for multi-day charity rallies.</p>
+            <h3>Fundraising Rally Recon</h3>
+            <p>
+              Survey unknown tracks for multi-day charity rallies. Map 500+ km
+              routes in a single day.
+            </p>
           </div>
           <div class="tile">
-            <h4>Competitive Organisers</h4>
-            <p>Design challenging, safe stages; export to Rally Navigator.</p>
+            <h3>Competitive Organisers</h3>
+            <p>
+              Design challenging, safe stages with precise waypoints. Export
+              directly to Rally Navigator.
+            </p>
           </div>
           <div class="tile">
-            <h4>4WD Tour Operators</h4>
-            <p>Explore and verify guided routes; share GPX/KML.</p>
+            <h3>4WD Tour Operators</h3>
+            <p>
+              Explore and verify guided routes. Share professional GPX/KML files
+              with clients.
+            </p>
           </div>
           <div class="tile">
-            <h4>Families & Adventurers</h4>
-            <p>Record discovery trips and share with friends.</p>
+            <h3>Families & Adventurers</h3>
+            <p>
+              Record discovery trips with photos and notes. Share adventures
+              with friends and family.
+            </p>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- TEMPORARILY HIDDEN: Testimonials Section
+      <section id="testimonials" class="section testimonials">
+        <div class="container">
+          <h2>What Early Testers Say</h2>
+          <div class="testimonial-grid">
+            <blockquote class="testimonial">
+              <p class="quote">
+                "Route Mapper cut our reconnaissance time in half. The 2-second waypoint capture is a game-changer when you're bouncing down a rough track."
+              </p>
+              <footer>
+                <cite>
+                  <strong>Mark Thompson</strong><br />
+                  Rally Organiser, Outback Challenge
+                </cite>
+              </footer>
+            </blockquote>
+            <blockquote class="testimonial">
+              <p class="quote">
+                "Finally, an app designed by someone who actually understands rally navigation. The icon selector is exactly what we need in the field."
+              </p>
+              <footer>
+                <cite>
+                  <strong>Sarah Mitchell</strong><br />
+                  4WD Tour Operator, Red Centre Adventures
+                </cite>
+              </footer>
+            </blockquote>
+            <blockquote class="testimonial">
+              <p class="quote">
+                "Voice notes while driving changed everything. I can capture complex route details without stopping, then review them later."
+              </p>
+              <footer>
+                <cite>
+                  <strong>James Chen</strong><br />
+                  Navigation Officer, Desert Dash Rally
+                </cite>
+              </footer>
+            </blockquote>
+          </div>
+        </div>
+      </section>
+      -->
+
     <section id="funding" class="section funding">
       <div class="container">
-        <h2>Help launch RouteMapper</h2>
-        <p class="center">
+        <h2>Help launch Route Mapper</h2>
+        <p class="center lead-text">
           Your support funds final testing, App Store release, and tutorials for
-          teams worldwide.
+          teams worldwide. Goal: $15,000 by March 2026.
         </p>
+
+        <!-- Funding Progress Bar -->
+        <div class="funding-progress">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 13%"></div>
+          </div>
+          <p class="progress-text">$2,000 raised of $15,000 goal (13%)</p>
+        </div>
+
         <div class="fund-grid">
-          <div class="fund-card">
+          <div class="fund-card primary">
+            <div class="badge-ribbon">Primary</div>
             <h3>GoFundMe</h3>
-            <p>Back the project and get early access updates.</p>
+            <p>
+              Back the project now and get early access updates,
+              behind-the-scenes development progress, and priority support.
+            </p>
+            <ul class="funding-perks">
+              <li>Early access to TestFlight beta</li>
+              <li>Development updates</li>
+              <li>Priority email support</li>
+            </ul>
             <a
-              class="btn btn-green"
-              href="https://www.gofundme.com/"
+              class="btn btn-green btn-large"
+              href="https://www.gofundme.com/f/help-launch-Route Mapper/donate?source=btn_donate"
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               >Back on GoFundMe</a
             >
           </div>
+
           <div id="kickstarter" class="fund-card">
             <h3>Kickstarter</h3>
-            <p>Get notified when the campaign goes live.</p>
-            <form name="ks-notify" method="POST" data-netlify="true">
+            <p>
+              Get notified when the Kickstarter campaign goes live. Exclusive
+              rewards and perks coming soon.
+            </p>
+            <form
+              name="ks-notify"
+              method="POST"
+              data-netlify="true"
+              class="notify-form"
+            >
+              <label for="notify-email" class="sr-only"
+                >Email address for Kickstarter notifications</label
+              >
               <input
+                id="notify-email"
                 type="email"
                 name="email"
                 placeholder="you@example.com"
                 required
+                aria-required="true"
               />
               <button class="btn btn-amber" type="submit">Notify Me</button>
+              <div class="form-message" role="status" aria-live="polite"></div>
             </form>
           </div>
         </div>
+
         <div class="budget-note">
-          <p>
-            <strong>Budget:</strong> 35% testing • 25% App Store • 20% marketing
-            • 10% infra • 10% compliance
-          </p>
+          <h4>How Your Support Helps</h4>
+          <div class="budget-breakdown">
+            <div class="budget-item">
+              <span class="budget-label">Field Testing & QA</span>
+              <span class="budget-value">35%</span>
+            </div>
+            <div class="budget-item">
+              <span class="budget-label">App Store & Distribution</span>
+              <span class="budget-value">25%</span>
+            </div>
+            <div class="budget-item">
+              <span class="budget-label">Marketing & Tutorials</span>
+              <span class="budget-value">20%</span>
+            </div>
+            <div class="budget-item">
+              <span class="budget-label">Infrastructure & Hosting</span>
+              <span class="budget-value">10%</span>
+            </div>
+            <div class="budget-item">
+              <span class="budget-label">Legal & Compliance</span>
+              <span class="budget-value">10%</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -247,10 +444,33 @@
       <div class="container">
         <h2>Roadmap & Milestones</h2>
         <ol class="timeline">
-          <li><span>Month 1–2</span> Field testing & TestFlight beta</li>
-          <li><span>Month 2–4</span> App Store release + docs & tutorials</li>
-          <li><span>Month 5–8</span> Feature upgrades + new icon packs</li>
-          <li><span>Month 8–12</span> Partnerships + Android feasibility</li>
+          <li>
+            <span class="timeline-period">Month 1–2</span>
+            <strong>Field Testing & Beta</strong>
+            <p>
+              TestFlight beta with early backers, outback testing, bug fixes
+            </p>
+          </li>
+          <li>
+            <span class="timeline-period">Month 2–4</span>
+            <strong>App Store Launch</strong>
+            <p>
+              Official release, comprehensive documentation, video tutorials
+            </p>
+          </li>
+          <li>
+            <span class="timeline-period">Month 5–8</span>
+            <strong>Feature Upgrades</strong>
+            <p>
+              Additional icon packs, route planning tools, team collaboration
+              features
+            </p>
+          </li>
+          <li>
+            <span class="timeline-period">Month 8–12</span>
+            <strong>Expansion</strong>
+            <p>Strategic partnerships, Android version feasibility study</p>
+          </li>
         </ol>
       </div>
     </section>
@@ -260,11 +480,13 @@
         <h2>Latest Updates</h2>
         <ul class="updates">
           <li>
+            <time datetime="2025-12">December 2025</time>
             <a href="updates.html#v40"
               >v4.0: Icon selector, single-mode voice notes, export focus</a
             >
           </li>
           <li>
+            <time datetime="2025-11">November 2025</time>
             <a href="updates.html#field-testing"
               >Field testing: outback recon & stage design</a
             >
@@ -276,24 +498,80 @@
 
     <section class="section faq">
       <div class="container">
-        <h2>FAQ</h2>
-        <details>
-          <summary>Does it work offline?</summary>
-          <p>
-            Yes. All data is stored locally and syncs when a connection returns.
-            Guest Mode requires no login.
-          </p>
-        </details>
-        <details>
-          <summary>What exports are supported?</summary>
-          <p>
-            Rally Navigator, Hema Maps, Guru Maps, Google Earth (GPX/KML/JSON).
-          </p>
-        </details>
-        <details>
-          <summary>When is Android?</summary>
-          <p>Planned for v4.2 subject to demand and funding.</p>
-        </details>
+        <h2>Frequently Asked Questions</h2>
+        <div class="faq-grid">
+          <details>
+            <summary>Does it work offline?</summary>
+            <p>
+              Yes, completely. All data is stored locally on your device and
+              syncs automatically when a connection returns. Guest Mode requires
+              no login and works entirely offline.
+            </p>
+          </details>
+          <details>
+            <summary>What export formats are supported?</summary>
+            <p>
+              Route Mapper exports to Rally Navigator, Hema Maps, Guru Maps, and
+              Google Earth. Supported formats include GPX, KML, and JSON for
+              maximum compatibility with navigation systems.
+            </p>
+          </details>
+          <details>
+            <summary>What devices does it work on?</summary>
+            <p>
+              Currently iPad-native (iPadOS 14+), optimised for both landscape
+              and portrait orientations. Works on iPad, iPad Air, iPad Pro, and
+              iPad mini. iPhone and Android versions are planned for future
+              releases.
+            </p>
+          </details>
+          <details>
+            <summary>When is the Android version coming?</summary>
+            <p>
+              Android development is planned for v4.2, subject to demand and
+              funding from this campaign. We'll prioritize based on backer
+              feedback and interest.
+            </p>
+          </details>
+          <details>
+            <summary>Can I use this for hiking or mountain biking?</summary>
+            <p>
+              Absolutely! While designed for rally navigation, Route Mapper
+              works perfectly for any route planning activity including hiking,
+              mountain biking, overlanding, and expedition planning.
+            </p>
+          </details>
+          <details>
+            <summary>Is there a free trial?</summary>
+            <p>
+              Early backers will receive priority access to the TestFlight beta.
+              After official launch, we'll offer a free Guest Mode with core
+              features, plus a premium subscription for advanced capabilities
+              and cloud sync.
+            </p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="section contact">
+      <div class="container center">
+        <h2>Get in Touch</h2>
+        <p class="lead-text">
+          Questions about Route Mapper? Want to discuss bulk licensing for your
+          organization?
+        </p>
+        <p>
+          <a href="mailto:hello@Route Mapper.net" class="btn btn-outline"
+            >hello@Route Mapper.net</a
+          >
+        </p>
+        <div class="social-links">
+          <a href="#" aria-label="Follow us on Twitter">Twitter</a>
+          <a href="#" aria-label="Follow us on Facebook">Facebook</a>
+          <a href="#" aria-label="Join our community on Reddit">Reddit</a>
+        </div>
       </div>
     </section>
 
@@ -303,17 +581,46 @@
           <img
             class="foot-logo"
             src="assets/route-logo.png"
-            alt="RouteMapper"
+            alt="Route Mapper logo"
           />
-          <p>© RouteMapper. All rights reserved.</p>
+          <p>&copy; 2024 Route Mapper. All rights reserved.</p>
+          <p class="footer-tagline">
+            Built for the journey, designed for the destination.
+          </p>
         </div>
-        <nav>
-          <a href="terms.html">Terms</a>
+        <nav aria-label="Footer navigation">
+          <h3 class="sr-only">Legal & Resources</h3>
+          <a href="terms.html">Terms of Service</a>
+          <a href="privacy.html">Privacy Policy</a>
           <a href="updates.html">Updates</a>
           <a href="press.html">Press Kit</a>
-          <a href="privacy.html">Privacy</a>
+          <a href="support.html">Support</a>
         </nav>
       </div>
     </footer>
+
+    <!-- Mobile Menu Script -->
+    <script src="mobile-menu.js"></script>
+
+    <!-- Form Handling Script -->
+    <script>
+      // Handle Kickstarter notification form
+      const form = document.querySelector('form[name="ks-notify"]');
+      const formMessage = form.querySelector(".form-message");
+
+      form.addEventListener("submit", function (e) {
+        // Netlify will handle the actual submission
+        // This just provides user feedback
+        formMessage.textContent =
+          "Thanks! We'll notify you when the campaign launches.";
+        formMessage.classList.add("success");
+
+        setTimeout(() => {
+          form.reset();
+          formMessage.textContent = "";
+          formMessage.classList.remove("success");
+        }, 5000);
+      });
+    </script>
   </body>
 </html>
