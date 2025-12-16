@@ -145,8 +145,10 @@ a {
 .brand img {
   height: 92px;
 }
-.nav a {
-  color: var(--slate) !important;
+@media (min-width: 769px) {
+  .nav a {
+    color: var(--slate);
+  }
 }
 .nav .btn-green {
   color: #ffffff !important;  /* force white text */
