@@ -467,11 +467,13 @@ h1 {
   gap: 18px;
   margin-top: 12px;
 }
+
 .fund-card {
   background: var(--card);
   border: 1px solid #1a2234;
   border-radius: 14px;
   padding: 18px;
+  min-width: 0; /* ← ADD THIS - prevents content from forcing width */
 }
 .fund-card form {
   display: flex;
@@ -679,7 +681,8 @@ body.nav-open .nav-toggle .hamburger::after {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 400px;
+  max-width: 100%; /* ← Changed from 400px to 100% */
+  width: 100%; /* ← ADD THIS */
 }
 
 .notify-form input[type="email"] {
