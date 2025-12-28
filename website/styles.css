@@ -355,6 +355,10 @@ h1 {
   transition: opacity 0.3s ease;
 }
 
+.hidden {
+  display: none;
+}
+
 .v-controls.hidden {
   opacity: 0;
   pointer-events: none;
