@@ -392,22 +392,21 @@
               name="ks-notify"
               method="POST"
               data-netlify="true"
-              class="notify-form"
+              netlify-honeypot="bot-field"
+              action="/thanks-kickstarter.html"
             >
               <input type="hidden" name="form-name" value="ks-notify" />
-              <label for="notify-email" class="sr-only"
-                >Email address for Kickstarter notifications</label
-              >
+              <p class="hidden">
+                <label>Don’t fill this out: <input name="bot-field" /></label>
+              </p>
+
               <input
-                id="notify-email"
                 type="email"
                 name="email"
                 placeholder="you@example.com"
                 required
-                aria-required="true"
               />
               <button class="btn btn-amber" type="submit">Notify Me</button>
-              <div class="form-message" role="status" aria-live="polite"></div>
             </form>
           </div>
         </div>
@@ -563,15 +562,7 @@
           organisation?
         </p>
         <p>
-          <a
-            href="/cdn-cgi/l/email-protection#741c1118181b34061b0100111915040411065a1a1100"
-            class="btn btn-outline"
-            ><span
-              class="__cf_email__"
-              data-cfemail="fa929f969695ba88958f8e9f979b8a8a9f88d4949f8e"
-              >[email&#160;protected]</span
-            ></a
-          >
+          <a href="contact.html">Contact Us</a>
         </p>
         <div class="social-links">
           <a
@@ -621,45 +612,40 @@
 
     <!-- Form Handling Script -->
     <script>
-      // Handle Kickstarter notification form
       const form = document.querySelector('form[name="ks-notify"]');
       const formMessage = form.querySelector(".form-message");
 
       form.addEventListener("submit", function (e) {
-        e.preventDefault(); // Stop default submission
+        e.preventDefault();
 
-        // Prepare form data for Netlify
         const formData = new FormData(form);
         const params = new URLSearchParams();
-        for (const [key, value] of formData.entries()) {
+        for (const [key, value] of formData.entries())
           params.append(key, value);
-        }
 
         fetch("/", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams(formData).toString(),
+          body: params.toString(),
         })
           .then((response) => {
-            if (response.ok) {
-              // Show success message
-              formMessage.textContent =
-                "Thanks! We'll notify you when the campaign launches.";
-              formMessage.classList.add("success");
+            if (!response.ok) throw new Error("Form submission failed");
 
-              // Clear after 15 seconds
-              setTimeout(() => {
-                form.reset();
-                formMessage.textContent = "";
-                formMessage.classList.remove("success");
-              }, 15000);
-            } else {
-              throw new Error("Form submission failed");
-            }
+            formMessage.textContent =
+              "Thanks! We'll notify you when the campaign launches.";
+            formMessage.classList.remove("error");
+            formMessage.classList.add("success");
+
+            setTimeout(() => {
+              form.reset();
+              formMessage.textContent = "";
+              formMessage.classList.remove("success");
+            }, 15000);
           })
-          .catch((error) => {
+          .catch(() => {
             formMessage.textContent =
               "Oops! Something went wrong. Please try again.";
+            formMessage.classList.remove("success");
             formMessage.classList.add("error");
           });
       });
