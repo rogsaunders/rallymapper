@@ -150,7 +150,7 @@
             loading="lazy"
             <!--poster="assets/video-poster.jpg"</video>
             class="rounded"-->
-          >
+          
             <track
               kind="captions"
               src="assets/captions.vtt"
@@ -398,6 +398,7 @@
               data-netlify="true"
               class="notify-form"
             >
+              <input type="hidden" name="form-name" value="ks-notify" />  
               <label for="notify-email" class="sr-only"
                 >Email address for Kickstarter notifications</label
               >
@@ -605,23 +606,45 @@
     <script src="mobile-menu.js"></script>
 
     <!-- Form Handling Script -->
+    <!-- Form Handling Script -->
     <script>
       // Handle Kickstarter notification form
       const form = document.querySelector('form[name="ks-notify"]');
       const formMessage = form.querySelector(".form-message");
 
       form.addEventListener("submit", function (e) {
-        // Netlify will handle the actual submission
-        // This just provides user feedback
-        formMessage.textContent =
-          "Thanks! We'll notify you when the campaign launches.";
-        formMessage.classList.add("success");
+        e.preventDefault(); // Stop default submission
+        
+        // Prepare form data for Netlify
+        const formData = new FormData(form);
+        formData.append("form-name", "ks-notify");
+        
+        fetch("/", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(formData).toString()
+        })
+        .then(response => {
+          if (response.ok) {
+            // Show success message
+            formMessage.textContent =
+              "Thanks! We'll notify you when the campaign launches.";
+            formMessage.classList.add("success");
 
-        setTimeout(() => {
-          form.reset();
-          formMessage.textContent = "";
-          formMessage.classList.remove("success");
-        }, 5000);
+            // Clear after 5 seconds
+            setTimeout(() => {
+              form.reset();
+              formMessage.textContent = "";
+              formMessage.classList.remove("success");
+            }, 5000);
+          } else {
+            throw new Error("Form submission failed");
+          }
+        })
+        .catch((error) => {
+          formMessage.textContent = "Oops! Something went wrong. Please try again.";
+          formMessage.classList.add("error");
+        });
       });
     </script>
   </body>
