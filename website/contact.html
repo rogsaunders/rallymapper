@@ -1,18 +1,43 @@
-<form
-  name="contact"
-  method="POST"
-  data-netlify="true"
-  netlify-honeypot="bot-field"
-  action="/thanks-contact.html"
->
-  <input type="hidden" name="form-name" value="contact" />
-  <p class="hidden">
-    <label>Don’t fill this out: <input name="bot-field" /></label>
-  </p>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact – Route Mapper</title>
 
-  <input type="text" name="name" placeholder="Name" required />
-  <input type="email" name="email" placeholder="Email" required />
-  <textarea name="message" placeholder="Message" rows="5" required></textarea>
+    <!-- SAME CSS AS index.html -->
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
 
-  <button class="btn btn-green" type="submit">Send</button>
-</form>
+  <body>
+    <main class="container">
+      <h1>Contact Us</h1>
+
+      <form
+        name="contact"
+        method="POST"
+        data-netlify="true"
+        netlify-honeypot="bot-field"
+        action="/thanks-contact.html"
+      >
+        <input type="hidden" name="form-name" value="contact" />
+
+        <!-- Honeypot -->
+        <p class="hidden">
+          <label>Don’t fill this out: <input name="bot-field" /></label>
+        </p>
+
+        <input type="text" name="name" placeholder="Name" required />
+        <input type="email" name="email" placeholder="Email" required />
+        <textarea
+          name="message"
+          placeholder="Message"
+          rows="5"
+          required
+        ></textarea>
+
+        <button class="btn btn-green" type="submit">Send</button>
+      </form>
+    </main>
+  </body>
+</html>
