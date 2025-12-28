@@ -110,7 +110,7 @@
           <div class="cta-row">
             <a
               class="btn btn-green btn-large"
-              href="https://www.gofundme.com/f/help-launch-Route Mapper/donate?source=btn_donate"
+              href="https://gofund.me/b31b70cd1"
               target="_blank"
               rel="noopener noreferrer"
               >Back on GoFundMe</a
@@ -122,6 +122,8 @@
         </div>
       </div>
     </section>
+    <br />
+    <br />
 
     <!-- Product Overview Section -->
     <section class="hero">
@@ -563,14 +565,8 @@
           organisation?
         </p>
         <p>
-          <a
-            href="/cdn-cgi/l/email-protection#741c1118181b34061b0100111915040411065a1a1100"
-            class="btn btn-outline"
-            ><span
-              class="__cf_email__"
-              data-cfemail="fa929f969695ba88958f8e9f979b8a8a9f88d4949f8e"
-              >[email&#160;protected]</span
-            ></a
+          <a href="mailto:hello@routemapper.net" class="btn btn-outline"
+            >hello@routemapper.net</a
           >
         </p>
         <div class="social-links">
@@ -613,12 +609,9 @@
     </footer>
 
     <!-- Mobile Menu Script -->
-    <script
-      data-cfasync="false"
-      src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"
-    ></script>
     <script src="mobile-menu.js"></script>
 
+    <!-- Form Handling Script -->
     <!-- Form Handling Script -->
     <script>
       // Handle Kickstarter notification form
@@ -630,10 +623,7 @@
 
         // Prepare form data for Netlify
         const formData = new FormData(form);
-        const params = new URLSearchParams();
-        for (const [key, value] of formData.entries()) {
-          params.append(key, value);
-        }
+        formData.append("form-name", "ks-notify");
 
         fetch("/", {
           method: "POST",
@@ -647,12 +637,12 @@
                 "Thanks! We'll notify you when the campaign launches.";
               formMessage.classList.add("success");
 
-              // Clear after 15 seconds
+              // Clear after 5 seconds
               setTimeout(() => {
                 form.reset();
                 formMessage.textContent = "";
                 formMessage.classList.remove("success");
-              }, 15000);
+              }, 5000);
             } else {
               throw new Error("Form submission failed");
             }
