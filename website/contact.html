@@ -1,17 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Contact – Route Mapper</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Contact — Route Mapper</title>
 
-    <!-- SAME CSS AS index.html -->
+    <meta
+      name="description"
+      content="Contact Route Mapper — questions, licensing, partnerships."
+    />
+
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="mobile-menu.css" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <link rel="apple-touch-icon" href="assets/route-logo-192.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
   </head>
 
   <body>
-    <main class="container">
-      <h1>Contact Us</h1>
+    <!-- NAV -->
+    <header class="nav">
+      <div class="container nav-wrap">
+        <nav class="nav-menu">
+          <a href="index.html#features">Features</a>
+          <a href="index.html#usecases">Use Cases</a>
+          <a href="index.html#roadmap">Roadmap</a>
+          <a href="updates.html">Updates</a>
+          <a href="index.html#funding" class="btn btn-green">Back the Launch</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="container section">
+      <h1>Get in Touch</h1>
+      <p class="lead">
+        Questions about Route Mapper? Want to discuss bulk licensing for your
+        organisation?
+      </p>
 
       <form
         name="contact"
@@ -19,10 +58,10 @@
         data-netlify="true"
         netlify-honeypot="bot-field"
         action="/thanks-contact.html"
+        class="contact-form"
       >
         <input type="hidden" name="form-name" value="contact" />
 
-        <!-- Honeypot -->
         <p class="hidden">
           <label>Don’t fill this out: <input name="bot-field" /></label>
         </p>
@@ -32,12 +71,37 @@
         <textarea
           name="message"
           placeholder="Message"
-          rows="5"
+          rows="6"
           required
         ></textarea>
 
         <button class="btn btn-green" type="submit">Send</button>
       </form>
     </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="container foot-grid">
+        <div>
+          <img
+            class="foot-logo"
+            src="assets/route-logo.png"
+            alt="Route Mapper logo"
+          />
+          <p>&copy; 2024 Route Mapper. All rights reserved.</p>
+          <p class="footer-tagline">
+            Built for the journey, designed for the destination.
+          </p>
+        </div>
+
+        <nav aria-label="Footer navigation">
+          <a href="terms.html">Terms of Service</a>
+          <a href="privacy.html">Privacy Policy</a>
+          <a href="updates.html">Updates</a>
+          <a href="press.html">Press Kit</a>
+          <a href="support.html">Support</a>
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>

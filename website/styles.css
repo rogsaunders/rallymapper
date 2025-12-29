@@ -752,3 +752,69 @@ body.nav-open .nav-toggle .hamburger::after {
   color: #dc2626; /* red */
   font-weight: 600;
 }
+
+/* Contact form */
+.contact-form {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.contact-form input,
+.contact-form textarea {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #25324a;
+  background: #0b1220;
+  color: #e5e7eb;
+  font-size: 16px;
+}
+
+.contact-form input::placeholder,
+.contact-form textarea::placeholder {
+  color: #9ca3af;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.contact-form button {
+  width: fit-content;
+  margin-top: 6px;
+}
+
+/* Contact form */
+.contact-form {
+  max-width: 560px;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.contact-form input,
+.contact-form textarea {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #25324a;
+  background: #0b1220;
+  color: #e5e7eb;
+  font-size: 16px;
+}
+
+.contact-form input::placeholder,
+.contact-form textarea::placeholder {
+  color: #9ca3af;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
