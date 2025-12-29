@@ -629,21 +629,18 @@
           body: params.toString(),
         })
           .then((response) => {
-            if (response.ok) {
-              // Show success message
-              formMessage.textContent =
-                "Thanks! We'll notify you when the campaign launches.";
-              formMessage.classList.add("success");
+            if (!response.ok) throw new Error("Form submission failed");
 
-              // Clear after 5 seconds
-              setTimeout(() => {
-                form.reset();
-                formMessage.textContent = "";
-                formMessage.classList.remove("success");
-              }, 5000);
-            } else {
-              throw new Error("Form submission failed");
-            }
+            formMessage.textContent =
+              "Thanks! We'll notify you when the campaign launches.";
+            formMessage.classList.remove("error");
+            formMessage.classList.add("success");
+
+            setTimeout(() => {
+              form.reset();
+              formMessage.textContent = "";
+              formMessage.classList.remove("success");
+            }, 15000);
           })
           .catch(() => {
             formMessage.textContent =
