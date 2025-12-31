@@ -881,3 +881,9 @@ body.nav-open .nav-toggle .hamburger::after {
     width: 100%;
   }
 }
+
+/* Ensure consistent horizontal padding on all pages */
+.container {
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
+}
