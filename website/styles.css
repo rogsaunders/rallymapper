@@ -89,10 +89,6 @@ a {
   padding-left: 100px; /* adjust to match your logo size */
 }
 
-/* Ensure hero text clears the overlay a bit */
-.hero-content {
-  padding-top: 10px; /* adjust if needed so text doesn't sit under the logo */
-}
 .hero-content p {
   color: #fff;
   text-shadow: 0 4px 14px rgba(0, 0, 0, 0.85);
@@ -255,16 +251,16 @@ h1 {
   backdrop-filter: blur(2px);
   display: none; /* shown when video is paused */
 }
-/* Full background hero with overlay */
 .hero-image {
   position: relative;
-  height: 70vh;
+  min-height: 70vh;
+  height: auto;
   background: url("assets/hero11.png") center center / cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  margin: 0; /* make sure there's NO space above */
-  padding: 0; /* remove inherited padding */
+  margin: 0;
+  padding: 0;
 }
 
 .hero-overlay {
@@ -282,7 +278,7 @@ h1 {
 
 .hero-content {
   max-width: 600px;
-  padding-top: 6cm; /* pushes text down, not the image */
+  padding-top: clamp(120px, 18vh, 220px);
   padding-left: 40px;
   padding-right: 20px;
   padding-bottom: 40px;
@@ -306,6 +302,15 @@ h1 {
   }
 }
 
+@media (max-width: 700px) {
+  .hero-content {
+    padding-top: 120px;
+    padding-left: 18px;
+    padding-right: 18px;
+    padding-bottom: 24px;
+  }
+}
+
 @media (max-width: 920px) {
   .hero-grid {
     grid-template-columns: 1fr;
@@ -316,15 +321,13 @@ h1 {
   .grid-4 {
     grid-template-columns: 1fr 1fr;
   }
-  .funding .fund-grid {
-    grid-template-columns: 1fr;
-  }
+}
 
-  @media (max-width: 700px) {
-    .hero-image {
-      height: 55vh;
-      background-position: center top;
-    }
+@media (max-width: 700px) {
+  .hero-image {
+    min-height: 55vh; /* keeps the hero feel */
+    height: auto; /* still allows growth */
+    background-position: center top;
   }
 }
 
@@ -464,12 +467,6 @@ h1 {
   border: 1px solid #1a2234;
   border-radius: 12px;
   padding: 16px;
-}
-.funding .fund-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin-top: 12px;
 }
 
 .fund-card {
@@ -680,28 +677,6 @@ body.nav-open .nav-toggle .hamburger::after {
   }
 }
 
-/* Kickstarter notification form - mobile friendly */
-.notify-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 100%; /* ← Changed from 400px to 100% */
-  width: 100%; /* ← ADD THIS */
-}
-
-.notify-form input[type="email"] {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
-}
-
-.notify-form button {
-  width: 75%;
-  padding: 12px 24px;
-}
-
 .form-message {
   margin-top: 8px;
   font-size: 14px;
@@ -755,41 +730,6 @@ body.nav-open .nav-toggle .hamburger::after {
 
 /* Contact form */
 .contact-form {
-  max-width: 520px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 20px;
-}
-
-.contact-form input,
-.contact-form textarea {
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid #25324a;
-  background: #0b1220;
-  color: #e5e7eb;
-  font-size: 16px;
-}
-
-.contact-form input::placeholder,
-.contact-form textarea::placeholder {
-  color: #9ca3af;
-}
-
-.contact-form input:focus,
-.contact-form textarea:focus {
-  outline: 2px solid var(--green);
-  outline-offset: 2px;
-}
-
-.contact-form button {
-  width: fit-content;
-  margin-top: 6px;
-}
-
-/* Contact form */
-.contact-form {
   max-width: 560px;
   margin-top: 18px;
   display: flex;
@@ -817,4 +757,127 @@ body.nav-open .nav-toggle .hamburger::after {
 .contact-form textarea:focus {
   outline: 2px solid var(--green);
   outline-offset: 2px;
+}
+
+/* --- Fix hero overlap on phones --- */
+@media (max-width: 700px) {
+  .hero-content {
+    padding-top: 120px; /* replaces 6cm on small screens */
+    padding-left: 18px;
+    padding-right: 18px;
+    padding-bottom: 24px;
+  }
+
+  .hero-image {
+    height: auto; /* allow hero to grow if content needs space */
+    min-height: 70vh; /* still feels like a hero */
+  }
+}
+
+.hero.hero-image + .hero {
+  padding-top: 40px;
+}
+
+/* --- Mobile hero CTA buttons: stack + full width --- */
+@media (max-width: 700px) {
+  .cta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cta-row .btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* Funding forms: stack nicely on mobile/tablet
+@media (max-width: 900px) {
+  .fund-card form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fund-card form input,
+  .fund-card form button {
+    width: 100%;
+  }
+}
+
+.fund-card form button {
+  flex: 0 0 auto;
+  white-space: nowrap;*/
+
+/* ================================
+   Mobile funding fixes
+   ================================ */
+
+/* Make anchored sections scroll into view below the nav */
+#funding,
+#kickstarter {
+  scroll-margin-top: 110px;
+}
+
+/* =========================================
+   HERO IMAGE: prevent overlap on iPhone
+   ========================================= */
+
+/* Replace the cm-based push-down with responsive spacing */
+.hero-image .hero-content {
+  padding-top: clamp(120px, 18vh, 220px);
+  padding-left: clamp(16px, 4vw, 40px);
+  padding-right: clamp(16px, 4vw, 20px);
+  padding-bottom: 32px;
+}
+
+/* Let the hero grow if content needs more space (stops collisions) */
+.hero-image {
+  min-height: 70vh;
+  height: auto;
+  padding-bottom: 24px; /* ensures separation from the next section */
+}
+
+/* Phones */
+@media (max-width: 700px) {
+  .hero-image {
+    min-height: 72vh; /* keeps the hero feel */
+    height: auto; /* but allows growth if needed */
+    background-position: center top;
+  }
+
+  .hero-image .hero-content {
+    padding-top: 120px; /* iPhone-safe */
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  /* Stack the two CTA buttons */
+  .cta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cta-row .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  section[id] {
+    scroll-margin-top: 110px;
+  }
+}
+
+@media (max-width: 900px) {
+  .fund-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fund-card form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fund-card form input,
+  .fund-card form button {
+    width: 100%;
+  }
 }
