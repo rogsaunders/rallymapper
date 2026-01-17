@@ -56,8 +56,9 @@
         name="contact"
         method="POST"
         data-netlify="true"
+        netlify
         netlify-honeypot="bot-field"
-        action="/thanks-contact.html"
+        action="thanks-contact.html"
         class="contact-form"
       >
         <input type="hidden" name="form-name" value="contact" />
@@ -74,6 +75,9 @@
           rows="6"
           required
         ></textarea>
+
+        <!-- Optional spam protection -->
+        <!-- <div data-netlify-recaptcha="true"></div> -->
 
         <button class="btn btn-green" type="submit">Send</button>
       </form>
@@ -99,7 +103,6 @@
           <a href="privacy.html">Privacy Policy</a>
           <a href="updates.html">Updates</a>
           <a href="press.html">Press Kit</a>
-          <a href="support.html">Support</a>
         </nav>
       </div>
     </footer>
