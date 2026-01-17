@@ -394,10 +394,12 @@
               name="ks-notify"
               method="POST"
               data-netlify="true"
+              netlify
               netlify-honeypot="bot-field"
-              action="/thanks-kickstarter.html"
+              action="thanks-kickstarter.html"
             >
               <input type="hidden" name="form-name" value="ks-notify" />
+
               <p class="hidden">
                 <label>Don’t fill this out: <input name="bot-field" /></label>
               </p>
@@ -408,7 +410,9 @@
                 placeholder="you@example.com"
                 required
               />
+
               <button class="btn btn-amber" type="submit">Notify Me</button>
+
               <div class="form-message" role="status" aria-live="polite"></div>
             </form>
           </div>
