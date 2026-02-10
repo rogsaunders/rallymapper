@@ -34,32 +34,44 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+      devOptions: { enabled: true },
+      includeAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon.png"],
       manifest: {
-        name: "Rally Route Mapper",
-        short_name: "RallyMapper",
+        name: "Route Mapper",
+        short_name: "RouteMapper",
         description:
-          "Record and export rally routes with GPS, icons, and voice input.",
-        theme_color: "#1e3a8a",
-        background_color: "#ffffff",
+          "Record and export routes with GPS, icons, and voice input.",
+        theme_color: "#588233",
+        background_color: "#111827",
         display: "standalone",
         start_url: "/",
+        scope: "/",
         icons: [
+          { src: "/pwa-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },
           {
-            src: "pwa-192x192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "pwa-512x512.png",
+            src: "/pwa-512-maskable.png",
             sizes: "512x512",
             type: "image/png",
+            purpose: "maskable",
           },
+        ],
+      },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        runtimeCaching: [
           {
-            src: "apple-touch-icon.png",
-            sizes: "180x180",
-            type: "image/png",
-            purpose: "any",
+            urlPattern: ({ url }) =>
+              url.origin.includes("tile.openstreetmap.org"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "osm-tiles",
+              expiration: {
+                maxEntries: 1500,
+                maxAgeSeconds: 60 * 60 * 24 * 14, // 14 days
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
           },
         ],
       },
