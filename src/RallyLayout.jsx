@@ -46,6 +46,31 @@ function haversineMeters(a, b) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(aa)));
 }
 
+// If a waypoint already has totalMeters, use it.
+// Otherwise compute it (from previous point) so OpenRally distance works.
+function ensureTotalsMeters(points) {
+  let total = 0;
+
+  return points
+    .map((p, idx) => {
+      const lat = Number(p.lat);
+      const lon = Number(p.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+      let totalMeters = Number(p.totalMeters);
+      if (!Number.isFinite(totalMeters)) {
+        if (idx > 0) {
+          const prev = points[idx - 1];
+          total += haversineMeters(prev, { lat, lon });
+        }
+        totalMeters = total;
+      }
+
+      return { ...p, lat, lon, totalMeters };
+    })
+    .filter(Boolean);
+}
+
 function fmtKm(meters) {
   const km = meters / 1000;
   return km >= 10 ? `${km.toFixed(1)} km` : `${km.toFixed(2)} km`;
@@ -140,31 +165,6 @@ function bearingDeg(a, b) {
     Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
 
   return Math.round((toDeg(Math.atan2(y, x)) + 360) % 360);
-}
-
-// If a waypoint already has totalMeters, use it.
-// Otherwise compute it (from previous point) so OpenRally distance works.
-function ensureTotalsMeters(points) {
-  let total = 0;
-
-  return points
-    .map((p, idx) => {
-      const lat = Number(p.lat);
-      const lon = Number(p.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
-      let totalMeters = Number(p.totalMeters);
-      if (!Number.isFinite(totalMeters)) {
-        if (idx > 0) {
-          const prev = points[idx - 1];
-          total += haversineMeters(prev, { lat, lon });
-        }
-        totalMeters = total;
-      }
-
-      return { ...p, lat, lon, totalMeters };
-    })
-    .filter(Boolean);
 }
 
 function toGpx({ meta, startGPS, waypoints }) {
