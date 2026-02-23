@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -128,9 +128,6 @@
               target="_blank"
               rel="noopener noreferrer"
               >Back on GoFundMe</a
-            >
-            <a class="btn btn-outline-white" href="#kickstarter"
-              >Notify me on Kickstarter</a
             >
           </div>
         </div>
@@ -397,39 +394,6 @@
             >
           </div>
           <p></p>
-
-          <div id="kickstarter" class="fund-card">
-            <h3>Kickstarter</h3>
-            <p>
-              Get notified when the Kickstarter campaign goes live. Exclusive
-              rewards and perks coming soon.
-            </p>
-            <form
-              name="ks-notify"
-              method="POST"
-              data-netlify="true"
-              netlify
-              netlify-honeypot="bot-field"
-              action="thanks-kickstarter.html"
-            >
-              <input type="hidden" name="form-name" value="ks-notify" />
-
-              <p class="hidden">
-                <label>Don’t fill this out: <input name="bot-field" /></label>
-              </p>
-
-              <input
-                type="email"
-                name="email"
-                placeholder="you@example.com"
-                required
-              />
-
-              <button class="btn btn-amber" type="submit">Notify Me</button>
-
-              <div class="form-message" role="status" aria-live="polite"></div>
-            </form>
-          </div>
         </div>
 
         <div class="budget-note">
