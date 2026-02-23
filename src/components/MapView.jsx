@@ -301,7 +301,7 @@ export default function MapView({
             console.log("NAV waypoint iconId =", wp.iconId);
           }
 
-          console.log("NAV svgFallback starts:", svgFallback?.slice?.(0, 120));
+          // console.log("NAV svgFallback starts:", svgFallback?.slice?.(0, 120));
 
           const cacheKey = isStart ? "start" : `${type}:${iconId || "default"}`;
           const icon = getLeafletIcon(cacheKey, svgFallback);

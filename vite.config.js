@@ -34,7 +34,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      devOptions: { enabled: true },
+      devOptions: { enabled: false }, // ✅ disable SW in dev
       includeAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon.png"],
       manifest: {
         name: "Route Mapper",

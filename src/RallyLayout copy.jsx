@@ -1,6 +1,6 @@
 // src/RallyLayout.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import rrmLogo from "./assets/RRMLogo_64x64.png";
+import RRMLogo_64x64 from "./assets/RRMLogo_64x64.png"; // adjust extension if needed
 import MapView from "./components/MapView";
 import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
@@ -205,59 +205,30 @@ function bearingDeg(a, b) {
 }
 
 function getCloudStatus({ online, userId, pendingCount }) {
-  if (!userId) return { color: "bg-gray-500", label: "Guest", dot: "⚪️" };
-  if (!online) return { color: "bg-red-500", label: "Offline", dot: "🔴" };
-  if (pendingCount > 0)
-    return {
-      color: "bg-yellow-500",
-      label: `Pending (${pendingCount})`,
-      dot: "🟡",
-    };
-  return { color: "bg-green-500", label: "Synced", dot: "🟢" };
+  // Signed out or guest: no cloud sync
+  if (!userId) return { color: "bg-gray-400", label: "Guest" };
+
+  // Signed in but offline
+  if (!online) return { color: "bg-red-500", label: "Offline" };
+
+  // Signed in, online, but pending items
+  if (pendingCount > 0) return { color: "bg-yellow-500", label: "Pending" };
+
+  // Signed in, online, nothing pending
+  return { color: "bg-green-500", label: "Synced" };
 }
 
 export default function RallyLayout() {
   const flushingRef = useRef(false);
   const { user, guestMode, loading, signOut } = useAuth();
-
-  const [pendingCount, setPendingCount] = useState(
-    () => readPendingQueue().length,
-  );
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
-
-  useEffect(() => {
-    const onUp = () => setOnline(true);
-    const onDown = () => setOnline(false);
-    window.addEventListener("online", onUp);
-    window.addEventListener("offline", onDown);
-    return () => {
-      window.removeEventListener("online", onUp);
-      window.removeEventListener("offline", onDown);
-    };
-  }, []);
-
-  useEffect(() => {
-    const refresh = () => setPendingCount(readPendingQueue().length);
-    refresh();
-    const onStorage = (e) => {
-      if (e.key === PENDING_SYNC_KEY) refresh();
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  const cloud = getCloudStatus({
-    online,
-    userId: user?.id,
-    pendingCount,
-  });
-  const cloudStatus = !online
+  const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+  const cloudStatus = !isOnline
     ? { label: "Offline", dot: "🔴" }
     : pendingCount > 0
       ? { label: `Pending (${pendingCount})`, dot: "🟡" }
       : { label: "Synced", dot: "🟢" };
+  const signedInLabel =
+    user?.email || user?.phone || user?.id?.slice(0, 8) || "Signed in";
   const localOwner = user?.id ?? "guest";
   const [currentGPS, setCurrentGPS] = useState(null); // ✅ LIVE GPS
   const [startGPS, setStartGPS] = useState(null);
@@ -309,13 +280,9 @@ export default function RallyLayout() {
     (wp) => wp.kind !== "start" && wp.poi !== "START",
   );
 
-  const handleNewStage = () => {
-    if (stageActive) {
-      alert("End the current stage before starting a new stage.");
-      return;
-    }
-    setStageNumber((n) => n + 1);
-  };
+  const [pendingCount, setPendingCount] = useState(
+    () => readPendingQueue().length,
+  );
 
   useEffect(() => {
     const refresh = () => setPendingCount(readPendingQueue().length);
@@ -330,17 +297,6 @@ export default function RallyLayout() {
   }, []);
 
   const STAGE_DRAFT_KEY = "rm_stage_draft_v1";
-
-  useEffect(() => {
-    const onUp = () => setOnline(true);
-    const onDown = () => setOnline(false);
-    window.addEventListener("online", onUp);
-    window.addEventListener("offline", onDown);
-    return () => {
-      window.removeEventListener("online", onUp);
-      window.removeEventListener("offline", onDown);
-    };
-  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -572,32 +528,6 @@ export default function RallyLayout() {
   ];
 
   // const [stageStartedAt, setStageStartedAt] = useState(null);
-
-  const canChangeMeta = !stageActive; // lock meta while stage is active (recommended)
-
-  const handleNewDay = () => {
-    if (stageActive) {
-      alert("End the current stage before starting a new day.");
-      return;
-    }
-    setDayNumber((d) => d + 1);
-    setRouteNumber(1);
-    setRouteName("Route 1");
-    setStageNumber(1);
-    // optional: clear archive, or keep it
-    // setStageArchive([]);
-  };
-
-  const routeNameRef = useRef(null);
-
-  const handleNewRoute = () => {
-    if (stageActive)
-      return alert("End the current stage before starting a new route.");
-    setRouteNumber((n) => n + 1);
-    setRouteName("");
-    setStageNumber(1);
-    setTimeout(() => routeNameRef.current?.focus(), 0);
-  };
 
   const handleStartStage = () => {
     // Stage starts: clear current stage data and "arm" the UI
@@ -969,144 +899,100 @@ export default function RallyLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      {/* HEADER */}
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-          {/* Left: logo + title */}
-          <div className="flex items-center gap-3">
-            <img
-              src={rrmLogo}
-              alt="Route Mapper"
-              className="h-10 w-10 rounded"
-            />
-            <div className="leading-tight">
-              <div className="text-lg font-semibold">Route Mapper</div>
-              <div className="text-xs text-gray-500">
-                {tripName} • Day {dayNumber} •{" "}
-                {routeName || `Route ${routeNumber}`}
-              </div>
-            </div>
-          </div>
+    <div className="h-screen flex flex-col">
+      <div className="px-3 py-2 border-b bg-gray-50">
+        <div className="flex items-center gap-3 flex-nowrap">
+          <div className="flex items-center gap-3 whitespace-nowrap">
+            <span className="text-xs text-gray-600">
+              {user
+                ? `Signed in as ${signedInLabel}`
+                : guestMode
+                  ? "Guest mode"
+                  : "Not signed in"}
 
-          {/* Right: cloud badge + signed-in */}
-          <div className="flex items-center gap-3">
-            <div
-              className={`text-sm px-3 py-1 rounded-full font-medium
-                ${cloud.color} bg-opacity-15 text-green-700`}
-            >
-              <span className="mr-1">{cloud.dot}</span>
-              <span className="font-medium">{cloud.label}</span>
-            </div>
-
-            <div className="text-sm text-gray-700">
-              {user?.email ? (
-                <span>
-                  Signed in as <span className="font-medium">{user.email}</span>
+              {user && pendingCount > 0 && (
+                <span className="ml-2 text-amber-700">
+                  Pending sync: {pendingCount}
                 </span>
-              ) : (
-                <span className="text-gray-500">Guest mode</span>
               )}
-            </div>
+            </span>
 
-            {user?.id && (
+            {user && (
               <button
-                className="text-sm underline text-gray-700 hover:text-gray-900"
+                type="button"
                 onClick={signOut}
+                className="text-xs underline text-gray-700 hover:text-black"
               >
                 Sign out
               </button>
             )}
           </div>
-        </div>
-      </header>
 
-      {/* MAIN */}
-      <main className="mx-auto max-w-6xl px-3 py-3 space-y-3">
-        {/* TOP CONTROLS STRIP */}
-        <section className="bg-white rounded-2xl shadow-sm border p-3">
-          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center">
-            <button
-              type="button"
-              className="px-3 py-2 rounded-xl text-white font-semibold disabled:opacity-50"
-              style={{ backgroundColor: "#588233" }}
-              onClick={handleNewDay}
-              disabled={!canChangeMeta}
-              title={
-                stageActive
-                  ? "End stage first"
-                  : "Increment day and reset route/stage"
-              }
-            >
-              📅 New Day
-            </button>
-            <div className="flex flex-wrap gap-2 items-center">
-              {/* NEW ROUTE (before name) */}
-              <button
-                type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50"
-                onClick={handleNewRoute}
-                disabled={stageActive}
-                title="Increment route, reset stage to 1"
-              >
-                🛣️ New Route
-              </button>
-              {/* ROUTE NAME (primary) */}
-              <input
-                className="min-w-[260px] flex-1 px-3 py-2 rounded-xl border bg-gray-50"
-                value={routeName}
-                onChange={(e) => setRouteName(e.target.value)}
-                disabled={stageActive}
-                placeholder="Route name (e.g., Barossa to Silverton)"
-              />
+          <div className="font-semibold whitespace-nowrap">
+            🧭 {tripName}: Day {dayNumber} - {tripDate}
+          </div>
 
-              {/* NEW STAGE (replaces 'Stage' label) */}
-              <button
-                type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50"
-                onClick={handleNewStage}
-                disabled={stageActive}
-                title="Increment stage number"
-              >
-                ➕ New Stage
-              </button>
-              {/* STAGE NUMBER DISPLAY (readable, compact) */}
-              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold">
-                Stage {stageNumber}
-              </div>
+          <button
+            type="button"
+            onClick={startNewDay}
+            disabled={stageActive}
+            className="px-3 py-2 rounded text-white whitespace-nowrap disabled:opacity-50"
+            style={{ backgroundColor: "#588234" }}
+          >
+            📅 New Day
+          </button>
+
+          <div className="flex items-center flex-1 min-w-0">
+            <input
+              className="w-full min-w-0 p-2 rounded border bg-white"
+              value={routeName}
+              onChange={(e) => setRouteName(e.target.value)}
+              disabled={stageActive}
+              placeholder="Route name"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={startNewRoute}
+            disabled={stageActive}
+            className="px-3 py-2 rounded text-white whitespace-nowrap disabled:opacity-50"
+            style={{ backgroundColor: "#588234" }}
+          >
+            🛣️ New Route
+          </button>
+
+          <div className="ml-auto flex items-center gap-2 flex-nowrap">
+            <div className="stage-label px-3 py-2 rounded border bg-white font-medium">
+              Stage {stageNumber}
             </div>
 
             <button
               type="button"
-              className="px-3 py-2 rounded-xl text-white font-semibold disabled:opacity-50"
-              style={{
-                backgroundColor: stageActive ? "#dc2626" : "#588233",
-              }}
               onClick={stageActive ? handleEndStage : handleStartStage}
-              title={stageActive ? "End current stage" : "Start a new stage"}
+              className="px-4 py-2 rounded text-white whitespace-nowrap transition-colors"
+              style={{ backgroundColor: stageActive ? "#dc2626" : "#588234" }}
             >
               {stageActive ? "⏹ End Stage" : "▶️ Start Stage"}
             </button>
           </div>
-        </section>
-        {/* MAP: horizontal, not tall */}
-        <section className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-          <div className="h-[100px] sm:h-[180px] md:h-[200px]">
-            <MapView
-              currentGPS={currentGPS}
-              startGPS={startGPS}
-              waypoints={waypoints}
-              followMap={followMap}
-              setFollowMap={setFollowMap}
-            />
-          </div>
-        </section>
+        </div>
+      </div>
 
-        {/* INPUT CONTROLS ROW (above the two columns) */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* GPS / Start */}
-          <div className="bg-white rounded-2xl shadow-sm border p-3">
-            <h2 className="font-semibold mb-2">GPS</h2>
+      <div className="flex flex-1">
+        <div className="w-1/2 h-full">
+          <MapView
+            currentGPS={currentGPS}
+            startGPS={startGPS}
+            waypoints={waypoints}
+            followMap={followMap}
+            setFollowMap={setFollowMap}
+          />
+        </div>
+
+        <div className="w-1/2 h-full overflow-y-auto p-4 space-y-4 bg-white border-l relative z-10">
+          <section className="space-y-2">
+            <h2 className="text-lg font-bold">🛰️ GPS</h2>
 
             <div className="text-sm">
               Live:{" "}
@@ -1115,10 +1001,10 @@ export default function RallyLayout() {
                 : "Waiting for GPS…"}
             </div>
 
-            <div className="text-sm mt-1">Start: {startText}</div>
+            <div className="text-sm">Start: {startText}</div>
 
             <button
-              className="btn btn-primary mt-3 w-full"
+              className="btn btn-primary"
               disabled={!stageActive}
               onClick={handleSetStart}
             >
@@ -1135,18 +1021,11 @@ export default function RallyLayout() {
                 Follow map (auto recenter)
               </span>
             </label>
-          </div>
+          </section>
 
-          {/* POI / Icons / Add waypoint */}
-          <div className="bg-white rounded-2xl shadow-sm border p-3 md:col-span-2">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-semibold">Input Controls</h2>
-              <div className="text-xs text-gray-500">
-                {stageActive ? "Stage active" : "Stage not started"}
-              </div>
-            </div>
-
-            <div className="flex gap-2 flex-wrap mb-2">
+          <section className="space-y-2">
+            <h2 className="text-lg font-bold">🗒️ POI</h2>
+            <div className="flex gap-2 flex-wrap">
               {ICON_ORDER.map((type) => (
                 <IconButton
                   key={type}
@@ -1174,8 +1053,9 @@ export default function RallyLayout() {
             </select>
 
             {waypointType === "hazard" && ICONS.hazard?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Hazard level</div>
+              <div className="space-y-2">
+                <div className="text-sm">Hazard level</div>
+
                 <div className="flex gap-2 flex-wrap">
                   {Object.entries(ICONS.hazard.variants).map(([id, v]) => (
                     <IconButton
@@ -1191,8 +1071,9 @@ export default function RallyLayout() {
             )}
 
             {waypointType === "nav" && ICONS.nav?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Navigation</div>
+              <div className="space-y-2">
+                <div className="text-sm">Navigation</div>
+
                 <div className="flex gap-2 flex-wrap">
                   {Object.entries(ICONS.nav.variants).map(([id, v]) => (
                     <IconButton
@@ -1208,8 +1089,9 @@ export default function RallyLayout() {
             )}
 
             {waypointType === "control" && ICONS.control?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Control</div>
+              <div className="space-y-2">
+                <div className="text-sm">Control</div>
+
                 <div className="flex gap-2 flex-wrap">
                   {Object.entries(ICONS.control.variants).map(([id, v]) => (
                     <IconButton
@@ -1224,129 +1106,45 @@ export default function RallyLayout() {
               </div>
             )}
 
-            <div className="mt-3 flex gap-2 items-start">
-              <button
-                type="button"
-                onClick={isListening ? stopDictation : startDictation}
-                className="px-3 py-2 rounded text-white whitespace-nowrap transition-colors disabled:opacity-50"
-                style={{ backgroundColor: isListening ? "#dc2626" : "#588234" }}
-                disabled={!stageActive}
-              >
-                {isListening ? "🎙️ Listening…" : "🎙️ Dictate"}
-              </button>
+            <button
+              type="button"
+              onClick={isListening ? stopDictation : startDictation}
+              className="px-3 py-2 rounded text-white whitespace-nowrap transition-colors disabled:opacity-50"
+              style={{ backgroundColor: isListening ? "#dc2626" : "#588234" }}
+            >
+              {isListening ? "🎙️ Listening…" : "🎙️ Dictate"}
+            </button>
 
-              <textarea
-                disabled={!stageActive}
-                className="flex-1 p-2 rounded bg-gray-100"
-                placeholder="Optional point of interest"
-                value={poi}
-                onChange={(e) => setPoi(e.target.value)}
-              />
-            </div>
+            <textarea
+              disabled={!stageActive}
+              className="w-full p-2 rounded bg-gray-100"
+              placeholder="Optional point of interest"
+              value={poi}
+              onChange={(e) => setPoi(e.target.value)}
+            />
 
             <button
-              className="btn btn-primary mt-3 w-full"
+              className="btn btn-primary"
               disabled={!stageActive}
               onClick={() => handleAddWaypoint(null)}
             >
               ➕ Add Waypoint (Current GPS)
             </button>
-          </div>
-        </section>
+          </section>
 
-        {/* BELOW MAP: 2 columns */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* LEFT: Waypoints */}
-          <div className="bg-white rounded-2xl shadow-sm border p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-semibold">Waypoints</h2>
-              <div className="text-xs text-gray-500">
-                {waypoints.length} total
-              </div>
+          <section
+            className="space-y-2"
+            style={{
+              border: "1px solid #e5e7eb",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <h2 style={{ fontSize: 22, margin: 0 }}>📏 Distances</h2>
+
+            <div className="text-sm">
+              Total distance: <strong>{totalText}</strong>
             </div>
-
-            {/* WAYPOINT LOG (compact) */}
-            <div className="divide-y">
-              {routePoints.length === 0 ? (
-                <div className="text-sm text-gray-500 py-3">
-                  No waypoints yet.
-                </div>
-              ) : (
-                routePoints.map((wp, idx) => {
-                  const isStart = wp.kind === "start" || wp.poi === "START";
-                  const wpNumber = isStart
-                    ? "START"
-                    : routePoints
-                        .slice(0, idx + 1)
-                        .filter((p) => p.kind !== "start" && p.poi !== "START")
-                        .length;
-
-                  const label = isStart
-                    ? "START"
-                    : wp.poi?.trim() || `WP ${wpNumber}`;
-
-                  const segKm = (Number(wp.segmentMeters || 0) / 1000).toFixed(
-                    2,
-                  );
-                  const totKm = (Number(wp.totalMeters || 0) / 1000).toFixed(2);
-
-                  return (
-                    <div
-                      key={wp.timestamp ?? `${wp.lat},${wp.lon},${idx}`}
-                      className="py-2 flex items-start justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-semibold text-gray-500">
-                            {isStart ? "START" : `WP ${wpNumber}`}
-                          </span>
-
-                          {wp.type && (
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 border text-gray-700">
-                              {wp.type}
-                              {wp.iconId ? `:${wp.iconId}` : ""}
-                            </span>
-                          )}
-
-                          <span className="truncate text-sm text-gray-900">
-                            {label}
-                          </span>
-                        </div>
-
-                        {wp.timestamp && (
-                          <div className="text-[11px] text-gray-500">
-                            {new Date(wp.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="text-right text-[11px] text-gray-600 whitespace-nowrap">
-                        <div>seg {segKm} km</div>
-                        <div>tot {totKm} km</div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* RIGHT: Distances */}
-          <div className="bg-white rounded-2xl shadow-sm border p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-semibold">Distances</h2>
-              <div className="text-xs text-gray-500">
-                {waypoints.length
-                  ? `${(Number(waypoints.at(-1)?.totalMeters || 0) / 1000).toFixed(2)} km`
-                  : "0.00 km"}
-              </div>
-            </div>
-
-            {/* Put your existing “distance / metrics” UI here */}
 
             {!distanceRows?.legs?.length ? (
               <div style={{ color: "#6b7280" }}>
@@ -1385,9 +1183,82 @@ export default function RallyLayout() {
                 ))}
               </div>
             )}
-          </div>
-        </section>
-      </main>
+          </section>
+
+          <section
+            className="space-y-2"
+            style={{
+              border: "1px solid #e5e7eb",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <h2 style={{ fontSize: 22, margin: 0 }}>
+              🧭 Waypoints ({waypoints.length})
+            </h2>
+            {routePoints.length === 0 ? (
+              <div style={{ color: "#6b7280" }}>No waypoints yet.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {routePoints.map((wp, idx) => {
+                  const isStart = wp.kind === "start" || wp.poi === "START";
+                  const wpNumber = isStart
+                    ? null
+                    : routePoints
+                        .slice(0, idx + 1)
+                        .filter((p) => p.kind !== "start" && p.poi !== "START")
+                        .length;
+
+                  return (
+                    <div
+                      key={wp.timestamp ?? `${wp.lat},${wp.lon},${idx}`}
+                      style={{
+                        padding: 10,
+                        borderRadius: 10,
+                        border: "1px solid #e5e7eb",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>
+                        {isStart ? "START" : `Waypoint ${wpNumber}`}
+                      </div>
+
+                      {wp.type && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#6b7280",
+                            marginTop: 2,
+                          }}
+                        >
+                          Type: {wp.type.toUpperCase()}
+                        </div>
+                      )}
+
+                      {wp.iconId && (
+                        <div style={{ fontSize: 12, opacity: 0.8 }}>
+                          IconId: {wp.iconId}
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: 14, color: "#374151" }}>
+                        {wp.lat}, {wp.lon}
+                      </div>
+
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        {wp.timestamp}
+                      </div>
+
+                      {wp.poi && !isStart ? (
+                        <div style={{ marginTop: 6 }}>{wp.poi}</div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

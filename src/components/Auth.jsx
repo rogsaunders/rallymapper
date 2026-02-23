@@ -1,6 +1,6 @@
 // Auth.jsx — improved spacing and layout
 import React, { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Auth({ onAuthSuccess, onGuest }) {
   const [loading, setLoading] = useState(false);
@@ -12,12 +12,15 @@ export default function Auth({ onAuthSuccess, onGuest }) {
   const [error, setError] = useState("");
   const [showPw, setShowPw] = useState(false);
 
+  const redirectTo = `${window.location.origin}/auth/reset`;
+
   const resetAlerts = () => {
     setMessage("");
     setError("");
   };
 
   const handleAuth = async (e) => {
+    setLoading(true);
     e.preventDefault();
     resetAlerts();
 
@@ -36,13 +39,28 @@ export default function Auth({ onAuthSuccess, onGuest }) {
       setLoading(true);
 
       if (isReset) {
-        const { error } = await supabase.auth.resetPasswordForEmail(
+        const redirectTo = import.meta.env.DEV
+          ? "https://localhost:5173/auth/callback"
+          : "https://routemapper.net/auth/callback";
+
+        console.log(
+          "[RESET] sending reset for:",
+          emailTrimmed,
+          "redirectTo:",
+          redirectTo,
+        );
+
+        const { data, error } = await supabase.auth.resetPasswordForEmail(
           emailTrimmed,
           {
-            redirectTo: window.location.origin + "/auth/callback",
-          }
+            redirectTo,
+          },
         );
+
+        console.log("[RESET] response:", { data, error });
+
         if (error) throw error;
+
         setMessage("Password reset email sent. Check your inbox.");
         return;
       }
@@ -59,7 +77,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
         setMessage(
           data?.user?.identities?.length
             ? "Sign-up successful. Please check your email to confirm your account."
-            : "If this email is new, check your inbox to confirm your account."
+            : "If this email is new, check your inbox to confirm your account.",
         );
         return;
       }
@@ -84,6 +102,8 @@ export default function Auth({ onAuthSuccess, onGuest }) {
         friendly = "Email not confirmed. Please check your inbox.";
       setError(friendly);
       console.error("Supabase auth error:", err);
+      console.error("[AUTH] error:", err);
+      setError(err?.message || "Authentication failed.");
     } finally {
       setLoading(false);
     }
@@ -107,7 +127,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
   };
 
   const inputStyle = {
-    width: "375px",
+    width: "100%",
     padding: "0.75rem",
     border: "1px solid #d1d5db",
     borderRadius: "6px",
@@ -128,7 +148,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
 
   const primaryButtonStyle = {
     ...buttonStyle,
-    backgroundColor: loading ? "rgba(88 130 52 / 1)" : "rgba(88 130 52 / 0.7)",
+    backgroundColor: loading ? "rgba(88 130 52 / 0.7)" : "rgba(88 130 52 / 1)",
     color: "white",
     cursor: loading ? "not-allowed" : "pointer",
   };
@@ -163,8 +183,8 @@ export default function Auth({ onAuthSuccess, onGuest }) {
           {isReset
             ? "Enter your email and we'll send you a reset link."
             : isSignUp
-            ? "Create your Route Mapper account."
-            : "Sign in to continue to Route Mapper."}
+              ? "Create your Route Mapper account."
+              : "Sign in to continue to Route Mapper."}
         </p>
 
         {message && (
@@ -219,6 +239,7 @@ export default function Auth({ onAuthSuccess, onGuest }) {
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               autoComplete="email"
               value={email}
@@ -247,11 +268,12 @@ export default function Auth({ onAuthSuccess, onGuest }) {
               <div style={{ position: "relative" }}>
                 <input
                   id="password"
+                  name="password"
                   type={showPw ? "text" : "password"}
                   autoComplete={isSignUp ? "new-password" : "current-password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ ...inputStyle, paddingRight: "3 rem" }}
+                  style={{ ...inputStyle, paddingRight: "3rem" }}
                   placeholder={
                     isSignUp ? "Create a password" : "Enter your password"
                   }
@@ -283,10 +305,10 @@ export default function Auth({ onAuthSuccess, onGuest }) {
             {loading
               ? "Please wait…"
               : isReset
-              ? "Send Reset Link"
-              : isSignUp
-              ? "Create Account"
-              : "Sign In"}
+                ? "Send Reset Link"
+                : isSignUp
+                  ? "Create Account"
+                  : "Sign In"}
           </button>
 
           <div

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
+import { useNavigate } from "react-router-dom";
 
 export default function SignIn() {
   const { enableGuest, disableGuest } = useAuth();
@@ -9,6 +10,7 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const nav = useNavigate();
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -16,24 +18,58 @@ export default function SignIn() {
     setBusy(true);
     disableGuest();
 
+    const emailTrimmed = email.trim();
+
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      if (mode === "forgot") {
+        const redirectTo = `${window.location.origin}/auth/reset`;
+
+        const { error } = await supabase.auth.resetPasswordForEmail(
+          emailTrimmed,
+          {
+            redirectTo,
+          },
+        );
         if (error) throw error;
-      } else if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        setMsg("Check your email to confirm your account.");
-      } else if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
-        if (error) throw error;
-        setMsg("Password reset email sent.");
+
+        setMsg("Password reset email sent. Check your inbox (and spam).");
+        return;
       }
-    } catch (err) {
-      setMsg(err?.message || "Something went wrong");
+
+      if (mode === "signup") {
+        const redirectTo = `${window.location.origin}/auth/reset`;
+
+        const { data, error } = await supabase.auth.signUp({
+          email: emailTrimmed,
+          password,
+          options: { emailRedirectTo: redirectTo },
+        });
+
+        console.log("SIGN UP RESPONSE:", { data, error });
+
+        if (error) throw error;
+
+        setMsg(
+          "Account created. Please check your email to confirm your account.",
+        );
+        setMode("signin"); // optional, but nice UX
+        return;
+      }
+
+      // mode === "signin"
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailTrimmed,
+        password,
+      });
+
+      console.log("SIGN IN RESPONSE:", { data, error });
+      if (error) throw error;
+
+      setMsg("Signed in.");
+      nav("/", { replace: true }); // ✅ go into the app
+    } catch (e) {
+      console.error("AUTH FAILED:", e);
+      setMsg(e?.message || "Auth failed");
     } finally {
       setBusy(false);
     }
@@ -46,13 +82,14 @@ export default function SignIn() {
         <p className="text-gray-600 mt-2">
           Sign in to continue to Route Mapper.
         </p>
-
         <form onSubmit={onSubmit} className="mt-8 space-y-6">
           <div>
             <label className="block text-gray-800 font-semibold mb-2">
               Email
             </label>
             <input
+              id="email"
+              name="email"
               className="w-full p-4 rounded-xl border bg-blue-50 border-gray-300"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -68,6 +105,8 @@ export default function SignIn() {
                 Password
               </label>
               <input
+                id="password"
+                name="password"
                 className="w-full p-4 rounded-xl border bg-blue-50 border-gray-300"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -117,7 +156,6 @@ export default function SignIn() {
 
           {!!msg && <div className="text-sm text-gray-700">{msg}</div>}
         </form>
-
         <div className="mt-10 border-t pt-6">
           <button
             type="button"

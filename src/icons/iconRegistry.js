@@ -23,6 +23,7 @@ import {
   BUMPS_SVG,
   RUTS_SVG,
   WASHOUT_SVG,
+  DIP_SVG,
 } from "./svgIcons";
 
 export const ICON_ORDER = ["note", "hazard", "nav", "control"];
@@ -39,6 +40,7 @@ export const ICONS = {
       danger_3: { label: "Danger 3", svg: DANGER_3_SVG },
       bump: { label: "Bump", svg: BUMP_SVG },
       bumps: { label: "Bumps", svg: BUMPS_SVG },
+      dip: { label: "Dip", svg: DIP_SVG },
       ruts: { label: "Ruts", svg: RUTS_SVG },
       washout: { label: "Washout", svg: WASHOUT_SVG },
     },

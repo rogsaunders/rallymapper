@@ -1,10 +1,10 @@
 // src/lib/stageSync.js
-import { supabase } from "./supabaseClient";
+import { supabase } from "/Users/Roger/routemapper/src/lib/supabaseClient.js";
 import { readPendingQueue, writePendingQueue } from "./pendingQueue";
 
 // Optional helper if you want it in one place
 export async function upsertStageExport({ userId, localId, meta, payload }) {
-  return supabase.from("stages").upsert(
+  return supabase.from("stage_exports").upsert(
     {
       user_id: userId,
       local_id: localId,
