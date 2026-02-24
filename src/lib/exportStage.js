@@ -34,22 +34,6 @@ export function bearingDeg(a, b) {
   return (brng + 360) % 360;
 }
 
-export function ensureTotalsMeters(ptsRaw = []) {
-  let total = 0;
-
-  return ptsRaw.map((p, i) => {
-    if (i === 0) {
-      return { ...p, segmentMeters: 0, totalMeters: 0 };
-    }
-
-    const prev = ptsRaw[i - 1];
-    const d = haversineMeters(prev, p);
-    total += d;
-
-    return { ...p, segmentMeters: d, totalMeters: total };
-  });
-}
-
 function haversineMeters(a, b) {
   if (!a || !b) return 0;
 
@@ -65,6 +49,38 @@ function haversineMeters(a, b) {
   const aa = s1 * s1 + Math.cos(lat1) * Math.cos(lat2) * s2 * s2;
 
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(aa)));
+}
+
+export function ensureTotalsMeters(ptsRaw = []) {
+  let total = 0;
+
+  return ptsRaw.map((p, i) => {
+    if (i === 0) return { ...p, segmentMeters: 0, totalMeters: 0 };
+
+    const prev = ptsRaw[i - 1];
+    const d = haversineMeters(prev, p);
+    total += d;
+
+    return { ...p, segmentMeters: d, totalMeters: total };
+  });
+}
+
+/**
+ * Find a stable bearing for point i by using the last prior point
+ * that is at least `minMeters` away (filters jitter / tiny moves).
+ */
+function stableCapDeg(pts, i, minMeters = 8) {
+  if (!pts?.length || i <= 0) return 0;
+
+  const cur = pts[i];
+  for (let j = i - 1; j >= 0; j--) {
+    const prev = pts[j];
+    if (haversineMeters(prev, cur) >= minMeters) {
+      return bearingDeg(prev, cur);
+    }
+  }
+  // If everything before is too close, fall back to immediate previous
+  return bearingDeg(pts[i - 1], cur);
 }
 
 export function prettyLabelFromTypeIcon(p) {
@@ -107,17 +123,31 @@ export function prettyLabelFromTypeIcon(p) {
 /* 📍 GPX (OpenRally-compatible)                     */
 /* -------------------------------------------------- */
 
-export async function toGpx({ meta, startGPS, waypoints }) {
-  const pts = ensureTotalsMeters(waypoints);
+/**
+ * Build OpenRally GPX.
+ * By default: WAYPOINTS ONLY (no <trk>) to avoid duplicate entries in Rally Navigator.
+ */
+export async function toGpx({
+  meta,
+  startGPS,
+  waypoints,
+  includeTrack = false, // default false fixes duplicates
+  capMinMeters = 8, // jitter filter for CAP stability
+}) {
+  // Optionally prepend startGPS if provided and first waypoint isn't basically identical
+  const ptsIn = Array.isArray(waypoints) ? waypoints : [];
+  const ptsRaw = maybePrependStart(startGPS, ptsIn);
+
+  const pts = ensureTotalsMeters(ptsRaw);
 
   const wptsArr = await Promise.all(
     pts.map(async (p, i) => {
-      const name = p.poi?.trim() || `WP ${i + 1}`;
+      const name = p.poi?.trim() || (i === 0 ? "START" : `WP ${i + 1}`);
 
       const desc =
         (p.poi && p.poi.trim()) || prettyLabelFromTypeIcon(p) || name;
 
-      const cap = i > 0 ? bearingDeg(pts[i - 1], p) : 0;
+      const cap = i > 0 ? stableCapDeg(pts, i, capMinMeters) : 0;
 
       const tulipBase64 = await generateTulipPngBase64({ cap });
 
@@ -142,16 +172,9 @@ export async function toGpx({ meta, startGPS, waypoints }) {
 
   const wpts = wptsArr.join("");
 
-  const trkpts = pts
-    .map(
-      (p) => `
-      <trkpt lat="${p.lat}" lon="${p.lon}">
-        ${p.timestamp ? `<time>${escXml(p.timestamp)}</time>` : ""}
-      </trkpt>`,
-    )
-    .join("");
-
   const totalMeters = pts.length ? Number(pts[pts.length - 1].totalMeters) : 0;
+
+  const trk = includeTrack ? buildTrackXml({ meta, pts }) : "";
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <gpx
@@ -176,27 +199,103 @@ export async function toGpx({ meta, startGPS, waypoints }) {
   </metadata>
 
   ${wpts}
+  ${trk}
+</gpx>`;
+}
 
+/**
+ * Optional: Track-only GPX for mapping/breadcrumbs.
+ * Keeping this separate prevents Rally Navigator from duplicating waypoint entries.
+ */
+export function toTrackOnlyGpx({ meta, startGPS, waypoints }) {
+  const ptsIn = Array.isArray(waypoints) ? waypoints : [];
+  const ptsRaw = maybePrependStart(startGPS, ptsIn);
+  const pts = ensureTotalsMeters(ptsRaw);
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<gpx
+  xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  creator="Route Mapper"
+  version="1.1"
+  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
+>
+  <metadata>
+    <name>${escXml(meta.tripName)} (Track)</name>
+    <time>${escXml(meta.endedAt)}</time>
+  </metadata>
+  ${buildTrackXml({ meta, pts })}
+</gpx>`;
+}
+
+function buildTrackXml({ meta, pts }) {
+  const trkpts = pts
+    .map(
+      (p) => `
+      <trkpt lat="${p.lat}" lon="${p.lon}">
+        ${p.timestamp ? `<time>${escXml(p.timestamp)}</time>` : ""}
+      </trkpt>`,
+    )
+    .join("");
+
+  return `
   <trk>
-    <name>Stage ${meta.stageNumber}</name>
+    <name>Stage ${escXml(meta.stageNumber)}</name>
     <trkseg>
       ${trkpts}
     </trkseg>
-  </trk>
-</gpx>`;
+  </trk>`;
+}
+
+function maybePrependStart(startGPS, pts) {
+  if (
+    !Number.isFinite(Number(startGPS?.lat)) ||
+    !Number.isFinite(Number(startGPS?.lon))
+  )
+    return pts;
+
+  if (!pts?.length) {
+    return [
+      {
+        lat: startGPS.lat,
+        lon: startGPS.lon,
+        timestamp: startGPS.timestamp,
+        type: "control",
+        iconId: "start",
+        poi: "START",
+      },
+    ];
+  }
+
+  const first = pts[0];
+  const d = haversineMeters(startGPS, first);
+  if (d < 3) return pts; // basically same point already
+
+  return [
+    {
+      lat: startGPS.lat,
+      lon: startGPS.lon,
+      timestamp: startGPS.timestamp,
+      type: "control",
+      iconId: "start",
+      poi: "START",
+    },
+    ...pts,
+  ];
 }
 
 /* -------------------------------------------------- */
 /* 📄 HTML Roadbook                                  */
 /* -------------------------------------------------- */
 
-export function buildStageHtml({ meta, waypoints }) {
-  const pts = ensureTotalsMeters(waypoints);
+export function buildStageHtml({ meta, waypoints, startGPS }) {
+  const ptsRaw = maybePrependStart(startGPS, waypoints);
+  const pts = ensureTotalsMeters(ptsRaw);
 
   const rows = pts
     .map((p, i) => {
       const km = (p.totalMeters / 1000).toFixed(2);
-      const cap = i > 0 ? Math.round(bearingDeg(pts[i - 1], p)) : 0;
+      const cap = i > 0 ? Math.round(stableCapDeg(pts, i, 8)) : 0;
       const desc =
         (p.poi && p.poi.trim()) || prettyLabelFromTypeIcon(p) || `WP ${i + 1}`;
 
@@ -205,8 +304,8 @@ export function buildStageHtml({ meta, waypoints }) {
           <td>${i + 1}</td>
           <td>${km}</td>
           <td>${cap}</td>
-          <td>${desc}</td>
-          <td>${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}</td>
+          <td>${escXml(desc)}</td>
+          <td>${Number(p.lat).toFixed(6)}, ${Number(p.lon).toFixed(6)}</td>
         </tr>`;
     })
     .join("");
@@ -216,7 +315,7 @@ export function buildStageHtml({ meta, waypoints }) {
 <html>
 <head>
 <meta charset="UTF-8">
-<title>${meta.tripName} - Stage ${meta.stageNumber}</title>
+<title>${escXml(meta.tripName)} - Stage ${escXml(meta.stageNumber)}</title>
 <style>
 body { font-family: Arial, sans-serif; padding: 20px; }
 table { border-collapse: collapse; width: 100%; }
@@ -225,8 +324,8 @@ th { background: #f2f2f2; }
 </style>
 </head>
 <body>
-<h2>${meta.tripName}</h2>
-<p>Day ${meta.dayNumber} – ${meta.routeName} – Stage ${meta.stageNumber}</p>
+<h2>${escXml(meta.tripName)}</h2>
+<p>Day ${escXml(meta.dayNumber)} – ${escXml(meta.routeName)} – Stage ${escXml(meta.stageNumber)}</p>
 <table>
 <thead>
 <tr>
@@ -249,16 +348,38 @@ ${rows}
 /* 📦 ZIP Export                                     */
 /* -------------------------------------------------- */
 
-export async function makeStageZip({ meta, startGPS, waypoints, baseName }) {
+export async function makeStageZip({
+  meta,
+  startGPS,
+  waypoints,
+  baseName,
+  includeTrackFile = true, // new: add separate breadcrumb GPX
+}) {
   const zip = new JSZip();
 
-  const gpxText = await toGpx({ meta, startGPS, waypoints });
-  const jsonText = JSON.stringify({ meta, startGPS, waypoints }, null, 2);
-  const htmlText = buildStageHtml({ meta, waypoints });
+  // ✅ OpenRally GPX is waypoint-only by default to prevent duplicates in Rally Navigator
+  const openRallyGpx = await toGpx({
+    meta,
+    startGPS,
+    waypoints,
+    includeTrack: false,
+  });
 
-  zip.file(`${baseName}.gpx`, gpxText);
+  // Optional: separate track GPX (for mapping), not for RN import
+  const trackGpx = includeTrackFile
+    ? toTrackOnlyGpx({ meta, startGPS, waypoints })
+    : null;
+
+  const jsonText = JSON.stringify({ meta, startGPS, waypoints }, null, 2);
+  const htmlText = buildStageHtml({ meta, startGPS, waypoints });
+
+  zip.file(`${baseName}.openrally.gpx`, openRallyGpx);
   zip.file(`${baseName}.json`, jsonText);
   zip.file(`${baseName}.html`, htmlText);
+
+  if (trackGpx) {
+    zip.file(`${baseName}.track.gpx`, trackGpx);
+  }
 
   return await zip.generateAsync({ type: "blob" });
 }

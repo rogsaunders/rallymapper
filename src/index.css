@@ -34,7 +34,7 @@ body {
 
 /* Variants */
 .btn-primary {
-  background-color: rgb(220, 70, 1, 1) !important;
+  background-color: rgb(213, 98, 45) !important;
   color: white;
 }
 
@@ -50,7 +50,7 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: rgb(220, 70, 1, 0.7) !important;
+  background-color: rgb(213, 98, 45, 0.7) !important;
 }
 
 .btn-success {

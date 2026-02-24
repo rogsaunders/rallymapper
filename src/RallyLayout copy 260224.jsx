@@ -104,15 +104,6 @@ function clamp(n, min, max) {
 
 function dynamicMinMoveMeters(gps) {
   const base = 6; // meters, beats normal GPS jitter
-
-  // OpenRally GPX XML (no <trk> by default to avoid duplicate-waypoint imports in Rally Navigator)
-  const metaHeader = {
-    name: meta?.stageName || base,
-    desc: `${meta?.tripName || ""} Day ${meta?.dayNumber || ""} Route ${meta?.routeNumber || ""} Stage ${meta?.stageNumber || ""}`.trim(),
-    time: new Date().toISOString(),
-    creator: "RouteMapper",
-  };
-
   const factor = 0.8; // how aggressively speed increases threshold
   const max = 30; // cap
 
@@ -150,62 +141,6 @@ function safeSlug(s) {
     .replace(/(^-|-$)/g, "");
 }
 
-// --- Utilities ---
-function xmlEscape(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function fmtIso(ts) {
-  // Your timestamps are already ISO strings; keep them stable.
-  // If you ever pass a number, this still works.
-  if (typeof ts === "string") return ts;
-  const d = ts instanceof Date ? ts : new Date(ts);
-  return d.toISOString();
-}
-
-// Your bearingDeg() function (kept as-is, just included for completeness)
-function bearingDeg(a, b) {
-  const lat1 = (Number(a.lat) * Math.PI) / 180;
-  const lat2 = (Number(b.lat) * Math.PI) / 180;
-  const dLon = ((Number(b.lon) - Number(a.lon)) * Math.PI) / 180;
-
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-  let brng = (Math.atan2(y, x) * 180) / Math.PI; // -180..180
-  brng = (brng + 360) % 360; // 0..359
-  return Math.round(brng);
-}
-
-function escXml(s = "") {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function wpName(i, wp) {
-  if (String(wp?.kind).toLowerCase() === "start") return "START";
-  return `WP ${i}`; // your sample starts at WP 2 after START
-}
-
-function wpDesc(wp) {
-  const kind = String(wp?.kind || "").toLowerCase();
-  if (kind === "start") return "START";
-  const poi = (wp?.poi || "").trim();
-  return poi || mapIconToRNSymbol(wp); // prefer POI text if present
-}
-
-// Your icon mapping (unchanged)
 function mapIconToRNSymbol(wp) {
   const type = String(wp?.type || "").toLowerCase();
   const iconId = String(wp?.iconId || "").toLowerCase();
@@ -232,175 +167,41 @@ function mapIconToRNSymbol(wp) {
   return "Waypoint";
 }
 
-/**
- * exportOpenRallyGpx
- *
- * @param {Object} args
- * @param {Array}  args.waypoints - your stored waypoint objects
- * @param {string} [args.name] - track/route name
- * @param {boolean} [args.includeTrack] - include <trk> breadcrumb for non-rally apps
- * @param {string} [args.creator] - GPX creator attribute
- * @param {Function} [args.getTulipDataUrl] - optional (wp)=> "data:image/png;base64,..." (or null)
- *
- * Returns: GPX XML string
- */
-function exportOpenRallyGpx(
-  routePoints,
-  trackName = "Route",
-  meta = {},
-  opts = {},
-) {
-  const {
-    includeTrack = false,
-    includeWaypoints = true,
-    trackPoints = null,
-    minCapDistanceMeters = 5,
-  } = opts || {};
+function estimateSpeedMps(prevGPS, curGPS) {
+  const t1 = prevGPS?.timestamp ? Date.parse(prevGPS.timestamp) : null;
+  const t2 = curGPS?.timestamp ? Date.parse(curGPS.timestamp) : null;
+  if (!t1 || !t2 || t2 <= t1) return 0;
 
-  const points = (routePoints || [])
-    .filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
-    .map((p, idx) => ({
-      ...p,
-      lat: Number(p.lat),
-      lon: Number(p.lon),
-      timeIso: p.time ? toUtcIso(p.time) : null,
-      name: (p.name ?? `WP ${idx + 1}`).toString(),
-      desc: (p.desc ?? "").toString(),
-      segmentMeters: Number.isFinite(p.segmentMeters)
-        ? Number(p.segmentMeters)
-        : 0,
-      totalMeters: Number.isFinite(p.totalMeters) ? Number(p.totalMeters) : 0,
-    }));
-
-  // Normalize track points ONCE, early
-  const trkPts = (trackPoints && trackPoints.length ? trackPoints : [])
-    .filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
-    .map((p) => ({
-      lat: Number(p.lat),
-      lon: Number(p.lon),
-      timeIso: p.time ? toUtcIso(p.time) : null,
-    }));
-
-  const hasWpt = includeWaypoints && points.length > 0;
-  const hasTrk = includeTrack && trkPts.length > 0;
-  if (!hasWpt && !hasTrk) return "";
-
-  // Only do CAP work if we will output WPTs
-  const caps = hasWpt
-    ? (() => {
-        const toRad = (d) => (d * Math.PI) / 180;
-        const haversineMeters = (a, b) => {
-          const R = 6371000;
-          const dLat = toRad(b.lat - a.lat);
-          const dLon = toRad(b.lon - a.lon);
-          const s1 = Math.sin(dLat / 2);
-          const s2 = Math.sin(dLon / 2);
-          const aa =
-            s1 * s1 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * s2 * s2;
-          const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
-          return R * c;
-        };
-        const computeCapDeg = (prev, cur) => {
-          const y =
-            Math.sin(toRad(cur.lon - prev.lon)) * Math.cos(toRad(cur.lat));
-          const x =
-            Math.cos(toRad(prev.lat)) * Math.sin(toRad(cur.lat)) -
-            Math.sin(toRad(prev.lat)) *
-              Math.cos(toRad(cur.lat)) *
-              Math.cos(toRad(cur.lon - prev.lon));
-          const brng = (Math.atan2(y, x) * 180) / Math.PI;
-          return (brng + 360) % 360;
-        };
-
-        return points.map((p, i) => {
-          if (i === 0) return 0;
-          for (let j = i - 1; j >= 0; j--) {
-            const d = haversineMeters(points[j], p);
-            if (d >= Math.max(minCapDistanceMeters, 0.001)) {
-              return Math.round(computeCapDeg(points[j], p));
-            }
-          }
-          return 0;
-        });
-      })()
-    : [];
-
-  const totalMetersForHeader = hasWpt
-    ? points[points.length - 1]?.totalMeters || 0
-    : 0;
-
-  const headerName = xmlEscape(meta.name || trackName);
-  const headerDesc = xmlEscape(meta.desc || "");
-  const headerTime =
-    meta.time ||
-    (hasWpt ? points[0].timeIso : null) ||
-    new Date().toISOString();
-
-  const xmlLines = [
-    `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<gpx creator="${xmlEscape(meta.creator || "RouteMapper")}" version="1.1"`,
-    `  xmlns="http://www.topografix.com/GPX/1/1"`,
-    `  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"`,
-    `  xmlns:openrally="http://www.openrally.org/xmlschemas/OpenRally/1.0"`,
-    `  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.openrally.org/xmlschemas/OpenRally/1.0 http://www.openrally.org/xmlschemas/OpenRally/1.0/OpenRally.xsd">`,
-    `  <metadata>`,
-    `    <name>${headerName}</name>`,
-    headerDesc ? `    <desc>${headerDesc}</desc>` : null,
-    `    <time>${headerTime}</time>`,
-    `    <extensions>`,
-    `      <openrally:units>metric</openrally:units>`,
-    hasWpt
-      ? `      <openrally:distance>${fmtKm(totalMetersForHeader)}</openrally:distance>`
-      : null,
-    `    </extensions>`,
-    `  </metadata>`,
-  ].filter(Boolean);
-
-  if (hasWpt) {
-    points.forEach((p, i) => {
-      const cap = caps[i] ?? 0;
-      const pngB64 = dataUrlToPngBase64(p.tulipDataUrl || p.tulipPngDataUrl);
-
-      xmlLines.push(
-        `  <wpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`,
-        `    <name>${xmlEscape(p.name)}</name>`,
-        p.desc ? `    <desc>${xmlEscape(p.desc)}</desc>` : null,
-        p.timeIso ? `    <time>${p.timeIso}</time>` : null,
-        `    <extensions>`,
-        `      <openrally:distance>${fmtKm(p.totalMeters)}</openrally:distance>`,
-        `      <openrally:cap>${cap}</openrally:cap>`,
-        `      <openrally:show_coordinates>0</openrally:show_coordinates>`,
-        pngB64
-          ? `      <openrally:tulip><![CDATA[data:image/png;base64,${pngB64}]]></openrally:tulip>`
-          : null,
-        `    </extensions>`,
-        `  </wpt>`,
-      );
-    });
-  }
-
-  if (hasTrk) {
-    xmlLines.push(`  <trk>`, `    <name>${headerName}</name>`, `    <trkseg>`);
-    trkPts.forEach((p) => {
-      xmlLines.push(
-        `      <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`,
-        p.timeIso ? `        <time>${p.timeIso}</time>` : null,
-        `      </trkpt>`,
-      );
-    });
-    xmlLines.push(`    </trkseg>`, `  </trk>`);
-  }
-
-  xmlLines.push(`</gpx>`);
-  return xmlLines.filter(Boolean).join("\n");
+  const dt = (t2 - t1) / 1000;
+  const d = haversineMeters(prevGPS, curGPS);
+  return d / dt;
 }
 
-// Convert a data URL (data:image/png;base64,...) into just the base64 payload.
-// Accepts null/undefined and returns null.
-function dataUrlToPngBase64(dataUrl) {
-  if (!dataUrl || typeof dataUrl !== "string") return null;
-  const m = dataUrl.match(/^data:image\/png;base64,(.+)$/);
-  return m ? m[1] : null;
+function minDistanceForSpeed(mps) {
+  // tune these
+  if (mps >= 15) return 20; // ~54 km/h+
+  if (mps >= 8) return 12; // ~29 km/h+
+  return 5;
+}
+
+function fmtKmNum(m) {
+  const km = (Number(m) || 0) / 1000;
+  return km.toFixed(2);
+}
+
+function bearingDeg(a, b) {
+  const lat1 = (Number(a.lat) * Math.PI) / 180;
+  const lat2 = (Number(b.lat) * Math.PI) / 180;
+  const dLon = ((Number(b.lon) - Number(a.lon)) * Math.PI) / 180;
+
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+  let brng = (Math.atan2(y, x) * 180) / Math.PI; // -180..180
+  brng = (brng + 360) % 360; // 0..359
+  return Math.round(brng);
 }
 
 function getCloudStatus({ online, userId, pendingCount }) {
@@ -529,6 +330,17 @@ export default function RallyLayout() {
   }, []);
 
   const STAGE_DRAFT_KEY = "rm_stage_draft_v1";
+
+  useEffect(() => {
+    const onUp = () => setOnline(true);
+    const onDown = () => setOnline(false);
+    window.addEventListener("online", onUp);
+    window.addEventListener("offline", onDown);
+    return () => {
+      window.removeEventListener("online", onUp);
+      window.removeEventListener("offline", onDown);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -845,34 +657,13 @@ export default function RallyLayout() {
     // 2️⃣ Export ZIP (await this!)
     const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
 
-    const metaHeader = {
-      name: meta?.stageName || base,
-      desc: `${meta?.tripName || ""} Day ${meta?.dayNumber || ""} Route ${meta?.routeNumber || ""} Stage ${meta?.stageNumber || ""}`.trim(),
-      time: new Date().toISOString(),
-      creator: "RouteMapper",
-    };
-
-    const openRallyGpxXml = exportOpenRallyGpx(
-      routePoints,
-      meta?.stageName || base,
-      metaHeader,
-      {
-        includeTrack: false,
-        includeWaypoints: true,
-      },
-    );
-
-    // only if you have breadcrumbPoints (recommended)
-
     const blob = await makeStageZip({
       meta,
       startGPS,
       waypoints,
-      openRallyGpxXml,
-      trackGpxXml,
-      // includeTrackFile: true,
       baseName: base,
     });
+
     downloadBlob(`${base}.zip`, blob);
 
     const { flushed, remaining } = await flushPendingQueue(user);
@@ -938,14 +729,21 @@ export default function RallyLayout() {
 
     const ts = new Date().toISOString();
 
-    setStartGPS({
-      lat: currentGPS.lat,
-      lon: currentGPS.lon,
-      timestamp: ts,
-    });
+    const start = { lat: currentGPS.lat, lon: currentGPS.lon, timestamp: ts };
+    setStartGPS(start);
 
-    // ✅ Option A: do NOT add a START waypoint to waypoints.
-    // The exporter will prepend startGPS automatically.
+    // ALSO record as a waypoint (same timestamp)
+    const wp = {
+      lat: start.lat,
+      lon: start.lon,
+      poi: "START",
+      timestamp: new Date().toISOString(),
+      kind: "start",
+      segmentMeters: 0,
+      totalMeters: 0,
+    };
+
+    setWaypoints((prev) => [...prev, wp]);
   };
 
   useEffect(() => {
@@ -966,16 +764,14 @@ export default function RallyLayout() {
   useEffect(() => {
     if (waypointType !== "nav") return;
 
-    const variants = ICONS.nav?.variants || {};
-    const hasCurrent = Boolean(variants[navIconId]);
+    const variants = ICONS.control?.variants || {};
+    const hasCurrent = Boolean(variants[controlIconId]);
 
     if (!hasCurrent) {
-      const fallback = variants.straight
-        ? "straight"
-        : Object.keys(variants)[0];
-      setNavIconId(fallback || "straight");
+      const fallback = variants.start ? "straight" : Object.keys(variants)[0];
+      setControlIconId(fallback || "straight");
     }
-  }, [waypointType, navIconId]);
+  }, [waypointType, controlIconId]);
 
   useEffect(() => {
     if (waypointType !== "control") return;
@@ -996,7 +792,7 @@ export default function RallyLayout() {
 
     // Optional freshness guard (recommended if you store fixTs)
     // const now = Date.now();
-    const fixTs = currentGPS.fixTs ?? Date.parse(currentGPS.timestamp);
+    // const fixTs = currentGPS.fixTs ?? Date.parse(currentGPS.timestamp);
     // if (!Number.isFinite(fixTs) || now - fixTs > 2000) {
     //  alert("Waiting for a fresh GPS fix…");
     //  return;
@@ -1086,7 +882,7 @@ export default function RallyLayout() {
 
     // 2) Then add all NON-start waypoints sorted by timestamp
     const rest = (waypoints || [])
-      .filter((wp) => wp)
+      .filter((wp) => wp && wp.kind !== "start" && wp.poi !== "START")
       .map((wp) => ({
         ...wp,
         lat: Number(wp.lat),
@@ -1095,6 +891,11 @@ export default function RallyLayout() {
       }))
       .filter((wp) => Number.isFinite(wp.lat) && Number.isFinite(wp.lon))
       .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+
+    // 3) Avoid duplicate first point if it matches start
+    for (const wp of rest) {
+      pts.push(wp); // ✅ allow same-position waypoints
+    }
 
     return pts;
   }, [startGPS, waypoints]);
@@ -1321,7 +1122,7 @@ export default function RallyLayout() {
               disabled={!stageActive}
               onClick={handleSetStart}
             >
-              ✅ Start Set (tap to update)
+              📍 Set Start Point
             </button>
 
             <label className="flex items-center gap-3 mt-3 select-none">
