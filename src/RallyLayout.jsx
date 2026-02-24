@@ -22,6 +22,41 @@ import {
 
 const PENDING_SYNC_KEY = "rm_pending_queue_signal_v1";
 
+function getGuestOwnerId() {
+  const k = "rm_guest_owner";
+  let v = localStorage.getItem(k);
+  if (!v) {
+    v = `guest_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
+    localStorage.setItem(k, v);
+  }
+  return v;
+}
+
+function haversineMeters(a, b) {
+  if (!a || !b) return Infinity;
+  if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon)) return Infinity;
+  if (!Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return Infinity;
+
+  const R = 6371000; // Earth radius in meters
+  const toRad = (deg) => (deg * Math.PI) / 180;
+
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+
+  const h =
+    sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+
+  return R * c;
+}
+
 function downloadBlob(filename, blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -32,54 +67,6 @@ function downloadBlob(filename, blob) {
   a.remove();
   // delay revoke a tick to avoid Safari weirdness
   setTimeout(() => URL.revokeObjectURL(url), 500);
-}
-
-function haversineMeters(a, b) {
-  if (!a || !b) return 0;
-
-  const lat1 = Number(a.lat),
-    lon1 = Number(a.lon);
-  const lat2 = Number(b.lat),
-    lon2 = Number(b.lon);
-  if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return 0;
-
-  const R = 6371000; // metres
-  const toRad = (d) => (d * Math.PI) / 180;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-
-  const s1 = Math.sin(dLat / 2);
-  const s2 = Math.sin(dLon / 2);
-
-  const aa = s1 * s1 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * s2 * s2;
-
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(aa)));
-}
-
-// If a waypoint already has totalMeters, use it.
-// Otherwise compute it (from previous point) so OpenRally distance works.
-function ensureTotalsMeters(points) {
-  let total = 0;
-
-  return points
-    .map((p, idx) => {
-      const lat = Number(p.lat);
-      const lon = Number(p.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
-      let totalMeters = Number(p.totalMeters);
-      if (!Number.isFinite(totalMeters)) {
-        if (idx > 0) {
-          const prev = points[idx - 1];
-          total += haversineMeters(prev, { lat, lon });
-        }
-        totalMeters = total;
-      }
-
-      return { ...p, lat, lon, totalMeters };
-    })
-    .filter(Boolean);
 }
 
 function fmtKm(meters) {
@@ -98,27 +85,36 @@ function saveStageLocal(userIdOrGuest, localId, payload) {
   );
 }
 
+function toUtcIso(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  return Number.isFinite(dt.getTime())
+    ? dt.toISOString()
+    : new Date().toISOString();
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function dynamicMinMoveMeters(gps) {
-  const base = 6; // meters, beats normal GPS jitter
+function buildMetaHeader(meta, base) {
+  const safeBase = typeof base === "string" && base.trim() ? base : "stage";
 
-  // OpenRally GPX XML (no <trk> by default to avoid duplicate-waypoint imports in Rally Navigator)
-  const metaHeader = {
-    name: meta?.stageName || base,
-    desc: `${meta?.tripName || ""} Day ${meta?.dayNumber || ""} Route ${meta?.routeNumber || ""} Stage ${meta?.stageNumber || ""}`.trim(),
+  return {
+    name: meta?.stageName || safeBase,
+    desc: `${meta?.tripName || ""} Day ${meta?.dayNumber ?? ""} Route ${meta?.routeNumber ?? ""} Stage ${meta?.stageNumber ?? ""}`.trim(),
     time: new Date().toISOString(),
     creator: "RouteMapper",
   };
+}
 
-  const factor = 0.8; // how aggressively speed increases threshold
-  const max = 30; // cap
+function dynamicMinMoveMeters(gps) {
+  const baseMeters = 6; // meters, beats normal GPS jitter
+  const factor = 0.8;
+  const maxMeters = 30;
 
   const v = Number.isFinite(gps?.speed) ? gps.speed : 0; // m/s
-  const threshold = base + v * factor; // assumes ~1s between fixes
-  return clamp(threshold, base, max);
+  const threshold = baseMeters + v * factor;
+  return clamp(threshold, baseMeters, maxMeters);
 }
 
 function makeLocalId(meta) {
@@ -128,18 +124,6 @@ function makeLocalId(meta) {
 
 function getSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-}
-
-function downloadText(filename, text, mime = "text/plain") {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 function safeSlug(s) {
@@ -158,51 +142,6 @@ function xmlEscape(s) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
-}
-
-function fmtIso(ts) {
-  // Your timestamps are already ISO strings; keep them stable.
-  // If you ever pass a number, this still works.
-  if (typeof ts === "string") return ts;
-  const d = ts instanceof Date ? ts : new Date(ts);
-  return d.toISOString();
-}
-
-// Your bearingDeg() function (kept as-is, just included for completeness)
-function bearingDeg(a, b) {
-  const lat1 = (Number(a.lat) * Math.PI) / 180;
-  const lat2 = (Number(b.lat) * Math.PI) / 180;
-  const dLon = ((Number(b.lon) - Number(a.lon)) * Math.PI) / 180;
-
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-  let brng = (Math.atan2(y, x) * 180) / Math.PI; // -180..180
-  brng = (brng + 360) % 360; // 0..359
-  return Math.round(brng);
-}
-
-function escXml(s = "") {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function wpName(i, wp) {
-  if (String(wp?.kind).toLowerCase() === "start") return "START";
-  return `WP ${i}`; // your sample starts at WP 2 after START
-}
-
-function wpDesc(wp) {
-  const kind = String(wp?.kind || "").toLowerCase();
-  if (kind === "start") return "START";
-  const poi = (wp?.poi || "").trim();
-  return poi || mapIconToRNSymbol(wp); // prefer POI text if present
 }
 
 // Your icon mapping (unchanged)
@@ -416,9 +355,8 @@ function getCloudStatus({ online, userId, pendingCount }) {
 }
 
 export default function RallyLayout() {
-  const flushingRef = useRef(false);
-  const { user, guestMode, loading, signOut } = useAuth();
-
+  const { user, signOut } = useAuth();
+  const localOwner = user?.id ?? getGuestOwnerId();
   const [pendingCount, setPendingCount] = useState(
     () => readPendingQueue().length,
   );
@@ -449,7 +387,7 @@ export default function RallyLayout() {
 
   const cloud = getCloudStatus({
     online,
-    userId: user?.id,
+    userId: null,
     pendingCount,
   });
   const cloudStatus = !online
@@ -457,7 +395,7 @@ export default function RallyLayout() {
     : pendingCount > 0
       ? { label: `Pending (${pendingCount})`, dot: "🟡" }
       : { label: "Synced", dot: "🟢" };
-  const localOwner = user?.id ?? "guest";
+
   const [currentGPS, setCurrentGPS] = useState(null); // ✅ LIVE GPS
   const [startGPS, setStartGPS] = useState(null);
   const [waypoints, setWaypoints] = useState([]);
@@ -468,23 +406,11 @@ export default function RallyLayout() {
   const [navIconId, setNavIconId] = useState("straight");
   const [controlIconId, setControlIconId] = useState("start"); // pick a sensible default
   const recognitionRef = useRef(null);
-  const lastFixTsRef = useRef(null); // timestamp of GPS fix used for last waypoint
-  const lastGpsRef = useRef(null); // latest GPS fix (optional, for speed gating)
-  const canAddWaypoint = !!currentGPS && hasNewFix(currentGPS);
-  function getFixTs(gps) {
-    const t = gps?.timestamp ? Date.parse(gps.timestamp) : NaN;
-    return Number.isFinite(t) ? t : null;
-  }
-
-  function hasNewFix(gps) {
-    const t = getFixTs(gps);
-    if (!t) return false;
-    if (!lastFixTsRef.current) return true;
-    return t > lastFixTsRef.current;
-  }
+  // const localOwner = getGuestOwnerId();
+  // const user = null;
 
   const [isListening, setIsListening] = useState(false);
-  const [dictationDraft, setDictationDraft] = useState("");
+
   // Trip meta
   const [tripName, setTripName] = useState("Survey Trip");
   const [tripDate, setTripDate] = useState(
@@ -500,13 +426,9 @@ export default function RallyLayout() {
   const [stageNumber, setStageNumber] = useState(1);
 
   // Archive completed stages in-memory (so you can export a whole day/route later)
-  const [stageArchive, setStageArchive] = useState([]);
   // each item: { tripName, tripDate, dayNumber, routeName, stageNumber, startedAt, endedAt, waypoints }
   const [stageActive, setStageActive] = useState(false);
   const [stageStartedAt, setStageStartedAt] = useState(null);
-  const stageWps = (waypoints || []).filter(
-    (wp) => wp.kind !== "start" && wp.poi !== "START",
-  );
 
   const handleNewStage = () => {
     if (stageActive) {
@@ -530,27 +452,7 @@ export default function RallyLayout() {
 
   const STAGE_DRAFT_KEY = "rm_stage_draft_v1";
 
-  useEffect(() => {
-    if (!user?.id) return;
-
-    let ignore = false;
-
-    (async () => {
-      if (flushingRef.current) return;
-      flushingRef.current = true;
-
-      try {
-        const { remaining } = await flushPendingQueue(user);
-        if (!ignore) setPendingCount(remaining);
-      } finally {
-        flushingRef.current = false;
-      }
-    })();
-
-    return () => {
-      ignore = true;
-    };
-  }, [user?.id]);
+  useEffect(() => {}, []);
 
   useEffect(() => {
     if (!stageActive) return;
@@ -606,13 +508,11 @@ export default function RallyLayout() {
     try {
       const raw = localStorage.getItem(STAGE_DRAFT_KEY);
       if (!raw) return;
+
       const draft = JSON.parse(raw);
 
-      // Only restore if it was active
       if (!draft?.stageActive) return;
 
-      // Option A: auto-resume
-      // Option B: ask user (recommended)
       const ok = confirm(
         `Resume unsaved stage?\nDay ${draft.dayNumber} • ${draft.routeName} • Stage ${draft.stageNumber}`,
       );
@@ -843,37 +743,34 @@ export default function RallyLayout() {
     saveStageLocal(localOwner, localId, payload);
 
     // 2️⃣ Export ZIP (await this!)
-    const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
+    try {
+      const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
 
-    const metaHeader = {
-      name: meta?.stageName || base,
-      desc: `${meta?.tripName || ""} Day ${meta?.dayNumber || ""} Route ${meta?.routeNumber || ""} Stage ${meta?.stageNumber || ""}`.trim(),
-      time: new Date().toISOString(),
-      creator: "RouteMapper",
-    };
+      const metaHeader = buildMetaHeader(meta, base);
 
-    const openRallyGpxXml = exportOpenRallyGpx(
-      routePoints,
-      meta?.stageName || base,
-      metaHeader,
-      {
-        includeTrack: false,
-        includeWaypoints: true,
-      },
-    );
+      const openRallyGpxXml = exportOpenRallyGpx(
+        routePoints,
+        meta?.stageName || base,
+        metaHeader,
+        {
+          includeTrack: false,
+          includeWaypoints: true,
+        },
+      );
 
-    // only if you have breadcrumbPoints (recommended)
+      const blob = await makeStageZip({
+        meta,
+        startGPS,
+        waypoints,
+        openRallyGpxXml,
+        baseName: base,
+      });
 
-    const blob = await makeStageZip({
-      meta,
-      startGPS,
-      waypoints,
-      openRallyGpxXml,
-      trackGpxXml,
-      // includeTrackFile: true,
-      baseName: base,
-    });
-    downloadBlob(`${base}.zip`, blob);
+      downloadBlob(`${base}.zip`, blob);
+    } catch (e) {
+      console.error("Export/ZIP failed", e);
+      alert("Stage saved locally, but export failed. Check console.");
+    }
 
     const { flushed, remaining } = await flushPendingQueue(user);
     if (flushed > 0) {
@@ -933,8 +830,12 @@ export default function RallyLayout() {
   };
 
   const handleSetStart = () => {
-    if (!currentGPS)
+    if (
+      !Number.isFinite(currentGPS?.lat) ||
+      !Number.isFinite(currentGPS?.lon)
+    ) {
       return alert("GPS not ready yet — wait a moment and try again.");
+    }
 
     const ts = new Date().toISOString();
 
@@ -996,7 +897,6 @@ export default function RallyLayout() {
 
     // Optional freshness guard (recommended if you store fixTs)
     // const now = Date.now();
-    const fixTs = currentGPS.fixTs ?? Date.parse(currentGPS.timestamp);
     // if (!Number.isFinite(fixTs) || now - fixTs > 2000) {
     //  alert("Waiting for a fresh GPS fix…");
     //  return;
@@ -1013,6 +913,15 @@ export default function RallyLayout() {
           ) || null;
 
       if (last) {
+        // ✅ Guard before using currentGPS.lat/lon
+        if (
+          !Number.isFinite(currentGPS?.lat) ||
+          !Number.isFinite(currentGPS?.lon)
+        ) {
+          console.log("⚠️ Ignored: invalid GPS fix");
+          return prev;
+        }
+
         const moved = haversineMeters(last, {
           lat: currentGPS.lat,
           lon: currentGPS.lon,
@@ -1023,8 +932,8 @@ export default function RallyLayout() {
         console.log("📍 Waypoint Debug:", {
           speed: currentGPS.speed,
           accuracy: currentGPS.accuracy,
-          moved: moved.toFixed(2),
-          minMove: minMove.toFixed(2),
+          movedMeters: Number(moved.toFixed(2)),
+          minMoveMeters: Number(minMove.toFixed(2)),
           lat: currentGPS.lat,
           lon: currentGPS.lon,
           ts: currentGPS.timestamp,
@@ -1034,6 +943,15 @@ export default function RallyLayout() {
           console.log("⏳ Ignored due to threshold");
           return prev;
         }
+      }
+
+      // ✅ Also guard for the "first waypoint" case (when last is null)
+      if (
+        !Number.isFinite(currentGPS?.lat) ||
+        !Number.isFinite(currentGPS?.lon)
+      ) {
+        console.log("⚠️ Ignored: invalid GPS fix (no last)");
+        return prev;
       }
 
       const typeToSave = typeOverride ?? waypointType;
@@ -1050,7 +968,7 @@ export default function RallyLayout() {
       const next = {
         lat: currentGPS.lat,
         lon: currentGPS.lon,
-        poi: poi.trim(),
+        poi: (poi ?? "").trim(),
         timestamp: new Date().toISOString(),
         kind: "waypoint",
         type: typeToSave,
@@ -1086,16 +1004,14 @@ export default function RallyLayout() {
 
     // 2) Then add all NON-start waypoints sorted by timestamp
     const rest = (waypoints || [])
-      .filter((wp) => wp)
-      .map((wp) => ({
-        ...wp,
-        lat: Number(wp.lat),
-        lon: Number(wp.lon),
-        timestamp: wp.timestamp ?? "",
-      }))
-      .filter((wp) => Number.isFinite(wp.lat) && Number.isFinite(wp.lon))
-      .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+      .filter((wp) => wp.kind !== "start" && wp.poi !== "START")
+      .sort((a, b) => {
+        const aTime = a.timestamp ? Date.parse(a.timestamp) : 0;
+        const bTime = b.timestamp ? Date.parse(b.timestamp) : 0;
+        return aTime - bTime;
+      });
 
+    pts.push(...rest);
     return pts;
   }, [startGPS, waypoints]);
 
@@ -1107,8 +1023,6 @@ export default function RallyLayout() {
     }
     return 0;
   }, [waypoints]);
-
-  const totalText = useMemo(() => fmtKm(totalMeters), [totalMeters]);
 
   const distanceRows = useMemo(() => {
     // routePoints is already ordered and has START included
@@ -1151,21 +1065,6 @@ export default function RallyLayout() {
 
     return { legs, totalMeters: total };
   }, [routePoints]);
-
-  // --- New Day / New Route helpers ---
-  const startNewDay = () => {
-    setDayNumber((d) => d + 1);
-    setRouteNumber(1);
-    setRouteName("Route 1");
-    setStageNumber(1);
-  };
-
-  const startNewRoute = () => {
-    const next = routeNumber + 1;
-    setRouteNumber(next);
-    setRouteName(`Route ${next}`);
-    setStageNumber(1);
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
