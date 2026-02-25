@@ -704,7 +704,20 @@ export default function RallyLayout() {
     setControlIconId("start");
   };
 
+  // Add this state near your other state hooks (once):
+  const [isEndingStage, setIsEndingStage] = useState(false);
+
   const handleEndStage = async () => {
+    // ✅ prevent double-taps / re-entry
+    if (isEndingStage) return;
+    if (!stageActive) return;
+
+    setIsEndingStage(true);
+
+    // ✅ yield so the UI can repaint (button can show "Ending…") before heavy work/download UI
+    await new Promise((r) => setTimeout(r, 0));
+
+    // We'll build these early so we can still queue/archive/reset in finally even if something fails
     const endedAt = new Date().toISOString();
 
     const localId = makeLocalId({
@@ -739,94 +752,112 @@ export default function RallyLayout() {
       created_at: new Date().toISOString(),
     };
 
-    // 1️⃣ Save locally
-    saveStageLocal(localOwner, localId, payload);
+    // Decide cloud capability once
+    const canCloudSync = Boolean(user?.id) && navigator.onLine;
 
-    // 2️⃣ Export ZIP (await this!)
+    // If we can't cloud sync, we should queue (offline/guest)
+    let needsQueue = !canCloudSync;
+
     try {
-      const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
+      // 1️⃣ Save locally (local-first, always)
+      saveStageLocal(localOwner, localId, payload);
 
-      const metaHeader = buildMetaHeader(meta, base);
-
-      const openRallyGpxXml = exportOpenRallyGpx(
-        routePoints,
-        meta?.stageName || base,
-        metaHeader,
-        {
-          includeTrack: false,
-          includeWaypoints: true,
-        },
-      );
-
-      const blob = await makeStageZip({
-        meta,
-        startGPS,
-        waypoints,
-        openRallyGpxXml,
-        baseName: base,
-      });
-
-      downloadBlob(`${base}.zip`, blob);
-    } catch (e) {
-      console.error("Export/ZIP failed", e);
-      alert("Stage saved locally, but export failed. Check console.");
-    }
-
-    const { flushed, remaining } = await flushPendingQueue(user);
-    if (flushed > 0) {
-      console.log(`✅ Flushed ${flushed} pending stage(s)`);
-    }
-    setPendingCount(remaining);
-
-    // 3️⃣ Sync to Supabase
-    let needsQueue = !user?.id;
-
-    if (user?.id) {
+      // 2️⃣ Export ZIP (await this!)
       try {
-        const { error } = await upsertStageExport({
-          userId: user.id,
-          localId: localId,
+        const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
+
+        const metaHeader = buildMetaHeader(meta, base);
+
+        const openRallyGpxXml = exportOpenRallyGpx(
+          routePoints,
+          meta?.stageName || base,
+          metaHeader,
+          {
+            includeTrack: false,
+            includeWaypoints: true,
+          },
+        );
+
+        const blob = await makeStageZip({
           meta,
-          payload,
+          startGPS,
+          waypoints,
+          openRallyGpxXml,
+          baseName: base,
         });
 
-        if (error) {
-          console.warn("Supabase sync failed:", error);
+        downloadBlob(`${base}.zip`, blob);
+      } catch (e) {
+        console.error("Export/ZIP failed", e);
+        alert("Stage saved locally, but export failed. Check console.");
+      }
+
+      // 3️⃣ Sync to Supabase (only if signed in AND online)
+      if (canCloudSync) {
+        try {
+          const { error } = await upsertStageExport({
+            userId: user.id,
+            localId,
+            meta,
+            payload,
+          });
+
+          if (error) {
+            console.warn("Supabase sync failed:", error);
+            needsQueue = true;
+          }
+        } catch (err) {
+          console.error("Supabase crashed:", err);
           needsQueue = true;
         }
-      } catch (err) {
-        console.error("Supabase crashed:", err);
-        needsQueue = true;
       }
+
+      // 4️⃣ Queue if needed (guest/offline OR supabase failed)
+      if (needsQueue) {
+        try {
+          enqueueStage(stage);
+        } catch (e) {
+          console.warn("Enqueue failed:", e);
+        }
+      }
+
+      // 5️⃣ 🔁 Flush queue if signed in & online (never block UI reset)
+      if (canCloudSync) {
+        try {
+          const { flushed, remaining } = await flushPendingQueue(user);
+          if (flushed > 0)
+            console.log(`✅ Flushed ${flushed} pending stage(s)`);
+          setPendingCount(remaining);
+        } catch (err) {
+          console.warn("Queue flush failed:", err);
+          setPendingCount(readPendingQueue().length);
+        }
+      } else {
+        setPendingCount(readPendingQueue().length);
+      }
+
+      // 6️⃣ Archive (local UI history)
+      setStageArchive((prev) => [...prev, stage]);
+    } finally {
+      // 7️⃣ Reset UI (ALWAYS runs, even if Supabase is blocked by Safari)
+      setStageActive(false);
+      setStageStartedAt(null);
+      setWaypoints([]);
+      setStartGPS(null);
+      setPoi("");
+      setHazardIconId("danger_1");
+      setNavIconId("straight");
+      setControlIconId("start");
+      setStageNumber((n) => n + 1);
+
+      try {
+        localStorage.removeItem(STAGE_DRAFT_KEY);
+      } catch {
+        // Silently ignore errors when clearing draft
+      }
+
+      setIsEndingStage(false);
     }
-
-    // 4️⃣ Queue if needed
-    if (needsQueue) {
-      enqueueStage(stage);
-    }
-
-    // 5️⃣ 🔁 Flush queue if signed in
-    if (user?.id) {
-      const { remaining } = await flushPendingQueue(user);
-      setPendingCount(remaining);
-    } else {
-      setPendingCount(readPendingQueue().length);
-    }
-
-    // 6️⃣ Archive
-    setStageArchive((prev) => [...prev, stage]);
-
-    // 7️⃣ Reset UI
-    setStageActive(false);
-    setStageStartedAt(null);
-    setWaypoints([]);
-    setStartGPS(null);
-    setPoi("");
-    setHazardIconId("danger_1");
-    setNavIconId("straight");
-    setControlIconId("start");
-    setStageNumber((n) => n + 1);
-    localStorage.removeItem(STAGE_DRAFT_KEY);
   };
 
   const handleSetStart = () => {
@@ -1184,6 +1215,12 @@ export default function RallyLayout() {
               title={stageActive ? "End current stage" : "Start a new stage"}
             >
               {stageActive ? "⏹ End Stage" : "▶️ Start Stage"}
+            </button>
+            <button
+              disabled={!stageActive || isEndingStage}
+              onClick={handleEndStage}
+            >
+              {isEndingStage ? "Ending…" : "End Stage"}
             </button>
           </div>
         </section>
