@@ -1,6 +1,7 @@
 // src/RallyLayout.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
+import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
 import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
@@ -1320,7 +1321,12 @@ export default function RallyLayout() {
               disabled={!stageActive}
               onClick={handleSetStart}
             >
-              ✅ Start Set (tap to update)
+              <img
+                src={startflag}
+                alt="Start Flag"
+                className="h-6 w-6 rounded"
+              />
+              Start Set (tap to update)
             </button>
 
             <label className="flex items-center gap-3 mt-3 select-none">
