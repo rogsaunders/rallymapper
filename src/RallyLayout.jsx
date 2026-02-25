@@ -410,6 +410,9 @@ export default function RallyLayout() {
   // const user = null;
 
   const [isListening, setIsListening] = useState(false);
+  const [showMap, setShowMap] = useState(true);
+  const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
+  const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
 
   // Trip meta
   const [tripName, setTripName] = useState("Survey Trip");
@@ -1225,17 +1228,77 @@ export default function RallyLayout() {
           </div>
         </section>
         {/* MAP: horizontal, not tall */}
-        <section className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-          <div className="h-[100px] sm:h-[180px] md:h-[200px]">
+
+        {mapMode === "review" ? (
+          <div className="fixed inset-0 z-50 bg-black">
+            {/* EXIT FULLSCREEN BUTTON */}
+            <div className="absolute top-4 right-4 z-[60]">
+              <button
+                onClick={() => setMapMode("normal")}
+                className="px-4 py-2 rounded-xl bg-white text-gray-900 shadow-md border"
+              >
+                Exit Full Screen
+              </button>
+            </div>
             <MapView
               currentGPS={currentGPS}
               startGPS={startGPS}
               waypoints={waypoints}
               followMap={followMap}
-              setFollowMap={setFollowMap}
+              mapMode="review"
+              mapSource={mapSource}
             />
           </div>
-        </section>
+        ) : (
+          <section className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+            <div
+              className={
+                "transition-all duration-300 overflow-hidden " +
+                (showMap ? "h-[100px] sm:h-[180px] md:h-[200px]" : "h-0")
+              }
+            >
+              <MapView
+                currentGPS={currentGPS}
+                startGPS={startGPS}
+                waypoints={waypoints}
+                followMap={followMap}
+                mapMode={mapMode}
+                mapSource={mapSource}
+                resizeKey={showMap ? 1 : 0}
+              />
+            </div>
+          </section>
+        )}
+
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={() => setShowMap((v) => !v)}
+            className="px-3 py-2 rounded-xl border"
+          >
+            {showMap ? "Hide Map" : "Show Map"}
+          </button>
+
+          <button
+            onClick={() =>
+              setMapMode((m) => (m === "review" ? "normal" : "review"))
+            }
+            className="px-3 py-2 rounded-xl border"
+            disabled={!showMap}
+          >
+            {mapMode === "review" ? "Exit Full Screen" : "Full Screen"}
+          </button>
+
+          <select
+            value={mapSource}
+            onChange={(e) => setMapSource(e.target.value)}
+            className="px-3 py-2 rounded-xl border"
+            disabled={!showMap}
+          >
+            <option value="osm">OSM</option>
+            <option value="opentopo">OpenTopoMap</option>
+            <option value="esri_imagery">Esri Imagery</option>
+          </select>
+        </div>
 
         {/* INPUT CONTROLS ROW (above the two columns) */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-3">

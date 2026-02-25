@@ -45,12 +45,14 @@ const svgToDivIcon = (svg, className = "") =>
     popupAnchor: [0, -13],
   });
 
-function FixResize({ resizeKey }) {
+function FixResize() {
   const map = useMap();
+
   useEffect(() => {
     const t = setTimeout(() => map.invalidateSize(), 50);
     return () => clearTimeout(t);
-  }, [map, resizeKey]);
+  }, [map]);
+
   return null;
 }
 
@@ -76,35 +78,7 @@ export default function MapView({
   startGPS,
   waypoints,
   followMap,
-  showMap = true,
-  mapMode = "normal",
-  mapSource = "osm",
-  resizeKey = 0,
 }) {
-  const tile = useMemo(() => {
-    switch (mapSource) {
-      case "esri_imagery":
-        return {
-          url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-          attribution: "Tiles © Esri",
-          maxZoom: 19,
-        };
-      case "opentopo":
-        return {
-          url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-          attribution: "© OpenTopoMap (CC-BY-SA)",
-          maxZoom: 17,
-        };
-      case "osm":
-      default:
-        return {
-          url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-          attribution: "&copy; OpenStreetMap contributors",
-          maxZoom: 19,
-        };
-    }
-  }, [mapSource]);
-
   const leafletIcons = useMemo(() => {
     const hazardDefaultSvg = ICONS?.hazard?.svg;
     const hazardVariants = ICONS?.hazard?.variants || {};
@@ -137,7 +111,7 @@ export default function MapView({
         ),
       ],
     ]);
-  }, []);
+  }, [ICONS]);
 
   function getLeafletIcon(key, svgFallback) {
     const k = key || "unknown";
@@ -222,27 +196,17 @@ export default function MapView({
   }, [routePositions]);
 
   return (
-    <div
-      className={
-        mapMode === "review"
-          ? "fixed inset-0 z-50" // full screen map
-          : showMap
-            ? "h-[100px] sm:h-[180px] md:h-[200px]" // normal
-            : "h-0" // collapsed
-      }
-    >
+    <div className="h-full w-full relative">
       <MapContainer
         center={[defaultCenter.lat, defaultCenter.lon]}
         zoom={14}
         style={{ height: "100%", width: "100%" }}
       >
-        <FixResize showMap={showMap} />
-        <FixResize resizeKey={resizeKey} />
+        <FixResize />
 
         <TileLayer
-          attribution={tile.attribution}
-          url={tile.url}
-          maxZoom={tile.maxZoom}
+          attribution="&copy; OpenStreetMap contributors"
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
         <Recenter center={recenterTarget} zoom={14} enabled={followMap} />
@@ -315,13 +279,11 @@ export default function MapView({
               ICONS.note?.svg;
           } else if (type === "nav") {
             const navKey = iconId || "straight";
-            const DEBUG = false;
-            if (DEBUG && type === "nav")
-              console.log("NAV waypoint debug:", {
-                type,
-                iconId,
-                hasVariant: !!ICONS.nav?.variants?.[iconId],
-              });
+            console.log("NAV marker", {
+              type,
+              iconId,
+              hasVariant: !!ICONS.nav?.variants?.[iconId],
+            });
             svgFallback =
               ICONS.nav?.variants?.[navKey]?.svg ||
               ICONS.nav?.svg ||
@@ -356,7 +318,7 @@ export default function MapView({
 
           return (
             <Marker
-              key={`${wp.timestamp ?? "no-ts"}_${lat}_${lon}_${idx}`}
+              key={wp.timestamp ?? `${lat},${lon},${idx}`}
               position={[lat, lon]}
               icon={icon}
             >
@@ -374,6 +336,8 @@ export default function MapView({
                     IconId: {String(rawIconId)}
                   </div>
                 )}
+                Object.keys(ICONS?.nav?.variants || {})); console.log("navKey
+                =", iconId, "variant =", ICONS?.nav?.variants?.[iconId]);
               </Popup>
             </Marker>
           );
