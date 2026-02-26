@@ -685,12 +685,21 @@ export default function RallyLayout() {
       const lon = Number(gps.lon);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
-      const last = trackLastRef.current;
-      if (last) {
-        const moved = haversineMeters(last, { lat, lon });
+      const curFix = { lat, lon };
 
-        if (!Number.isFinite(moved)) return;
-        if (moved < TRACK_MIN_MOVE_M) return;
+      const last = trackLastRef.current; // last track point we accepted
+
+      if (last) {
+        const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
+        if (!Number.isFinite(lastFix.lat) || !Number.isFinite(lastFix.lon)) {
+          // If last is corrupted, just reset it and allow capturing again
+          console.log("⚠️ Invalid last track fix; resetting", last);
+          trackLastRef.current = null;
+        } else {
+          const moved = haversineMeters(lastFix, curFix);
+          if (!Number.isFinite(moved)) return;
+          if (moved < TRACK_MIN_MOVE_M) return; // suppress jitter
+        }
       }
 
       const pt = { lat, lon, time: new Date().toISOString() };
@@ -699,7 +708,7 @@ export default function RallyLayout() {
     }, TRACK_INTERVAL_MS);
 
     return () => clearInterval(id);
-  }, [stageActive]);
+  }, [stageActive, TRACK_INTERVAL_MS, TRACK_MIN_MOVE_M]);
 
   // const [stageStartedAt, setStageStartedAt] = useState(null);
 
@@ -991,59 +1000,50 @@ export default function RallyLayout() {
               Number.isFinite(Number(p?.lon)),
           ) || null;
 
-      if (last) {
-        // ✅ Guard before using currentGPS.lat/lon
-        if (
-          !Number.isFinite(currentGPS?.lat) ||
-          !Number.isFinite(currentGPS?.lon)
-        ) {
-          console.log("⚠️ Ignored: invalid GPS fix");
-          return prev;
-        }
+      const curFix = {
+        lat: Number(currentGPS.lat),
+        lon: Number(currentGPS.lon),
+      };
 
-        const moved =
-          (last,
-          {
-            lat: currentGPS.lat,
-            lon: currentGPS.lon,
+      // If we have a previous point, enforce threshold
+      if (last) {
+        const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
+
+        if (Number.isFinite(lastFix.lat) && Number.isFinite(lastFix.lon)) {
+          const moved = haversineMeters(lastFix, curFix);
+          const minMove = dynamicMinMoveMeters(currentGPS);
+
+          console.log("📍 Waypoint Debug:", {
+            speed: currentGPS?.speed,
+            accuracy: currentGPS?.accuracy,
+            movedMeters: Number.isFinite(moved)
+              ? Number(moved.toFixed(2))
+              : null,
+            minMoveMeters: Number.isFinite(minMove)
+              ? Number(minMove.toFixed(2))
+              : null,
+            lat: currentGPS?.lat,
+            lon: currentGPS?.lon,
+            ts: currentGPS?.timestamp,
           });
 
-        const minMove = dynamicMinMoveMeters(currentGPS);
-
-        console.log("📍 Waypoint Debug:", {
-          speed: currentGPS?.speed,
-          accuracy: currentGPS?.accuracy,
-          movedMeters: Number.isFinite(moved) ? Number(moved.toFixed(2)) : null,
-          minMoveMeters: Number.isFinite(minMove)
-            ? Number(minMove.toFixed(2))
-            : null,
-          lat: currentGPS?.lat,
-          lon: currentGPS?.lon,
-          ts: currentGPS?.timestamp,
-        });
-
-        if (!Number.isFinite(moved) || !Number.isFinite(minMove)) {
-          console.log("⚠️ Invalid movement calculation");
-          return prev;
-        }
-
-        if (moved < minMove) {
-          console.log("⏳ Ignored due to threshold");
-          return prev;
+          // If movement calc failed, don't block adding — just skip the gate
+          if (
+            Number.isFinite(moved) &&
+            Number.isFinite(minMove) &&
+            moved < minMove
+          ) {
+            console.log("⏳ Ignored due to threshold");
+            return prev; // ✅ prev is in-scope here
+          }
+        } else {
+          console.log("⚠️ Invalid last waypoint fix", last);
+          // allow adding
         }
       }
 
-      // ✅ Also guard for the "first waypoint" case (when last is null)
-      if (
-        !Number.isFinite(currentGPS?.lat) ||
-        !Number.isFinite(currentGPS?.lon)
-      ) {
-        console.log("⚠️ Ignored: invalid GPS fix (no last)");
-        return prev;
-      }
-
+      // build waypoint (your existing code)
       const typeToSave = typeOverride ?? waypointType;
-
       const iconId =
         typeToSave === "hazard"
           ? hazardIconId || "danger_1"
@@ -1056,17 +1056,14 @@ export default function RallyLayout() {
       const next = {
         lat: currentGPS.lat,
         lon: currentGPS.lon,
-        poi: (poi ?? "").trim(),
+        poi: poi.trim(),
         timestamp: new Date().toISOString(),
         kind: "waypoint",
         type: typeToSave,
         iconId,
       };
 
-      const segmentMeters = last ? haversineMeters(last, next) : 0;
-      const totalMeters = (Number(last?.totalMeters) || 0) + segmentMeters;
-
-      return [...prev, { ...next, segmentMeters, totalMeters }];
+      return [...prev, next];
     });
 
     setPoi("");
@@ -1276,7 +1273,9 @@ export default function RallyLayout() {
             <button
               disabled={!stageActive || isEndingStage}
               onClick={handleEndStage}
-            ></button>
+            >
+              {isEndingStage ? "Ending..." : "End Stage"}
+            </button>
           </div>
         </section>
         {/* MAP: horizontal, not tall */}
