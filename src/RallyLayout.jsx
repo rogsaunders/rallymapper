@@ -688,7 +688,9 @@ export default function RallyLayout() {
       const last = trackLastRef.current;
       if (last) {
         const moved = haversineMeters(last, { lat, lon });
-        if (moved < 8) return; // meters; tune as you like
+
+        if (!Number.isFinite(moved)) return;
+        if (moved < TRACK_MIN_MOVE_M) return;
       }
 
       const pt = { lat, lon, time: new Date().toISOString() };
@@ -1009,14 +1011,21 @@ export default function RallyLayout() {
         const minMove = dynamicMinMoveMeters(currentGPS);
 
         console.log("📍 Waypoint Debug:", {
-          speed: currentGPS.speed,
-          accuracy: currentGPS.accuracy,
-          movedMeters: Number(moved.toFixed(2)),
-          minMoveMeters: Number(minMove.toFixed(2)),
-          lat: currentGPS.lat,
-          lon: currentGPS.lon,
-          ts: currentGPS.timestamp,
+          speed: currentGPS?.speed,
+          accuracy: currentGPS?.accuracy,
+          movedMeters: Number.isFinite(moved) ? Number(moved.toFixed(2)) : null,
+          minMoveMeters: Number.isFinite(minMove)
+            ? Number(minMove.toFixed(2))
+            : null,
+          lat: currentGPS?.lat,
+          lon: currentGPS?.lon,
+          ts: currentGPS?.timestamp,
         });
+
+        if (!Number.isFinite(moved) || !Number.isFinite(minMove)) {
+          console.log("⚠️ Invalid movement calculation");
+          return prev;
+        }
 
         if (moved < minMove) {
           console.log("⏳ Ignored due to threshold");
@@ -1267,9 +1276,7 @@ export default function RallyLayout() {
             <button
               disabled={!stageActive || isEndingStage}
               onClick={handleEndStage}
-            >
-              {isEndingStage ? "Ending…" : "End Stage"}
-            </button>
+            ></button>
           </div>
         </section>
         {/* MAP: horizontal, not tall */}
