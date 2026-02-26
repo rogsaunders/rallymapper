@@ -663,6 +663,42 @@ export default function RallyLayout() {
     { id: "control", label: "Control" },
   ];
 
+  const [trackPoints, setTrackPoints] = useState([]); // {lat, lon, ts}
+  const trackLastRef = useRef(null); // last point used for distance threshold
+  const gpsRef = useRef(null);
+
+  useEffect(() => {
+    gpsRef.current = currentGPS;
+  }, [currentGPS]);
+
+  const TRACK_INTERVAL_MS = 5000;
+  const TRACK_MIN_MOVE_M = 10; // or 10000
+
+  useEffect(() => {
+    if (!stageActive) return;
+
+    const id = setInterval(() => {
+      const gps = gpsRef.current;
+      if (!gps) return;
+
+      const lat = Number(gps.lat);
+      const lon = Number(gps.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+      const last = trackLastRef.current;
+      if (last) {
+        const moved = haversineMeters(last, { lat, lon });
+        if (moved < 8) return; // meters; tune as you like
+      }
+
+      const pt = { lat, lon, time: new Date().toISOString() };
+      trackLastRef.current = pt;
+      setTrackPoints((prev) => [...prev, pt]);
+    }, TRACK_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  }, [stageActive]);
+
   // const [stageStartedAt, setStageStartedAt] = useState(null);
 
   const canChangeMeta = !stageActive; // lock meta while stage is active (recommended)
@@ -700,6 +736,9 @@ export default function RallyLayout() {
     setWaypoints([]);
     setStartGPS(null);
     setPoi("");
+
+    setTrackPoints([]);
+    trackLastRef.current = null;
 
     // Optional defaults
     // setWaypointType("note");
@@ -777,8 +816,9 @@ export default function RallyLayout() {
           meta?.stageName || base,
           metaHeader,
           {
-            includeTrack: false,
+            includeTrack: true,
             includeWaypoints: true,
+            trackPoints,
           },
         );
 
@@ -853,6 +893,8 @@ export default function RallyLayout() {
       setNavIconId("straight");
       setControlIconId("start");
       setStageNumber((n) => n + 1);
+      setTrackPoints([]);
+      trackLastRef.current = null;
 
       try {
         localStorage.removeItem(STAGE_DRAFT_KEY);
@@ -957,10 +999,12 @@ export default function RallyLayout() {
           return prev;
         }
 
-        const moved = haversineMeters(last, {
-          lat: currentGPS.lat,
-          lon: currentGPS.lon,
-        });
+        const moved =
+          (last,
+          {
+            lat: currentGPS.lat,
+            lon: currentGPS.lon,
+          });
 
         const minMove = dynamicMinMoveMeters(currentGPS);
 
@@ -1171,7 +1215,7 @@ export default function RallyLayout() {
                   : "Increment day and reset route/stage"
               }
             >
-              📅 New Day
+              New Day
             </button>
             <div className="flex flex-wrap gap-2 items-center">
               {/* NEW ROUTE (before name) */}
@@ -1182,7 +1226,7 @@ export default function RallyLayout() {
                 disabled={stageActive}
                 title="Increment route, reset stage to 1"
               >
-                🛣️ New Route
+                New Route
               </button>
               {/* ROUTE NAME (primary) */}
               <input
@@ -1201,7 +1245,7 @@ export default function RallyLayout() {
                 disabled={stageActive}
                 title="Increment stage number"
               >
-                ➕ New Stage
+                New Stage
               </button>
               {/* STAGE NUMBER DISPLAY (readable, compact) */}
               <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold">
@@ -1218,7 +1262,7 @@ export default function RallyLayout() {
               onClick={stageActive ? handleEndStage : handleStartStage}
               title={stageActive ? "End current stage" : "Start a new stage"}
             >
-              {stageActive ? "⏹ End Stage" : "▶️ Start Stage"}
+              {stageActive ? "⏹ End Stage" : "Start Stage"}
             </button>
             <button
               disabled={!stageActive || isEndingStage}
@@ -1245,6 +1289,7 @@ export default function RallyLayout() {
               currentGPS={currentGPS}
               startGPS={startGPS}
               waypoints={waypoints}
+              trackPoints={trackPoints}
               followMap={followMap}
               mapMode="review"
               mapSource={mapSource}
