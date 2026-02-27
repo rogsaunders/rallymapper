@@ -203,7 +203,11 @@ function exportOpenRallyGpx(
       ...p,
       lat: Number(p.lat),
       lon: Number(p.lon),
-      timeIso: p.time ? toUtcIso(p.time) : null,
+      timeIso: p.time
+        ? String(p.time).includes("T")
+          ? String(p.time)
+          : toUtcIso(p.time)
+        : null,
       name: (p.name ?? `WP ${idx + 1}`).toString(),
       desc: (p.desc ?? "").toString(),
       segmentMeters: Number.isFinite(p.segmentMeters)
@@ -1295,10 +1299,11 @@ export default function RallyLayout() {
               currentGPS={currentGPS}
               startGPS={startGPS}
               waypoints={waypoints}
-              trackPoints={trackPoints}
+              trackPoints={trackPoints} // ✅ add
               followMap={followMap}
-              mapMode="review"
+              mapMode={mapMode}
               mapSource={mapSource}
+              resizeKey={showMap ? 1 : 0}
             />
           </div>
         ) : (
@@ -1313,6 +1318,7 @@ export default function RallyLayout() {
                 currentGPS={currentGPS}
                 startGPS={startGPS}
                 waypoints={waypoints}
+                trackPoints={trackPoints}
                 followMap={followMap}
                 mapMode={mapMode}
                 mapSource={mapSource}

@@ -11,12 +11,12 @@ import L from "leaflet";
 import { ICONS } from "../icons/iconRegistry";
 
 const LIVE_SVG = `<svg viewBox="0 0 24 24" width="24" height="24">
-  <text x="2" y="18">📡</text>
+  <circle cx="12" cy="12" r="6" fill="#2563EB" stroke="white" stroke-width="3"/>
+  <circle cx="12" cy="12" r="10" fill="none" stroke="#2563EB" stroke-opacity="0.35" stroke-width="2"/>
 </svg>`;
 
 const START_SVG = `<svg viewBox="0 0 24 24" width="24" height="24">
-  <circle cx="12" cy="12" r="10" fill="#111827" />
-  <text x="8" y="16" fill="white" font-size="10">S</text>
+  <circle cx="12" cy="12" r="9" fill="#2563EB" stroke="white" stroke-width="3" />
 </svg>`;
 
 function makeSvgDivIcon(svg, size = 28) {
@@ -75,6 +75,7 @@ export default function MapView({
   currentGPS,
   startGPS,
   waypoints,
+  trackPoints,
   followMap,
   showMap = true,
   mapMode = "normal",
@@ -166,36 +167,42 @@ export default function MapView({
 
   const recenterTarget = useMemo(() => {
     if (!followMap) return null;
-    const latestWaypoint = waypoints?.length
-      ? waypoints[waypoints.length - 1]
+    const lastTrk = trackPoints?.length
+      ? trackPoints[trackPoints.length - 1]
       : null;
-    return latestWaypoint ?? startGPS ?? currentGPS ?? null;
-  }, [followMap, waypoints, startGPS, currentGPS]);
+    return lastTrk ?? currentGPS ?? startGPS ?? null;
+  }, [followMap, trackPoints, currentGPS, startGPS]);
 
   const routePositions = useMemo(() => {
     const pts = [];
 
-    if (startGPS) {
-      const sLat = Number(startGPS.lat);
-      const sLon = Number(startGPS.lon);
-      if (Number.isFinite(sLat) && Number.isFinite(sLon))
-        pts.push([sLat, sLon]);
-    }
+    const add = (lat, lon) => {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const last = pts[pts.length - 1];
+      if (!last || last[0] !== lat || last[1] !== lon) pts.push([lat, lon]);
+    };
 
-    const rest = (waypoints || [])
-      .filter((wp) => wp && wp.kind !== "start" && wp.poi !== "START")
-      .map((wp) => [Number(wp.lat), Number(wp.lon), wp.timestamp])
+    // include start
+    if (startGPS) add(Number(startGPS.lat), Number(startGPS.lon));
+
+    const source =
+      (trackPoints?.length ? trackPoints : null) ??
+      (waypoints?.length ? waypoints : []);
+
+    const rest = source
+      .map((p) => [
+        Number(p.lat),
+        Number(p.lon),
+        p.time ?? p.ts ?? p.timestamp ?? "",
+      ])
       .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon))
-      .sort((a, b) => String(a[2] ?? "").localeCompare(String(b[2] ?? "")))
+      .sort((a, b) => String(a[2]).localeCompare(String(b[2])))
       .map(([lat, lon]) => [lat, lon]);
 
-    for (const p of rest) {
-      const last = pts[pts.length - 1];
-      if (!last || last[0] !== p[0] || last[1] !== p[1]) pts.push(p);
-    }
+    for (const [lat, lon] of rest) add(lat, lon);
 
     return pts;
-  }, [startGPS, waypoints]);
+  }, [startGPS, trackPoints, waypoints]);
 
   const segmentLabels = useMemo(() => {
     if (!routePositions || routePositions.length < 2) return [];
