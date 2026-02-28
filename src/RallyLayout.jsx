@@ -216,14 +216,18 @@ function exportOpenRallyGpx(
       totalMeters: Number.isFinite(p.totalMeters) ? Number(p.totalMeters) : 0,
     }));
 
-  // Normalize track points ONCE, early
-  const trkPts = (trackPoints && trackPoints.length ? trackPoints : [])
-    .filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
+  // Normalize track points ONCE, early (accept numbers OR numeric strings)
+  const trkPts = (Array.isArray(trackPoints) ? trackPoints : [])
     .map((p) => ({
-      lat: Number(p.lat),
-      lon: Number(p.lon),
-      timeIso: p.time ? toUtcIso(p.time) : null,
-    }));
+      lat: Number(p?.lat),
+      lon: Number(p?.lon),
+      timeIso: p?.time
+        ? String(p.time).includes("T")
+          ? String(p.time)
+          : toUtcIso(p.time)
+        : null,
+    }))
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
 
   const hasWpt = includeWaypoints && points.length > 0;
   const hasTrk = includeTrack && trkPts.length > 0;
@@ -825,6 +829,12 @@ export default function RallyLayout() {
         const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
 
         const metaHeader = buildMetaHeader(meta, base);
+
+        console.log(
+          "🧭 Exporting trackPoints:",
+          trackPoints?.length,
+          trackPoints?.[0],
+        );
 
         const openRallyGpxXml = exportOpenRallyGpx(
           routePoints,

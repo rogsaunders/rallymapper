@@ -205,28 +205,39 @@ export default function MapView({
   }, [startGPS, trackPoints, waypoints]);
 
   const segmentLabels = useMemo(() => {
-    if (!routePositions || routePositions.length < 2) return [];
+    // Use only START + WAYPOINTS for labels (not track points)
+    const pts = [];
+
+    const add = (lat, lon) => {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      pts.push([lat, lon]);
+    };
+
+    if (startGPS) add(Number(startGPS.lat), Number(startGPS.lon));
+
+    (waypoints || [])
+      .filter((wp) => wp && wp.kind !== "start" && wp.poi !== "START")
+      .forEach((wp) => add(Number(wp.lat), Number(wp.lon)));
+
+    if (pts.length < 2) return [];
+
     const labels = [];
-
-    for (let i = 0; i < routePositions.length - 1; i++) {
-      const a = routePositions[i];
-      const b = routePositions[i + 1];
-      if (!a || !b) continue;
-
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
       const meters = L.latLng(a[0], a[1]).distanceTo(L.latLng(b[0], b[1]));
       if (meters < 25) continue;
 
       const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-
       labels.push({
-        key: `seg-${i}`,
+        key: `wpseg-${i}`,
         position: mid,
         text: fmtKm(meters),
       });
     }
 
     return labels;
-  }, [routePositions]);
+  }, [startGPS, waypoints]);
 
   return (
     <div
