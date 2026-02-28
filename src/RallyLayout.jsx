@@ -197,6 +197,13 @@ function exportOpenRallyGpx(
     minCapDistanceMeters = 5,
   } = opts || {};
 
+  console.log("🧩 exportOpenRallyGpx opts", {
+    includeTrack,
+    includeWaypoints,
+    trackPointsLen: Array.isArray(trackPoints) ? trackPoints.length : null,
+    firstTrackPoint: Array.isArray(trackPoints) ? trackPoints[0] : null,
+  });
+
   const points = (routePoints || [])
     .filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
     .map((p, idx) => ({
@@ -232,6 +239,11 @@ function exportOpenRallyGpx(
   const hasWpt = includeWaypoints && points.length > 0;
   const hasTrk = includeTrack && trkPts.length > 0;
   if (!hasWpt && !hasTrk) return "";
+
+  console.log("🧩 exportOpenRallyGpx trkPts", {
+    trkPtsLen: trkPts.length,
+    firstTrkPt: trkPts[0] ?? null,
+  });
 
   // Only do CAP work if we will output WPTs
   const caps = hasWpt

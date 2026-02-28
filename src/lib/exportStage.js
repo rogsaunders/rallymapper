@@ -203,29 +203,44 @@ export async function toGpx({
 </gpx>`;
 }
 
-/**
- * Optional: Track-only GPX for mapping/breadcrumbs.
- * Keeping this separate prevents Rally Navigator from duplicating waypoint entries.
- */
-export function toTrackOnlyGpx({ meta, startGPS, waypoints }) {
-  const ptsIn = Array.isArray(waypoints) ? waypoints : [];
-  const ptsRaw = maybePrependStart(startGPS, ptsIn);
-  const pts = ensureTotalsMeters(ptsRaw);
+export function toTrackOnlyGpx({ meta, trackPoints }) {
+  const pts = (Array.isArray(trackPoints) ? trackPoints : [])
+    .map((p) => ({
+      lat: Number(p?.lat),
+      lon: Number(p?.lon),
+      time: p?.time,
+    }))
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
 
-  return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<gpx
-  xmlns="http://www.topografix.com/GPX/1/1"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  creator="Route Mapper"
-  version="1.1"
-  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
->
-  <metadata>
-    <name>${escXml(meta.tripName)} (Track)</name>
-    <time>${escXml(meta.endedAt)}</time>
-  </metadata>
-  ${buildTrackXml({ meta, pts })}
-</gpx>`;
+  if (!pts.length) return "";
+
+  const name = meta?.name || "Track";
+  const time = pts[0]?.time || new Date().toISOString();
+
+  const lines = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<gpx version="1.1" creator="RouteMapper"`,
+    `  xmlns="http://www.topografix.com/GPX/1/1">`,
+    `  <metadata>`,
+    `    <name>${escXml(name)}</name>`,
+    `    <time>${time}</time>`,
+    `  </metadata>`,
+    `  <trk>`,
+    `    <name>${escXml(name)}</name>`,
+    `    <trkseg>`,
+  ];
+
+  pts.forEach((p) => {
+    lines.push(
+      `      <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`,
+      p.time ? `        <time>${p.time}</time>` : null,
+      `      </trkpt>`,
+    );
+  });
+
+  lines.push(`    </trkseg>`, `  </trk>`, `</gpx>`);
+
+  return lines.filter(Boolean).join("\n");
 }
 
 function buildTrackXml({ meta, pts }) {
@@ -352,34 +367,39 @@ export async function makeStageZip({
   meta,
   startGPS,
   waypoints,
+  trackPoints, // ✅ NEW
   baseName,
-  includeTrackFile = true, // new: add separate breadcrumb GPX
+  openRallyGpxXml, // ✅ NEW (prebuilt)
+  includeTrackFile = true,
 }) {
   const zip = new JSZip();
 
-  // ✅ OpenRally GPX is waypoint-only by default to prevent duplicates in Rally Navigator
-  const openRallyGpx = await toGpx({
-    meta,
-    startGPS,
-    waypoints,
-    includeTrack: false,
-  });
+  // ✅ Use the GPX you already generated (with <trk> if you want it)
+  const openRallyGpx =
+    openRallyGpxXml ??
+    (await toGpx({
+      meta,
+      startGPS,
+      waypoints,
+      includeTrack: false, // fallback behaviour
+    }));
 
-  // Optional: separate track GPX (for mapping), not for RN import
+  // ✅ Track-only GPX should be built from TRACK POINTS, not waypoints
   const trackGpx = includeTrackFile
-    ? toTrackOnlyGpx({ meta, startGPS, waypoints })
+    ? toTrackOnlyGpx({ meta, startGPS, trackPoints })
     : null;
 
-  const jsonText = JSON.stringify({ meta, startGPS, waypoints }, null, 2);
+  const jsonText = JSON.stringify(
+    { meta, startGPS, waypoints, trackPoints },
+    null,
+    2,
+  );
   const htmlText = buildStageHtml({ meta, startGPS, waypoints });
 
   zip.file(`${baseName}.openrally.gpx`, openRallyGpx);
   zip.file(`${baseName}.json`, jsonText);
   zip.file(`${baseName}.html`, htmlText);
-
-  if (trackGpx) {
-    zip.file(`${baseName}.track.gpx`, trackGpx);
-  }
+  if (trackGpx) zip.file(`${baseName}.track.gpx`, trackGpx);
 
   return await zip.generateAsync({ type: "blob" });
 }
