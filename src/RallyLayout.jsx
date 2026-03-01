@@ -196,8 +196,6 @@ function exportOpenRallyGpx(
     trackPoints = null,
     minCapDistanceMeters = 5,
   } = opts || {};
-  const BLANK_PNG_1X1_B64 =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X0pQAAAAASUVORK5CYII=";
 
   console.log("🧩 exportOpenRallyGpx opts", {
     includeTrack,
@@ -321,9 +319,7 @@ function exportOpenRallyGpx(
   if (hasWpt) {
     points.forEach((p, i) => {
       const cap = caps[i] ?? 0;
-      const pngB64 =
-        dataUrlToPngBase64(p.tulipDataUrl || p.tulipPngDataUrl) ||
-        BLANK_PNG_1X1_B64;
+
       xmlLines.push(
         `  <wpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`,
         `    <name>${xmlEscape(p.name)}</name>`,
@@ -355,6 +351,8 @@ function exportOpenRallyGpx(
   xmlLines.push(`</gpx>`);
   return xmlLines.filter(Boolean).join("\n");
 }
+const BLANK_PNG_1X1_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X0pQAAAAASUVORK5CYII=";
 
 // Convert a data URL (data:image/png;base64,...) into just the base64 payload.
 // Accepts null/undefined and returns null.
