@@ -320,6 +320,10 @@ function exportOpenRallyGpx(
     points.forEach((p, i) => {
       const cap = caps[i] ?? 0;
 
+      const pngB64 =
+        dataUrlToPngBase64(p.tulipDataUrl || p.tulipPngDataUrl) ||
+        BLANK_PNG_1X1_B64;
+
       xmlLines.push(
         `  <wpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`,
         `    <name>${xmlEscape(p.name)}</name>`,
@@ -333,6 +337,7 @@ function exportOpenRallyGpx(
         `    </extensions>`,
         `  </wpt>`,
       );
+      if (!pngB64) console.warn("No pngB64 for waypoint", p);
     });
   }
 
