@@ -196,15 +196,6 @@ function exportOpenRallyGpx(
     trackPoints = null,
     minCapDistanceMeters = 5,
   } = opts || {};
-  const BLANK_PNG_1X1_B64 =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X0pQAAAAASUVORK5CYII=";
-
-  console.log("🧩 exportOpenRallyGpx opts", {
-    includeTrack,
-    includeWaypoints,
-    trackPointsLen: Array.isArray(trackPoints) ? trackPoints.length : null,
-    firstTrackPoint: Array.isArray(trackPoints) ? trackPoints[0] : null,
-  });
 
   const points = (routePoints || [])
     .filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
@@ -212,11 +203,7 @@ function exportOpenRallyGpx(
       ...p,
       lat: Number(p.lat),
       lon: Number(p.lon),
-      timeIso: p.time
-        ? String(p.time).includes("T")
-          ? String(p.time)
-          : toUtcIso(p.time)
-        : null,
+      timeIso: p.time ? toUtcIso(p.time) : null,
       name: (p.name ?? `WP ${idx + 1}`).toString(),
       desc: (p.desc ?? "").toString(),
       segmentMeters: Number.isFinite(p.segmentMeters)
@@ -225,27 +212,18 @@ function exportOpenRallyGpx(
       totalMeters: Number.isFinite(p.totalMeters) ? Number(p.totalMeters) : 0,
     }));
 
-  // Normalize track points ONCE, early (accept numbers OR numeric strings)
-  const trkPts = (Array.isArray(trackPoints) ? trackPoints : [])
+  // Normalize track points ONCE, early
+  const trkPts = (trackPoints && trackPoints.length ? trackPoints : [])
+    .filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon))
     .map((p) => ({
-      lat: Number(p?.lat),
-      lon: Number(p?.lon),
-      timeIso: p?.time
-        ? String(p.time).includes("T")
-          ? String(p.time)
-          : toUtcIso(p.time)
-        : null,
-    }))
-    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+      lat: Number(p.lat),
+      lon: Number(p.lon),
+      timeIso: p.time ? toUtcIso(p.time) : null,
+    }));
 
   const hasWpt = includeWaypoints && points.length > 0;
   const hasTrk = includeTrack && trkPts.length > 0;
   if (!hasWpt && !hasTrk) return "";
-
-  console.log("🧩 exportOpenRallyGpx trkPts", {
-    trkPtsLen: trkPts.length,
-    firstTrkPt: trkPts[0] ?? null,
-  });
 
   // Only do CAP work if we will output WPTs
   const caps = hasWpt
@@ -321,9 +299,8 @@ function exportOpenRallyGpx(
   if (hasWpt) {
     points.forEach((p, i) => {
       const cap = caps[i] ?? 0;
-      const pngB64 =
-        dataUrlToPngBase64(p.tulipDataUrl || p.tulipPngDataUrl) ||
-        BLANK_PNG_1X1_B64;
+      const pngB64 = dataUrlToPngBase64(p.tulipDataUrl || p.tulipPngDataUrl);
+
       xmlLines.push(
         `  <wpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`,
         `    <name>${xmlEscape(p.name)}</name>`,
@@ -333,7 +310,9 @@ function exportOpenRallyGpx(
         `      <openrally:distance>${fmtKm(p.totalMeters)}</openrally:distance>`,
         `      <openrally:cap>${cap}</openrally:cap>`,
         `      <openrally:show_coordinates>0</openrally:show_coordinates>`,
-        `      <openrally:tulip><![CDATA[data:image/png;base64,${pngB64}]]></openrally:tulip>`,
+        pngB64
+          ? `      <openrally:tulip><![CDATA[data:image/png;base64,${pngB64}]]></openrally:tulip>`
+          : null,
         `    </extensions>`,
         `  </wpt>`,
       );
@@ -706,21 +685,12 @@ export default function RallyLayout() {
       const lon = Number(gps.lon);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
-      const curFix = { lat, lon };
-
-      const last = trackLastRef.current; // last track point we accepted
-
+      const last = trackLastRef.current;
       if (last) {
-        const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
-        if (!Number.isFinite(lastFix.lat) || !Number.isFinite(lastFix.lon)) {
-          // If last is corrupted, just reset it and allow capturing again
-          console.log("⚠️ Invalid last track fix; resetting", last);
-          trackLastRef.current = null;
-        } else {
-          const moved = haversineMeters(lastFix, curFix);
-          if (!Number.isFinite(moved)) return;
-          if (moved < TRACK_MIN_MOVE_M) return; // suppress jitter
-        }
+        const moved = haversineMeters(last, { lat, lon });
+
+        if (!Number.isFinite(moved)) return;
+        if (moved < TRACK_MIN_MOVE_M) return;
       }
 
       const pt = { lat, lon, time: new Date().toISOString() };
@@ -729,7 +699,7 @@ export default function RallyLayout() {
     }, TRACK_INTERVAL_MS);
 
     return () => clearInterval(id);
-  }, [stageActive, TRACK_INTERVAL_MS, TRACK_MIN_MOVE_M]);
+  }, [stageActive]);
 
   // const [stageStartedAt, setStageStartedAt] = useState(null);
 
@@ -842,12 +812,6 @@ export default function RallyLayout() {
         const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
 
         const metaHeader = buildMetaHeader(meta, base);
-
-        console.log(
-          "🧭 Exporting trackPoints:",
-          trackPoints?.length,
-          trackPoints?.[0],
-        );
 
         const openRallyGpxXml = exportOpenRallyGpx(
           routePoints,
@@ -1027,50 +991,52 @@ export default function RallyLayout() {
               Number.isFinite(Number(p?.lon)),
           ) || null;
 
-      const curFix = {
-        lat: Number(currentGPS.lat),
-        lon: Number(currentGPS.lon),
-      };
-
-      // If we have a previous point, enforce threshold
       if (last) {
-        const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
+        // ✅ Guard before using currentGPS.lat/lon
+        if (
+          !Number.isFinite(currentGPS?.lat) ||
+          !Number.isFinite(currentGPS?.lon)
+        ) {
+          console.log("⚠️ Ignored: invalid GPS fix");
+          return prev;
+        }
 
-        if (Number.isFinite(lastFix.lat) && Number.isFinite(lastFix.lon)) {
-          const moved = haversineMeters(lastFix, curFix);
-          const minMove = dynamicMinMoveMeters(currentGPS);
-
-          console.log("📍 Waypoint Debug:", {
-            speed: currentGPS?.speed,
-            accuracy: currentGPS?.accuracy,
-            movedMeters: Number.isFinite(moved)
-              ? Number(moved.toFixed(2))
-              : null,
-            minMoveMeters: Number.isFinite(minMove)
-              ? Number(minMove.toFixed(2))
-              : null,
-            lat: currentGPS?.lat,
-            lon: currentGPS?.lon,
-            ts: currentGPS?.timestamp,
+        const moved =
+          (last,
+          {
+            lat: currentGPS.lat,
+            lon: currentGPS.lon,
           });
 
-          // If movement calc failed, don't block adding — just skip the gate
-          if (
-            Number.isFinite(moved) &&
-            Number.isFinite(minMove) &&
-            moved < minMove
-          ) {
-            console.log("⏳ Ignored due to threshold");
-            return prev; // ✅ prev is in-scope here
-          }
-        } else {
-          console.log("⚠️ Invalid last waypoint fix", last);
-          // allow adding
+        const minMove = dynamicMinMoveMeters(currentGPS);
+
+        console.log("📍 Waypoint Debug:", {
+          speed: currentGPS.speed,
+          accuracy: currentGPS.accuracy,
+          movedMeters: Number.isFinite(moved) ? Number(moved.toFixed(2)) : null,
+          minMoveMeters: Number(minMove.toFixed(2)),
+          lat: currentGPS.lat,
+          lon: currentGPS.lon,
+          ts: currentGPS.timestamp,
+        });
+
+        if (moved < minMove) {
+          console.log("⏳ Ignored due to threshold");
+          return prev;
         }
       }
 
-      // build waypoint (your existing code)
+      // ✅ Also guard for the "first waypoint" case (when last is null)
+      if (
+        !Number.isFinite(currentGPS?.lat) ||
+        !Number.isFinite(currentGPS?.lon)
+      ) {
+        console.log("⚠️ Ignored: invalid GPS fix (no last)");
+        return prev;
+      }
+
       const typeToSave = typeOverride ?? waypointType;
+
       const iconId =
         typeToSave === "hazard"
           ? hazardIconId || "danger_1"
@@ -1083,14 +1049,17 @@ export default function RallyLayout() {
       const next = {
         lat: currentGPS.lat,
         lon: currentGPS.lon,
-        poi: poi.trim(),
+        poi: (poi ?? "").trim(),
         timestamp: new Date().toISOString(),
         kind: "waypoint",
         type: typeToSave,
         iconId,
       };
 
-      return [...prev, next];
+      const segmentMeters = last ? haversineMeters(last, next) : 0;
+      const totalMeters = (Number(last?.totalMeters) || 0) + segmentMeters;
+
+      return [...prev, { ...next, segmentMeters, totalMeters }];
     });
 
     setPoi("");
@@ -1301,7 +1270,7 @@ export default function RallyLayout() {
               disabled={!stageActive || isEndingStage}
               onClick={handleEndStage}
             >
-              {isEndingStage ? "Ending..." : "End Stage"}
+              {isEndingStage ? "Ending…" : "End Stage"}
             </button>
           </div>
         </section>
@@ -1322,11 +1291,10 @@ export default function RallyLayout() {
               currentGPS={currentGPS}
               startGPS={startGPS}
               waypoints={waypoints}
-              trackPoints={trackPoints} // ✅ add
+              trackPoints={trackPoints}
               followMap={followMap}
-              mapMode={mapMode}
+              mapMode="review"
               mapSource={mapSource}
-              resizeKey={showMap ? 1 : 0}
             />
           </div>
         ) : (
@@ -1341,7 +1309,6 @@ export default function RallyLayout() {
                 currentGPS={currentGPS}
                 startGPS={startGPS}
                 waypoints={waypoints}
-                trackPoints={trackPoints}
                 followMap={followMap}
                 mapMode={mapMode}
                 mapSource={mapSource}
