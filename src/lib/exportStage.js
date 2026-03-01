@@ -375,18 +375,16 @@ export async function makeStageZip({
   const zip = new JSZip();
 
   // ✅ Use the GPX you already generated (with <trk> if you want it)
-  const openRallyGpx =
-    openRallyGpxXml ??
-    (await toGpx({
-      meta,
-      startGPS,
-      waypoints,
-      includeTrack: false, // fallback behaviour
-    }));
+  const openRallyGpx = await toGpx({
+    meta,
+    startGPS,
+    waypoints,
+    includeTrack: false, // fallback behaviour
+  });
 
   // ✅ Track-only GPX should be built from TRACK POINTS, not waypoints
   const trackGpx = includeTrackFile
-    ? toTrackOnlyGpx({ meta, startGPS, trackPoints })
+    ? toTrackOnlyGpx({ meta, trackPoints })
     : null;
 
   const jsonText = JSON.stringify(

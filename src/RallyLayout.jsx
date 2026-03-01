@@ -118,6 +118,11 @@ function dynamicMinMoveMeters(gps) {
   return clamp(threshold, baseMeters, maxMeters);
 }
 
+function fmtKmNumber(meters) {
+  const km = Number(meters || 0) / 1000;
+  return km.toFixed(2); // "3.10"
+}
+
 function makeLocalId(meta) {
   // stable enough + human readable; includes timestamp to avoid collisions
   return `${meta.tripDate}_d${meta.dayNumber}_r${meta.routeNumber}_s${meta.stageNumber}_${meta.endedAt}`;
@@ -310,7 +315,7 @@ function exportOpenRallyGpx(
     `    <extensions>`,
     `      <openrally:units>metric</openrally:units>`,
     hasWpt
-      ? `      <openrally:distance>${fmtKm(totalMetersForHeader)}</openrally:distance>`
+      ? `      <openrally:distance>${fmtKmNumber(totalMetersForHeader)}</openrally:distance>`
       : null,
     `    </extensions>`,
     `  </metadata>`,
@@ -330,7 +335,7 @@ function exportOpenRallyGpx(
         p.desc ? `    <desc>${xmlEscape(p.desc)}</desc>` : null,
         p.timeIso ? `    <time>${p.timeIso}</time>` : null,
         `    <extensions>`,
-        `      <openrally:distance>${fmtKm(p.totalMeters)}</openrally:distance>`,
+        `      <openrally:distance>${fmtKmNumber(p.totalMeters)}</openrally:distance>`,
         `      <openrally:cap>${cap}</openrally:cap>`,
         `      <openrally:show_coordinates>0</openrally:show_coordinates>`,
         `      <openrally:tulip><![CDATA[data:image/png;base64,${pngB64}]]></openrally:tulip>`,
@@ -867,6 +872,7 @@ export default function RallyLayout() {
           meta,
           startGPS,
           waypoints,
+          trackPoints,
           openRallyGpxXml,
           baseName: base,
         });
