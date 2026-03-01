@@ -367,22 +367,24 @@ export async function makeStageZip({
   meta,
   startGPS,
   waypoints,
-  trackPoints, // ✅ NEW
+  trackPoints,
   baseName,
-  openRallyGpxXml, // ✅ NEW (prebuilt)
   includeTrackFile = true,
+  openRallyGpxXml = null, // ✅ add
 }) {
   const zip = new JSZip();
 
-  // ✅ Use the GPX you already generated (with <trk> if you want it)
-  const openRallyGpx = await toGpx({
-    meta,
-    startGPS,
-    waypoints,
-    includeTrack: false, // fallback behaviour
-  });
+  // ✅ Prefer the caller-provided OpenRally GPX (can include <trk>)
+  const openRallyGpx =
+    typeof openRallyGpxXml === "string" && openRallyGpxXml.trim()
+      ? openRallyGpxXml
+      : await toGpx({
+          meta,
+          startGPS,
+          waypoints,
+          includeTrack: false, // fallback behavior
+        });
 
-  // ✅ Track-only GPX should be built from TRACK POINTS, not waypoints
   const trackGpx = includeTrackFile
     ? toTrackOnlyGpx({ meta, trackPoints })
     : null;
@@ -397,6 +399,7 @@ export async function makeStageZip({
   zip.file(`${baseName}.openrally.gpx`, openRallyGpx);
   zip.file(`${baseName}.json`, jsonText);
   zip.file(`${baseName}.html`, htmlText);
+
   if (trackGpx) zip.file(`${baseName}.track.gpx`, trackGpx);
 
   return await zip.generateAsync({ type: "blob" });

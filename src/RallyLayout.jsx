@@ -875,6 +875,7 @@ export default function RallyLayout() {
           trackPoints,
           openRallyGpxXml,
           baseName: base,
+          includeTrackFile: true,
         });
 
         downloadBlob(`${base}.zip`, blob);
