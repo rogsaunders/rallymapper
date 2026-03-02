@@ -1153,18 +1153,12 @@ export default function RallyLayout() {
         };
       }
     }
-
+    console.log(
+      "routePoints distances:",
+      pts.map((p) => p.totalMeters),
+    );
     return pts;
   }, [startGPS, waypoints]);
-
-  const totalMeters = useMemo(() => {
-    // Prefer the last waypoint with a valid totalMeters (your Add Waypoint sets this)
-    for (let i = waypoints.length - 1; i >= 0; i--) {
-      const t = Number(waypoints[i]?.totalMeters);
-      if (Number.isFinite(t)) return t;
-    }
-    return 0;
-  }, [waypoints]);
 
   const distanceRows = useMemo(() => {
     // routePoints is already ordered and has START included
