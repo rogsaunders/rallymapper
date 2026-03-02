@@ -862,7 +862,7 @@ export default function RallyLayout() {
           meta?.stageName || base,
           metaHeader,
           {
-            includeTrack: true,
+            includeTrack: false,
             includeWaypoints: true,
             trackPoints,
           },
