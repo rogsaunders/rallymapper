@@ -1120,6 +1120,8 @@ export default function RallyLayout() {
           timestamp: startGPS.timestamp ?? "",
           poi: "START",
           kind: "start",
+          segmentMeters: 0,
+          totalMeters: 0,
         });
       }
     }
@@ -1134,6 +1136,24 @@ export default function RallyLayout() {
       });
 
     pts.push(...rest);
+
+    // ✅ NEW: calculate cumulative distances so the exporter has correct values
+    let cumulativeMeters = 0;
+    for (let i = 0; i < pts.length; i++) {
+      if (i === 0) {
+        pts[i] = { ...pts[i], segmentMeters: 0, totalMeters: 0 };
+      } else {
+        const seg = haversineMeters(pts[i - 1], pts[i]);
+        const segM = Number.isFinite(seg) ? seg : 0;
+        cumulativeMeters += segM;
+        pts[i] = {
+          ...pts[i],
+          segmentMeters: segM,
+          totalMeters: cumulativeMeters,
+        };
+      }
+    }
+
     return pts;
   }, [startGPS, waypoints]);
 
