@@ -252,42 +252,58 @@ function exportOpenRallyGpx(
 
   // Only do CAP work if we will output WPTs
   const caps = hasWpt
-    ? (() => {
-        const toRad = (d) => (d * Math.PI) / 180;
-        const haversineMeters = (a, b) => {
-          const R = 6371000;
-          const dLat = toRad(b.lat - a.lat);
-          const dLon = toRad(b.lon - a.lon);
-          const s1 = Math.sin(dLat / 2);
-          const s2 = Math.sin(dLon / 2);
-          const aa =
-            s1 * s1 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * s2 * s2;
-          const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
-          return R * c;
-        };
-        const computeCapDeg = (prev, cur) => {
-          const y =
-            Math.sin(toRad(cur.lon - prev.lon)) * Math.cos(toRad(cur.lat));
-          const x =
-            Math.cos(toRad(prev.lat)) * Math.sin(toRad(cur.lat)) -
-            Math.sin(toRad(prev.lat)) *
-              Math.cos(toRad(cur.lat)) *
-              Math.cos(toRad(cur.lon - prev.lon));
-          const brng = (Math.atan2(y, x) * 180) / Math.PI;
-          return (brng + 360) % 360;
-        };
+    ? points.map((p, i) => {
+        if (i === 0) return 0;
 
-        return points.map((p, i) => {
-          if (i === 0) return 0;
-          for (let j = i - 1; j >= 0; j--) {
-            const d = haversineMeters(points[j], p);
-            if (d >= Math.max(minCapDistanceMeters, 0.001)) {
-              return Math.round(computeCapDeg(points[j], p));
+        // If we have track points, use them for a more accurate bearing
+        if (trkPts.length >= 2) {
+          // Find the track point closest to this waypoint
+          let closestIdx = 0;
+          let closestDist = Infinity;
+          trkPts.forEach((tp, ti) => {
+            const d = haversineMeters(p, tp);
+            if (d < closestDist) {
+              closestDist = d;
+              closestIdx = ti;
             }
+          });
+
+          // Use the track point before and after the closest one for bearing
+          const fromIdx = Math.max(0, closestIdx - 1);
+          const toIdx = Math.min(trkPts.length - 1, closestIdx + 1);
+
+          if (fromIdx !== toIdx) {
+            const from = trkPts[fromIdx];
+            const to = trkPts[toIdx];
+            const toRad = (d) => (d * Math.PI) / 180;
+            const y =
+              Math.sin(toRad(to.lon - from.lon)) * Math.cos(toRad(to.lat));
+            const x =
+              Math.cos(toRad(from.lat)) * Math.sin(toRad(to.lat)) -
+              Math.sin(toRad(from.lat)) *
+                Math.cos(toRad(to.lat)) *
+                Math.cos(toRad(to.lon - from.lon));
+            return Math.round(((Math.atan2(y, x) * 180) / Math.PI + 360) % 360);
           }
-          return 0;
-        });
-      })()
+        }
+
+        // Fallback: waypoint-to-waypoint bearing
+        for (let j = i - 1; j >= 0; j--) {
+          const d = haversineMeters(points[j], p);
+          if (d >= Math.max(minCapDistanceMeters, 0.001)) {
+            const toRad = (d) => (d * Math.PI) / 180;
+            const y =
+              Math.sin(toRad(p.lon - points[j].lon)) * Math.cos(toRad(p.lat));
+            const x =
+              Math.cos(toRad(points[j].lat)) * Math.sin(toRad(p.lat)) -
+              Math.sin(toRad(points[j].lat)) *
+                Math.cos(toRad(p.lat)) *
+                Math.cos(toRad(p.lon - points[j].lon));
+            return Math.round(((Math.atan2(y, x) * 180) / Math.PI + 360) % 360);
+          }
+        }
+        return 0;
+      })
     : [];
 
   const totalMetersForHeader = hasWpt
@@ -417,18 +433,14 @@ export default function RallyLayout() {
 
   const cloud = getCloudStatus({
     online,
-    userId: null,
+    userId: user?.id,
     pendingCount,
   });
-  const cloudStatus = !online
-    ? { label: "Offline", dot: "🔴" }
-    : pendingCount > 0
-      ? { label: `Pending (${pendingCount})`, dot: "🟡" }
-      : { label: "Synced", dot: "🟢" };
 
   const [currentGPS, setCurrentGPS] = useState(null); // ✅ LIVE GPS
   const [startGPS, setStartGPS] = useState(null);
   const [waypoints, setWaypoints] = useState([]);
+  const [_stageArchive, setStageArchive] = useState([]);
   const [waypointType, setWaypointType] = useState("note");
   const [poi, setPoi] = useState("");
   const [followMap, setFollowMap] = useState(true);
