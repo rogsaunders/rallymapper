@@ -1544,7 +1544,7 @@ export default function RallyLayout() {
               </div>
             )}
 
-            <div className="mt-3 flex gap-2 items-start">
+            <div className="mt-3 flex gap-2 items-stretch">
               <button
                 type="button"
                 onClick={isListening ? stopDictation : startDictation}
@@ -1557,7 +1557,7 @@ export default function RallyLayout() {
 
               <textarea
                 disabled={!stageActive}
-                className="flex-1 p-2 rounded bg-gray-100"
+                className="flex-1 p-2 rounded bg-gray-100 resize-none"
                 placeholder="Optional point of interest"
                 value={poi}
                 onChange={(e) => setPoi(e.target.value)}
