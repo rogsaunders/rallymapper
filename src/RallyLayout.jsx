@@ -1286,7 +1286,7 @@ export default function RallyLayout() {
             >
               New Day
             </button>
-            <div className="flex flex-wrap gap-2 items-center">
+            <div className="grid grid-cols-[auto_1fr] gap-2 items-center lg:flex lg:flex-wrap">
               {/* NEW ROUTE (before name) */}
               <button
                 type="button"
@@ -1544,7 +1544,7 @@ export default function RallyLayout() {
               </div>
             )}
 
-            <div className="mt-3 flex gap-2 items-stretch">
+            <div className="mt-3 flex gap-2 items-center">
               <button
                 type="button"
                 onClick={isListening ? stopDictation : startDictation}
@@ -1559,6 +1559,7 @@ export default function RallyLayout() {
                 disabled={!stageActive}
                 className="flex-1 p-2 rounded bg-gray-100 resize-none"
                 placeholder="Optional point of interest"
+                rows={1}
                 value={poi}
                 onChange={(e) => setPoi(e.target.value)}
               />
