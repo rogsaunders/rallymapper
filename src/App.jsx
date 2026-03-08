@@ -3,7 +3,7 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthProvider";
 
-import RallyLayout from "./RallyLayout";
+import RouteMapperLayout from "./RouteMapperLayout";
 import SignIn from "./auth/SignIn";
 import ResetPassword from "./auth/ResetPassword";
 
@@ -47,7 +47,7 @@ export default function App() {
         path="/"
         element={
           <RequireAuth>
-            <RallyLayout />
+            <RouteMapperLayout />
           </RequireAuth>
         }
       />

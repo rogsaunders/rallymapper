@@ -1,4 +1,4 @@
-// src/RallyLayout.jsx
+// src/RouteMapperLayout.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import startflag from "/icons/start-flag.svg";
@@ -9,7 +9,6 @@ import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
-import { makeStageZip } from "./lib/exportStage";
 import {
   Document,
   Packer,
@@ -20,6 +19,9 @@ import {
   TableCell,
   WidthType,
 } from "docx";
+
+import { buildRoutePackage } from "./export";
+import { generateRoadbook, renderTulipSvg } from "./roadbook";
 
 const PENDING_SYNC_KEY = "rm_pending_queue_signal_v1";
 
@@ -121,6 +123,13 @@ function dynamicMinMoveMeters(gps) {
 function fmtKmNumber(meters) {
   const km = Number(meters || 0) / 1000;
   return km.toFixed(2); // "3.10"
+}
+
+function formatRoadbookEventLabel(value) {
+  if (!value) return "Unknown";
+  return String(value)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function makeLocalId(meta) {
@@ -400,7 +409,7 @@ function getCloudStatus({ online, userId, pendingCount }) {
   return { color: "bg-green-500", label: "Synced", dot: "🟢" };
 }
 
-export default function RallyLayout() {
+export default function RouteMapperLayout() {
   const { user, signOut } = useAuth();
   const localOwner = user?.id ?? getGuestOwnerId();
   const [pendingCount, setPendingCount] = useState(
@@ -474,6 +483,8 @@ export default function RallyLayout() {
   // each item: { tripName, tripDate, dayNumber, routeName, stageNumber, startedAt, endedAt, waypoints }
   const [stageActive, setStageActive] = useState(false);
   const [stageStartedAt, setStageStartedAt] = useState(null);
+  const [showRoadbookPreview, setShowRoadbookPreview] = useState(false);
+  const [trackPoints, setTrackPoints] = useState([]); // {lat, lon, ts}
 
   const handleNewStage = () => {
     if (stageActive) {
@@ -495,7 +506,7 @@ export default function RallyLayout() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const STAGE_DRAFT_KEY = "rm_stage_draft_v1";
+  const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
 
   useEffect(() => {}, []);
 
@@ -513,6 +524,7 @@ export default function RallyLayout() {
       stageActive,
       stageStartedAt,
       startGPS,
+      trackPoints,
       waypoints,
       waypointType,
       hazardIconId,
@@ -541,6 +553,7 @@ export default function RallyLayout() {
     stageStartedAt,
     startGPS,
     waypoints,
+    trackPoints,
     waypointType,
     hazardIconId,
     navIconId,
@@ -575,7 +588,7 @@ export default function RallyLayout() {
 
       setStartGPS(draft.startGPS ?? null);
       setWaypoints(Array.isArray(draft.waypoints) ? draft.waypoints : []);
-
+      setTrackPoints(Array.isArray(draft.trackPoints) ? draft.trackPoints : []);
       setWaypointType(draft.waypointType ?? "note");
       setHazardIconId(draft.hazardIconId ?? "danger_1");
       setNavIconId(draft.navIconId ?? "straight");
@@ -704,7 +717,6 @@ export default function RallyLayout() {
     { id: "control", label: "Control" },
   ];
 
-  const [trackPoints, setTrackPoints] = useState([]); // {lat, lon, ts}
   const trackLastRef = useRef(null); // last point used for distance threshold
   const gpsRef = useRef(null);
 
@@ -727,14 +739,16 @@ export default function RallyLayout() {
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
       const curFix = { lat, lon };
+      const lastAccepted = trackLastRef.current;
 
-      const last = trackLastRef.current; // last track point we accepted
+      if (lastAccepted) {
+        const lastFix = {
+          lat: Number(lastAccepted.lat),
+          lon: Number(lastAccepted.lon),
+        };
 
-      if (last) {
-        const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
         if (!Number.isFinite(lastFix.lat) || !Number.isFinite(lastFix.lon)) {
-          // If last is corrupted, just reset it and allow capturing again
-          console.log("⚠️ Invalid last track fix; resetting", last);
+          console.log("⚠️ Invalid last track fix; resetting", lastAccepted);
           trackLastRef.current = null;
         } else {
           const moved = haversineMeters(lastFix, curFix);
@@ -743,9 +757,30 @@ export default function RallyLayout() {
         }
       }
 
-      const pt = { lat, lon, time: new Date().toISOString() };
-      trackLastRef.current = pt;
-      setTrackPoints((prev) => [...prev, pt]);
+      setTrackPoints((prev) => {
+        const lastPoint = prev.length ? prev[prev.length - 1] : null;
+
+        const segMeters = lastPoint
+          ? haversineMeters(
+              { lat: Number(lastPoint.lat), lon: Number(lastPoint.lon) },
+              { lat, lon },
+            )
+          : 0;
+
+        const totalMeters =
+          (lastPoint?.distanceFromStartM || 0) +
+          (Number.isFinite(segMeters) ? segMeters : 0);
+
+        const pt = {
+          lat,
+          lon,
+          time: new Date().toISOString(),
+          distanceFromStartM: totalMeters,
+        };
+
+        trackLastRef.current = pt;
+        return [...prev, pt];
+      });
     }, TRACK_INTERVAL_MS);
 
     return () => clearInterval(id);
@@ -803,16 +838,13 @@ export default function RallyLayout() {
   const [isEndingStage, setIsEndingStage] = useState(false);
 
   const handleEndStage = async () => {
-    // ✅ prevent double-taps / re-entry
     if (isEndingStage) return;
     if (!stageActive) return;
 
     setIsEndingStage(true);
 
-    // ✅ yield so the UI can repaint (button can show "Ending…") before heavy work/download UI
     await new Promise((r) => setTimeout(r, 0));
 
-    // We'll build these early so we can still queue/archive/reset in finally even if something fails
     const endedAt = new Date().toISOString();
 
     const localId = makeLocalId({
@@ -824,70 +856,59 @@ export default function RallyLayout() {
       endedAt,
     });
 
-    const meta = {
-      tripName,
-      tripDate,
-      dayNumber,
-      routeNumber,
-      routeName,
-      stageNumber,
-      startedAt: stageStartedAt,
-      endedAt,
-      local_id: localId,
-    };
-
-    const payload = { meta, startGPS, waypoints };
-
-    // Build stage object ONCE
     const stage = {
-      meta,
+      meta: {
+        appName: "RouteMapper",
+        appVersion: "1.0.0",
+        tripName,
+        tripDate,
+        dayNumber,
+        routeNumber,
+        routeName,
+        stageNumber,
+        stageName: `${routeName || `Route ${routeNumber}`} - Stage ${stageNumber}`,
+        startedAt: stageStartedAt,
+        endedAt,
+        local_id: localId,
+      },
       startGPS,
-      waypoints,
+      trackPoints: Array.isArray(trackPoints) ? trackPoints : [],
+      waypoints: Array.isArray(waypoints) ? waypoints : [],
+      routePoints: Array.isArray(routePoints) ? routePoints : [],
+      roadbook: null,
       local_id: localId,
       created_at: new Date().toISOString(),
     };
 
-    // Decide cloud capability once
-    const canCloudSync = Boolean(user?.id) && navigator.onLine;
+    let roadbook = null;
 
-    // If we can't cloud sync, we should queue (offline/guest)
+    try {
+      roadbook = generateRoadbook(stage);
+    } catch (err) {
+      console.error("Roadbook generation failed", err);
+    }
+
+    const stageWithRoadbook = {
+      ...stage,
+      roadbook,
+    };
+
+    const canCloudSync = Boolean(user?.id) && navigator.onLine;
     let needsQueue = !canCloudSync;
 
     try {
-      // 1️⃣ Save locally (local-first, always)
-      saveStageLocal(localOwner, localId, payload);
+      saveStageLocal(localOwner, localId, stageWithRoadbook);
 
-      // 2️⃣ Export ZIP (await this!)
       try {
-        const base = `${safeSlug(meta.tripName)}_day${meta.dayNumber}_route${meta.routeNumber}_stage${meta.stageNumber}`;
+        const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
-        const metaHeader = buildMetaHeader(meta, base);
-
-        console.log(
-          "🧭 Exporting trackPoints:",
-          trackPoints?.length,
-          trackPoints?.[0],
-        );
-
-        const openRallyGpxXml = exportOpenRallyGpx(
-          routePoints,
-          meta?.stageName || base,
-          metaHeader,
-          {
-            includeTrack: false,
-            includeWaypoints: true,
-            trackPoints,
-          },
-        );
-
-        const blob = await makeStageZip({
-          meta,
-          startGPS,
-          waypoints,
-          trackPoints,
-          openRallyGpxXml,
-          baseName: base,
-          includeTrackFile: true,
+        const blob = await buildRoutePackage(stageWithRoadbook, {
+          includeHema: true,
+          includeGarmin: true,
+          includeRallyNav: true,
+          includeGoogleEarth: true,
+          includeGaia: true,
+          includePdf: false,
         });
 
         downloadBlob(`${base}.zip`, blob);
@@ -896,14 +917,13 @@ export default function RallyLayout() {
         alert("Stage saved locally, but export failed. Check console.");
       }
 
-      // 3️⃣ Sync to Supabase (only if signed in AND online)
       if (canCloudSync) {
         try {
           const { error } = await upsertStageExport({
             userId: user.id,
             localId,
-            meta,
-            payload,
+            meta: stageWithRoadbook.meta,
+            payload: stageWithRoadbook,
           });
 
           if (error) {
@@ -916,21 +936,20 @@ export default function RallyLayout() {
         }
       }
 
-      // 4️⃣ Queue if needed (guest/offline OR supabase failed)
       if (needsQueue) {
         try {
-          enqueueStage(stage);
+          enqueueStage(stageWithRoadbook);
         } catch (e) {
           console.warn("Enqueue failed:", e);
         }
       }
 
-      // 5️⃣ 🔁 Flush queue if signed in & online (never block UI reset)
       if (canCloudSync) {
         try {
           const { flushed, remaining } = await flushPendingQueue(user);
-          if (flushed > 0)
+          if (flushed > 0) {
             console.log(`✅ Flushed ${flushed} pending stage(s)`);
+          }
           setPendingCount(remaining);
         } catch (err) {
           console.warn("Queue flush failed:", err);
@@ -940,10 +959,8 @@ export default function RallyLayout() {
         setPendingCount(readPendingQueue().length);
       }
 
-      // 6️⃣ Archive (local UI history)
-      setStageArchive((prev) => [...prev, stage]);
+      setStageArchive((prev) => [...prev, stageWithRoadbook]);
     } finally {
-      // 7️⃣ Reset UI (ALWAYS runs, even if Supabase is blocked by Safari)
       setStageActive(false);
       setStageStartedAt(null);
       setWaypoints([]);
@@ -959,7 +976,7 @@ export default function RallyLayout() {
       try {
         localStorage.removeItem(STAGE_DRAFT_KEY);
       } catch {
-        // Silently ignore errors when clearing draft
+        // ignore
       }
 
       setIsEndingStage(false);
@@ -1214,6 +1231,67 @@ export default function RallyLayout() {
     return { legs, totalMeters: total };
   }, [routePoints]);
 
+  const roadbookPreviewStage = useMemo(() => {
+    return {
+      meta: {
+        appName: "RouteMapper",
+        appVersion: "1.0.0",
+        tripName,
+        tripDate,
+        dayNumber,
+        routeNumber,
+        routeName,
+        stageNumber,
+        stageName: `${routeName || `Route ${routeNumber}`} - Stage ${stageNumber}`,
+        startedAt: stageStartedAt,
+        endedAt: null,
+        local_id: "preview",
+      },
+      startGPS,
+      trackPoints: Array.isArray(trackPoints) ? trackPoints : [],
+      waypoints: Array.isArray(waypoints) ? waypoints : [],
+      routePoints: Array.isArray(routePoints) ? routePoints : [],
+      roadbook: null,
+      local_id: "preview",
+      created_at: new Date().toISOString(),
+    };
+  }, [
+    tripName,
+    tripDate,
+    dayNumber,
+    routeNumber,
+    routeName,
+    stageNumber,
+    stageStartedAt,
+    startGPS,
+    trackPoints,
+    waypoints,
+    routePoints,
+  ]);
+
+  const roadbookPreview = useMemo(() => {
+    const hasEnoughData =
+      (trackPoints?.length || 0) >= 3 || (waypoints?.length || 0) >= 1;
+
+    if (!hasEnoughData) return null;
+
+    try {
+      return generateRoadbook(roadbookPreviewStage);
+    } catch (err) {
+      console.error("Roadbook preview generation failed", err);
+      return null;
+    }
+  }, [roadbookPreviewStage, trackPoints, waypoints]);
+
+  const previewRows = roadbookPreview?.rows?.slice(0, 25) || [];
+
+  function formatRoadbookEventLabel(value) {
+    if (!value) return "Unknown";
+    return String(value)
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* HEADER */}
@@ -1223,11 +1301,11 @@ export default function RallyLayout() {
           <div className="flex items-center gap-3">
             <img
               src={rrmLogo}
-              alt="Route Mapper"
+              alt="RouteMapper"
               className="h-10 w-10 rounded"
             />
             <div className="leading-tight">
-              <div className="text-lg font-semibold">Route Mapper</div>
+              <div className="text-lg font-semibold">RouteMapper</div>
               <div className="text-xs text-gray-500">
                 {tripName} • Day {dayNumber} •{" "}
                 {routeName || `Route ${routeNumber}`}
@@ -1329,19 +1407,28 @@ export default function RallyLayout() {
                 backgroundColor: stageActive ? "#dc2626" : "#588233",
               }}
               onClick={stageActive ? handleEndStage : handleStartStage}
+              disabled={isEndingStage}
               title={stageActive ? "End current stage" : "Start a new stage"}
             >
-              {stageActive ? "⏹ End Stage" : "Start Stage"}
-            </button>
-            <button
-              disabled={!stageActive || isEndingStage}
-              onClick={handleEndStage}
-            >
-              {isEndingStage ? "Ending..." : "End Stage"}
+              {isEndingStage
+                ? "Ending..."
+                : stageActive
+                  ? "⏹ End Stage"
+                  : "Start Stage"}
             </button>
           </div>
         </section>
         {/* MAP: horizontal, not tall */}
+
+        <button
+          type="button"
+          className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-medium disabled:opacity-50"
+          onClick={() => setShowRoadbookPreview((v) => !v)}
+          disabled={!stageActive && !(roadbookPreview?.rows?.length > 0)}
+          title="Show generated roadbook preview"
+        >
+          {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
+        </button>
 
         {mapMode === "review" ? (
           <div className="fixed inset-0 z-50 bg-black">
@@ -1456,6 +1543,100 @@ export default function RallyLayout() {
               </span>
             </label>
           </div>
+
+          {showRoadbookPreview && (
+            <section className="bg-white rounded-2xl shadow-sm border p-3">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="font-semibold">Roadbook Preview</h2>
+                  <div className="text-xs text-gray-500">
+                    {roadbookPreview?.rows?.length || 0} rows
+                  </div>
+                </div>
+
+                {roadbookPreview?.stats && (
+                  <div className="text-xs text-gray-500 text-right">
+                    <div>Track pts: {roadbookPreview.stats.rawTrackPoints}</div>
+                    <div>
+                      Candidates: {roadbookPreview.stats.candidateCount}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {!roadbookPreview?.rows?.length ? (
+                <div className="text-sm text-gray-500">
+                  No roadbook rows yet. Start recording track points and add a
+                  few waypoints.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {previewRows.map((row) => (
+                    <div
+                      key={`${row.index}-${row.kmTotal}-${row.eventType}`}
+                      className="border rounded-xl p-3 flex items-center gap-3"
+                    >
+                      <div
+                        className="shrink-0 rounded border bg-white"
+                        style={{ width: 72, height: 72 }}
+                        dangerouslySetInnerHTML={{
+                          __html: renderTulipSvg(
+                            row.tulipTemplate || row.eventType,
+                            {
+                              size: 72,
+                              strokeWidth: 8,
+                            },
+                          ),
+                        }}
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-900">
+                            {row.eventType}
+                          </span>
+
+                          {row.icon && (
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 border text-gray-700">
+                              {row.icon}
+                            </span>
+                          )}
+
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 border text-gray-700">
+                            {row.source}
+                          </span>
+                        </div>
+
+                        <div className="text-sm text-gray-700 mt-1">
+                          {row.notes || "—"}
+                        </div>
+
+                        <div className="text-xs text-gray-500 mt-1">
+                          Total {Number(row.kmTotal || 0).toFixed(2)} km •
+                          Partial {Number(row.kmPartial || 0).toFixed(2)} km
+                        </div>
+                      </div>
+
+                      <div className="text-right text-xs text-gray-500 shrink-0">
+                        <div>
+                          Confidence{" "}
+                          {typeof row.confidence === "number"
+                            ? row.confidence.toFixed(2)
+                            : "—"}
+                        </div>
+                        <div>
+                          Angle{" "}
+                          {typeof row.angle === "number"
+                            ? `${Math.round(row.angle)}°`
+                            : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* POI / Icons / Add waypoint */}
           <div className="bg-white rounded-2xl shadow-sm border p-3 md:col-span-2">
