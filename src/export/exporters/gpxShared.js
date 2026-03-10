@@ -4,30 +4,56 @@ export function xmlEscape(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&apos;")
+    .replace(/'/g, "&apos;");
 }
 
 export function symbolForIcon(icon) {
   switch (icon) {
-    case "start": return "Flag, Blue"
-    case "finish": return "Flag, Red"
+    case "start":
+      return "Flag, Blue";
+
+    case "finish":
+      return "Flag, Red";
+
     case "danger1":
     case "danger2":
-    case "danger3": return "Danger Area"
-    case "gate": return "Gate"
-    case "water": return "Bridge"
-    case "crest": return "Summit"
-    case "dip": return "Valley"
-    case "control": return "Pin, Blue"
-    case "stop": return "Stop Sign"
-    default: return "Waypoint"
+    case "danger3":
+    case "danger_1":
+    case "danger_2":
+    case "danger_3":
+      return "Danger Area";
+
+    case "gate":
+      return "Gate";
+
+    case "water":
+      return "Bridge";
+
+    case "crest":
+      return "Summit";
+
+    case "dip":
+      return "Valley";
+
+    case "control":
+      return "Pin, Blue";
+
+    case "stop":
+      return "Stop Sign";
+
+    case "straight":
+    case "nav":
+      return "Waypoint";
+
+    default:
+      return "Waypoint";
   }
 }
 
 export function gpxHeader(appName = "RouteMapper") {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="${xmlEscape(appName)}" xmlns="http://www.topografix.com/GPX/1/1">`
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="${xmlEscape(appName)}" xmlns="http://www.topografix.com/GPX/1/1">`;
 }
 
 export function gpxFooter() {
-  return `</gpx>`
+  return `</gpx>`;
 }

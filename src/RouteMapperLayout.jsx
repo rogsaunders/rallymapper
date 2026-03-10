@@ -1420,16 +1420,6 @@ export default function RouteMapperLayout() {
         </section>
         {/* MAP: horizontal, not tall */}
 
-        <button
-          type="button"
-          className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-medium disabled:opacity-50"
-          onClick={() => setShowRoadbookPreview((v) => !v)}
-          disabled={!stageActive && !(roadbookPreview?.rows?.length > 0)}
-          title="Show generated roadbook preview"
-        >
-          {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
-        </button>
-
         {mapMode === "review" ? (
           <div className="fixed inset-0 z-50 bg-black">
             {/* EXIT FULLSCREEN BUTTON */}
@@ -1502,6 +1492,16 @@ export default function RouteMapperLayout() {
             <option value="opentopo">OpenTopoMap</option>
             <option value="esri_imagery">Esri Imagery</option>
           </select>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
+            onClick={() => setShowRoadbookPreview((v) => !v)}
+            disabled={!stageActive && !(roadbookPreview?.rows?.length > 0)}
+            title="Show generated roadbook preview"
+          >
+            {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
+          </button>
         </div>
 
         {/* INPUT CONTROLS ROW (above the two columns) */}

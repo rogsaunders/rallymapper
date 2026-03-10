@@ -1,10 +1,26 @@
-import { gpxFooter, gpxHeader, symbolForIcon, xmlEscape } from "./gpxShared"
+import { gpxFooter, gpxHeader, symbolForIcon, xmlEscape } from "./gpxShared";
 
 export function exportUniversalTrackGpx(stage, config = {}) {
-  const name = xmlEscape(stage?.meta?.stageName || "Stage Track")
+  const name = xmlEscape(stage?.meta?.stageName || "Stage Track");
+
   const points = (stage.trackPoints || [])
-    .map((p) => `    <trkpt lat="${p.lat}" lon="${p.lon}">${p.time ? `\n      <time>${xmlEscape(p.time)}</time>\n    ` : ""}</trkpt>`)
-    .join("\n")
+    .filter(
+      (p) => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)),
+    )
+    .map((p) => {
+      const lat = Number(p.lat);
+      const lon = Number(p.lon);
+      const time = p.time || p.timestamp || "";
+
+      return [
+        `    <trkpt lat="${lat}" lon="${lon}">`,
+        time ? `      <time>${xmlEscape(time)}</time>` : null,
+        `    </trkpt>`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n");
 
   return [
     gpxHeader(config.appName),
@@ -15,24 +31,86 @@ export function exportUniversalTrackGpx(stage, config = {}) {
     `    </trkseg>`,
     `  </trk>`,
     gpxFooter(),
-  ].join("\n")
+  ].join("\n");
 }
 
 export function exportUniversalWaypointsGpx(stage, config = {}) {
-  const waypoints = (stage.waypoints || [])
-    .map((w, index) => {
-      const name = xmlEscape(w.name || w.icon || `WP${index + 1}`)
-      const desc = xmlEscape(w.note || w.description || "")
-      const sym = xmlEscape(symbolForIcon(w.icon))
-      return [
-        `  <wpt lat="${w.lat}" lon="${w.lon}">`,
-        `    <name>${name}</name>`,
-        desc ? `    <desc>${desc}</desc>` : null,
-        `    <sym>${sym}</sym>`,
-        `  </wpt>`,
-      ].filter(Boolean).join("\n")
-    })
-    .join("\n")
+  const startWaypoint = buildStartWaypoint(stage?.startGPS);
 
-  return [gpxHeader(config.appName), waypoints, gpxFooter()].join("\n")
+  const regularWaypoints = (stage.waypoints || [])
+    .filter(
+      (w) => Number.isFinite(Number(w.lat)) && Number.isFinite(Number(w.lon)),
+    )
+    .map((w, index) => buildWaypointXml(w, index));
+
+  const allWaypoints = [startWaypoint, ...regularWaypoints]
+    .filter(Boolean)
+    .join("\n");
+
+  return [gpxHeader(config.appName), allWaypoints, gpxFooter()].join("\n");
+}
+
+function buildStartWaypoint(startGPS) {
+  if (
+    !startGPS ||
+    !Number.isFinite(Number(startGPS.lat)) ||
+    !Number.isFinite(Number(startGPS.lon))
+  ) {
+    return null;
+  }
+
+  const lat = Number(startGPS.lat);
+  const lon = Number(startGPS.lon);
+  const time = startGPS.timestamp || "";
+  const name = xmlEscape("START");
+  const desc = xmlEscape("Stage Start");
+  const sym = xmlEscape(symbolForIcon("start"));
+
+  return [
+    `  <wpt lat="${lat}" lon="${lon}">`,
+    `    <name>${name}</name>`,
+    `    <desc>${desc}</desc>`,
+    `    <sym>${sym}</sym>`,
+    time ? `    <time>${xmlEscape(time)}</time>` : null,
+    `  </wpt>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildWaypointXml(w, index) {
+  const lat = Number(w.lat);
+  const lon = Number(w.lon);
+
+  const iconId = w.iconId || w.icon || "";
+  const type = w.type || "";
+  const poi = (w.poi || w.name || "").trim();
+  const time = w.timestamp || w.time || "";
+
+  const fallbackName = iconId
+    ? iconId.toUpperCase()
+    : type
+      ? `${type.toUpperCase()} ${index + 1}`
+      : `WP${index + 1}`;
+
+  const name = xmlEscape(poi || fallbackName);
+
+  const descParts = [];
+  if (type) descParts.push(`Type: ${type}`);
+  if (iconId) descParts.push(`Icon: ${iconId}`);
+  if (poi) descParts.push(`POI: ${poi}`);
+
+  const desc = xmlEscape(descParts.join(" | "));
+  const sym = xmlEscape(symbolForIcon(iconId || type));
+
+  return [
+    `  <wpt lat="${lat}" lon="${lon}">`,
+    `    <name>${name}</name>`,
+    desc ? `    <desc>${desc}</desc>` : null,
+    `    <sym>${sym}</sym>`,
+    time ? `    <time>${xmlEscape(time)}</time>` : null,
+    `  </wpt>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

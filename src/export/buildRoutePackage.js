@@ -1,15 +1,20 @@
-import JSZip from "jszip"
-import { buildManifest } from "./manifestBuilder"
-import { exportMasterJson } from "./exporters/exportMasterJson"
-import { exportUniversalTrackGpx, exportUniversalWaypointsGpx } from "./exporters/exportUniversalGpx"
-import { exportHemaFiles } from "./exporters/exportHemaFiles"
-import { exportGarminFiles } from "./exporters/exportGarminFiles"
-import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv"
-import { exportGoogleEarthKml } from "./exporters/exportGoogleEarthKml"
-import { exportGaiaFiles } from "./exporters/exportGaiaFiles"
+import JSZip from "jszip";
+import { buildManifest } from "./manifestBuilder";
+import { exportMasterJson } from "./exporters/exportMasterJson";
+import {
+  exportUniversalTrackGpx,
+  exportUniversalWaypointsGpx,
+} from "./exporters/exportUniversalGpx";
+import { exportHemaFiles } from "./exporters/exportHemaFiles";
+import { exportGarminFiles } from "./exporters/exportGarminFiles";
+import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv";
+import { exportGoogleEarthKml } from "./exporters/exportGoogleEarthKml";
+import { exportGaiaFiles } from "./exporters/exportGaiaFiles";
 
-export async function buildRoutePackage(stage, roadbook, options = {}) {
-  validateStage(stage)
+export async function buildRoutePackage(stage, options = {}) {
+  validateStage(stage);
+
+  const roadbook = stage?.roadbook ?? null;
 
   const config = {
     includeHema: true,
@@ -22,59 +27,117 @@ export async function buildRoutePackage(stage, roadbook, options = {}) {
     appName: "RouteMapper",
     version: "0.1.0",
     ...options,
-  }
+  };
 
-  const zip = new JSZip()
-  const safeBase = makeBaseName(stage, config)
+  const zip = new JSZip();
+  const safeBase = makeBaseName(stage, config);
 
-  const coreFiles = {}
-  coreFiles[`${safeBase}_stage.json`] = exportMasterJson(stage, roadbook, config)
-  coreFiles[`${safeBase}_track.gpx`] = exportUniversalTrackGpx(stage, config)
-  coreFiles[`${safeBase}_waypoints.gpx`] = exportUniversalWaypointsGpx(stage, config)
+  const coreFiles = {};
+  coreFiles[`${safeBase}_stage.json`] = exportMasterJson(
+    stage,
+    roadbook,
+    config,
+  );
+  coreFiles[`${safeBase}_track.gpx`] = exportUniversalTrackGpx(stage, config);
+  coreFiles[`${safeBase}_waypoints.gpx`] = exportUniversalWaypointsGpx(
+    stage,
+    config,
+  );
+
   if (roadbook) {
-    coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2)
-    coreFiles[`${safeBase}_roadbook.csv`] = exportRallyNavCsv(roadbook, config)
+    coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
+    coreFiles[`${safeBase}_roadbook.csv`] = exportRallyNavCsv(stage, config);
   }
 
-  Object.entries(coreFiles).forEach(([name, content]) => zip.file(name, content))
+  Object.entries(coreFiles).forEach(([name, content]) =>
+    zip.file(name, content),
+  );
 
-  const manifest = buildManifest(stage, config, safeBase, roadbook)
+  const manifest = buildManifest(stage, config, safeBase, roadbook);
 
-  if (config.includeHema) addFolderFiles(zip.folder("hema"), exportHemaFiles(stage, config, safeBase), manifest.files.hema)
-  if (config.includeGarmin) addFolderFiles(zip.folder("garmin"), exportGarminFiles(stage, config, safeBase), manifest.files.garmin)
-  if (config.includeRallyNav && roadbook) addFolderFiles(zip.folder("rallynav"), { [`${safeBase}_rallynav.csv`]: exportRallyNavCsv(roadbook, config) }, manifest.files.rallynav)
-  if (config.includeGoogleEarth) addFolderFiles(zip.folder("google-earth"), exportGoogleEarthKml(stage, config, safeBase), manifest.files.googleEarth)
-  if (config.includeGaia) addFolderFiles(zip.folder("gaia"), exportGaiaFiles(stage, config, safeBase), manifest.files.gaia)
+  if (config.includeHema) {
+    addFolderFiles(
+      zip.folder("hema"),
+      exportHemaFiles(stage, config, safeBase),
+      manifest.files.hema,
+    );
+  }
 
-  zip.file("manifest.json", JSON.stringify(manifest, null, 2))
-  zip.file("README.md", buildReadme(config))
+  if (config.includeGarmin) {
+    addFolderFiles(
+      zip.folder("garmin"),
+      exportGarminFiles(stage, config, safeBase),
+      manifest.files.garmin,
+    );
+  }
 
-  return zip.generateAsync({ type: "blob" })
+  if (config.includeRallyNav && roadbook) {
+    addFolderFiles(
+      zip.folder("rallynav"),
+      { [`${safeBase}_rallynav.csv`]: exportRallyNavCsv(stage, config) },
+      manifest.files.rallynav,
+    );
+  }
+
+  if (config.includeGoogleEarth) {
+    addFolderFiles(
+      zip.folder("google-earth"),
+      exportGoogleEarthKml(stage, config, safeBase),
+      manifest.files.googleEarth,
+    );
+  }
+
+  if (config.includeGaia) {
+    addFolderFiles(
+      zip.folder("gaia"),
+      exportGaiaFiles(stage, config, safeBase),
+      manifest.files.gaia,
+    );
+  }
+
+  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
+  zip.file("README.md", buildReadme(config));
+
+  return zip.generateAsync({ type: "blob" });
 }
 
 function addFolderFiles(folder, files, manifestArray) {
   Object.entries(files).forEach(([name, content]) => {
-    folder.file(name, content)
-    manifestArray.push(`${folder.name}/${name}`)
-  })
+    folder.file(name, content);
+    manifestArray.push(`${folder.name}/${name}`);
+  });
 }
 
 function validateStage(stage) {
   if (!stage || !Array.isArray(stage.trackPoints)) {
-    throw new Error("buildRoutePackage: stage.trackPoints is required")
+    throw new Error("buildRoutePackage: stage.trackPoints is required");
   }
 }
 
 function makeBaseName(stage, config) {
-  const stageName = sanitize(stage?.meta?.stageName || "Stage")
-  const date = (config.exportedAt || new Date().toISOString()).slice(0, 10)
-  return `${config.appName}_${stageName}_${date}`
+  const stageName = sanitize(stage?.meta?.stageName || "Stage");
+  const date = (config.exportedAt || new Date().toISOString()).slice(0, 10);
+  return `${config.appName}_${stageName}_${date}`;
 }
 
 function sanitize(value) {
-  return String(value).replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")
+  return String(value)
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
 }
 
 function buildReadme(config) {
-  return `# ${config.appName} Export Package\n\nThis ZIP was generated by ${config.appName} ${config.version}.\n\nCore files:\n- stage JSON\n- universal track GPX\n- universal waypoints GPX\n- roadbook JSON/CSV when available\n\nTarget folders may include Hema, Garmin, Rally Navigator, Google Earth, and Gaia GPS exports.\n`
+  return `# ${config.appName} Export Package
+
+This ZIP was generated by ${config.appName} ${config.version}.
+
+Core files:
+- stage JSON
+- universal track GPX
+- universal waypoints GPX
+- roadbook JSON/CSV when available
+
+Target folders may include Hema, Garmin, Rally Navigator, Google Earth, and Gaia GPS exports.
+`;
 }
