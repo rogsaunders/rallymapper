@@ -1,4 +1,4 @@
-import { getIconExportMeta } from "@/roadbook/iconMappings";
+import { getIconExportMeta } from "./iconMappings";
 
 export function mergeWithWaypoints(events, waypoints, config) {
   const mergeRadiusM = config.mergeRadiusM ?? 20;

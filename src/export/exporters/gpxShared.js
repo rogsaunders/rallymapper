@@ -1,11 +1,11 @@
-import { getIconExportMeta } from "./iconMappings";
+import { getIconExportMeta } from "../../roadbook/iconMappings";
 
 export function xmlEscape(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 }
 
