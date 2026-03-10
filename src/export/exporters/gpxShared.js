@@ -1,3 +1,5 @@
+import { getIconExportMeta } from "./iconMappings";
+
 export function xmlEscape(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -8,46 +10,7 @@ export function xmlEscape(value) {
 }
 
 export function symbolForIcon(icon) {
-  switch (icon) {
-    case "start":
-      return "Flag, Blue";
-
-    case "finish":
-      return "Flag, Red";
-
-    case "danger1":
-    case "danger2":
-    case "danger3":
-    case "danger_1":
-    case "danger_2":
-    case "danger_3":
-      return "Danger Area";
-
-    case "gate":
-      return "Gate";
-
-    case "water":
-      return "Bridge";
-
-    case "crest":
-      return "Summit";
-
-    case "dip":
-      return "Valley";
-
-    case "control":
-      return "Pin, Blue";
-
-    case "stop":
-      return "Stop Sign";
-
-    case "straight":
-    case "nav":
-      return "Waypoint";
-
-    default:
-      return "Waypoint";
-  }
+  return getIconExportMeta(icon).gpxSymbol;
 }
 
 export function gpxHeader(appName = "RouteMapper") {

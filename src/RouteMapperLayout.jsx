@@ -1049,13 +1049,6 @@ export default function RouteMapperLayout() {
     if (!currentGPS)
       return alert("GPS not ready yet — wait a moment and try again.");
 
-    // Optional freshness guard (recommended if you store fixTs)
-    // const now = Date.now();
-    // if (!Number.isFinite(fixTs) || now - fixTs > 2000) {
-    //  alert("Waiting for a fresh GPS fix…");
-    //  return;
-    // }
-
     setWaypoints((prev) => {
       const last =
         [...prev]
@@ -1071,7 +1064,6 @@ export default function RouteMapperLayout() {
         lon: Number(currentGPS.lon),
       };
 
-      // If we have a previous point, enforce threshold
       if (last) {
         const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
 
@@ -1093,22 +1085,19 @@ export default function RouteMapperLayout() {
             ts: currentGPS?.timestamp,
           });
 
-          // If movement calc failed, don't block adding — just skip the gate
           if (
             Number.isFinite(moved) &&
             Number.isFinite(minMove) &&
             moved < minMove
           ) {
             console.log("⏳ Ignored due to threshold");
-            return prev; // ✅ prev is in-scope here
+            return prev;
           }
         } else {
           console.log("⚠️ Invalid last waypoint fix", last);
-          // allow adding
         }
       }
 
-      // build waypoint (your existing code)
       const typeToSave = typeOverride ?? waypointType;
       const iconId =
         typeToSave === "hazard"
@@ -1119,7 +1108,47 @@ export default function RouteMapperLayout() {
               ? controlIconId || "start"
               : null;
 
+      const lastWaypointDistance =
+        prev.length > 0
+          ? Number(prev[prev.length - 1]?.distanceFromStartM || 0)
+          : 0;
+
+      const segmentFromLastWaypoint =
+        prev.length > 0
+          ? haversineMeters(
+              {
+                lat: Number(prev[prev.length - 1].lat),
+                lon: Number(prev[prev.length - 1].lon),
+              },
+              curFix,
+            )
+          : startGPS &&
+              Number.isFinite(Number(startGPS.lat)) &&
+              Number.isFinite(Number(startGPS.lon))
+            ? haversineMeters(
+                {
+                  lat: Number(startGPS.lat),
+                  lon: Number(startGPS.lon),
+                },
+                curFix,
+              )
+            : 0;
+
+      const distanceFromStartM =
+        prev.length > 0
+          ? lastWaypointDistance +
+            (Number.isFinite(segmentFromLastWaypoint)
+              ? segmentFromLastWaypoint
+              : 0)
+          : Number.isFinite(segmentFromLastWaypoint)
+            ? segmentFromLastWaypoint
+            : 0;
+
       const next = {
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         lat: currentGPS.lat,
         lon: currentGPS.lon,
         poi: poi.trim(),
@@ -1127,6 +1156,7 @@ export default function RouteMapperLayout() {
         kind: "waypoint",
         type: typeToSave,
         iconId,
+        distanceFromStartM,
       };
 
       return [...prev, next];
