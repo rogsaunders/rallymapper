@@ -1525,7 +1525,7 @@ export default function RouteMapperLayout() {
 
           <button
             type="button"
-            className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
+            className="px-3 py-2 rounded-xl border bg-white text-red-500 disabled:opacity-50"
             onClick={() => setShowRoadbookPreview((v) => !v)}
             disabled={!stageActive && !(roadbookPreview?.rows?.length > 0)}
             title="Show generated roadbook preview"

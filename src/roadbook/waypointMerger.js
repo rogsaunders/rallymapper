@@ -4,32 +4,30 @@ export function mergeWithWaypoints(events, waypoints, config) {
   const mergeRadiusM = config.mergeRadiusM ?? 20;
   const merged = [...events];
 
-  for (const waypoint of waypoints || []) {
-    const iconId = waypoint.iconId || waypoint.icon || waypoint.type || "note";
-    const eventType = mapWaypointToEventType(iconId);
-
-    const distanceM = Number.isFinite(waypoint.distanceFromStartM)
-      ? waypoint.distanceFromStartM
-      : 0;
+  for (const rawWaypoint of waypoints || []) {
+    const waypoint = normalizeWaypoint(rawWaypoint);
+    if (!Number.isFinite(waypoint.lat) || !Number.isFinite(waypoint.lon)) {
+      continue;
+    }
 
     const nearby = merged.find(
-      (event) => Math.abs((event.distanceM ?? 0) - distanceM) <= mergeRadiusM,
+      (event) =>
+        Math.abs((event.distanceM ?? 0) - waypoint.distanceM) <= mergeRadiusM,
     );
 
-    const waypointNote =
-      waypoint.poi ||
-      waypoint.note ||
-      waypoint.description ||
-      humanizeEventType(eventType);
-
     if (nearby) {
-      nearby.icon = iconId || nearby.icon;
-      nearby.notes = combineNotes(nearby.notes, waypointNote);
+      nearby.icon = waypoint.icon || nearby.icon;
+      nearby.notes = combineNotes(nearby.notes, waypoint.note);
       nearby.source = "merged";
-      nearby.linkedWaypointIds = [
-        ...(nearby.linkedWaypointIds || []),
-        waypoint.id || `${waypoint.timestamp || "wp"}`,
-      ];
+
+      const existingIds = Array.isArray(nearby.linkedWaypointIds)
+        ? nearby.linkedWaypointIds.filter(Boolean)
+        : [];
+
+      nearby.linkedWaypointIds = waypoint.id
+        ? [...existingIds, waypoint.id]
+        : existingIds;
+
       nearby.confidence = Math.min(1, (nearby.confidence ?? 0.7) + 0.15);
       continue;
     }
@@ -38,18 +36,36 @@ export function mergeWithWaypoints(events, waypoints, config) {
       id: `wp-${waypoint.id || waypoint.timestamp || Math.random().toString(36).slice(2)}`,
       lat: waypoint.lat,
       lon: waypoint.lon,
-      distanceM,
-      eventType,
-      tulipTemplate: eventType,
-      icon: iconId,
-      notes: waypointNote,
+      distanceM: waypoint.distanceM,
+      eventType: waypoint.eventType,
+      tulipTemplate: waypoint.eventType,
+      icon: waypoint.icon,
+      notes: waypoint.note,
       source: "manual",
       confidence: 0.95,
-      linkedWaypointIds: [waypoint.id || `${waypoint.timestamp || "wp"}`],
+      linkedWaypointIds: waypoint.id ? [waypoint.id] : [],
     });
   }
 
   return merged.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+}
+
+function normalizeWaypoint(wp) {
+  const icon = wp.iconId || wp.icon || wp.type || "note";
+  const eventType = mapWaypointToEventType(icon);
+
+  return {
+    id: wp.id ?? null,
+    lat: Number(wp.lat),
+    lon: Number(wp.lon),
+    timestamp: wp.timestamp || wp.time || null,
+    icon,
+    eventType,
+    note: wp.poi || wp.note || wp.description || humanizeEventType(eventType),
+    distanceM: Number.isFinite(Number(wp.distanceFromStartM))
+      ? Number(wp.distanceFromStartM)
+      : 0,
+  };
 }
 
 function mapWaypointToEventType(icon) {
