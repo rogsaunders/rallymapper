@@ -46,7 +46,12 @@ export async function buildRoutePackage(stage, options = {}) {
 
   if (roadbook) {
     coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
-    coreFiles[`${safeBase}_roadbook.csv`] = exportRallyNavCsv(stage, config);
+    coreFiles[`${safeBase}_roadbook_raw.csv`] = exportRallyNavCsv(stage, {
+      mode: "raw",
+    });
+    coreFiles[`${safeBase}_roadbook_driver.csv`] = exportRallyNavCsv(stage, {
+      mode: "driver",
+    });
   }
 
   Object.entries(coreFiles).forEach(([name, content]) =>
@@ -74,7 +79,14 @@ export async function buildRoutePackage(stage, options = {}) {
   if (config.includeRallyNav && roadbook) {
     addFolderFiles(
       zip.folder("rallynav"),
-      { [`${safeBase}_rallynav.csv`]: exportRallyNavCsv(stage, config) },
+      {
+        [`${safeBase}_rallynav_raw.csv`]: exportRallyNavCsv(stage, {
+          mode: "raw",
+        }),
+        [`${safeBase}_rallynav_driver.csv`]: exportRallyNavCsv(stage, {
+          mode: "driver",
+        }),
+      },
       manifest.files.rallynav,
     );
   }

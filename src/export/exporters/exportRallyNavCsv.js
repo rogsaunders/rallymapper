@@ -1,5 +1,11 @@
-export function exportRallyNavCsv(stage) {
-  const rows = stage?.roadbook?.rows || [];
+export function exportRallyNavCsv(stage, options = {}) {
+  const mode = options.mode || "driver";
+
+  const roadbook = stage?.roadbook || {};
+  const rows =
+    mode === "raw"
+      ? roadbook?.views?.raw || roadbook?.rows || []
+      : roadbook?.views?.driver || roadbook?.rows || [];
 
   const headers = [
     "index",

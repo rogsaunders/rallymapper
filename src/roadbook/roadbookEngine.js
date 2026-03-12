@@ -2,6 +2,7 @@ import { preprocessTrack } from "./trackPreprocessor"
 import { detectTurnCandidates } from "./turnDetection"
 import { classifyCandidates } from "./eventClassifier"
 import { mergeWithWaypoints } from "./waypointMerger"
+import { buildRoadbookViews } from "./roadbookFilter";
 
 export function generateRoadbook(stage, options = {}) {
   validateStage(stage)
@@ -20,19 +21,26 @@ export function generateRoadbook(stage, options = {}) {
   const classified = classifyCandidates(candidates, config)
   const mergedEvents = mergeWithWaypoints(classified, stage.waypoints || [], config)
   const rows = buildRoadbookRows(mergedEvents)
+    const views = buildRoadbookViews(rows, {
+    minConfidence: options.minConfidence ?? 0.8,
+    minGapM: options.minGapM ?? 80,
+    clusterRadiusM: options.clusterRadiusM ?? 60,
+  });
 
   return {
-    meta: stage.meta || {},
+    meta: stage.meta,
     config,
     stats: {
       rawTrackPoints: stage.trackPoints.length,
-      processedTrackPoints: preprocessedTrack.length,
+      processedTrackPoints: preprocessed.length,
       candidateCount: candidates.length,
       roadbookRowCount: rows.length,
+      driverRowCount: views.driver.length,
     },
     rows,
-  }
-}
+    views,
+  };
+
 
 function validateStage(stage) {
   if (!stage || !Array.isArray(stage.trackPoints)) {
