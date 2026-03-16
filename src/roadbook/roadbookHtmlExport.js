@@ -297,7 +297,7 @@ export function exportRoadbookHtml(stage) {
 function renderRow(row, index, nextRow) {
   const total = formatKm(row.kmTotal);
   const partial = formatKm(row.kmPartial);
-  const tulip = renderTulipSvg(row);
+  const tulip = renderTulipSvg(row.tulipTemplate || row.eventType);
   const note = escapeHtml(row.notes || humanizeEventType(row.eventType));
   const gps = formatGps(row.lat, row.lon);
   const cap = formatCap(row, nextRow);
@@ -367,6 +367,14 @@ function formatCap(row, nextRow) {
     bearing = row.bearingOut;
   } else if (Number.isFinite(nextRow?.bearingIn)) {
     bearing = nextRow.bearingIn;
+  } else if (
+    nextRow &&
+    Number.isFinite(row?.lat) &&
+    Number.isFinite(row?.lon) &&
+    Number.isFinite(nextRow?.lat) &&
+    Number.isFinite(nextRow?.lon)
+  ) {
+    bearing = bearingBetween(row.lat, row.lon, nextRow.lat, nextRow.lon);
   }
 
   if (!Number.isFinite(bearing)) return "";
@@ -374,6 +382,16 @@ function formatCap(row, nextRow) {
   const cap = Math.round(((bearing % 360) + 360) % 360);
 
   return `${cap}°`;
+}
+
+function bearingBetween(lat1, lon1, lat2, lon2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLon = toRad(lon2 - lon1);
+  const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+  return (Math.atan2(y, x) * 180) / Math.PI;
 }
 
 function formatGps(lat, lon) {
