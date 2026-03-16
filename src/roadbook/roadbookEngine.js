@@ -1,11 +1,11 @@
-import { preprocessTrack } from "./trackPreprocessor"
-import { detectTurnCandidates } from "./turnDetection"
-import { classifyCandidates } from "./eventClassifier"
-import { mergeWithWaypoints } from "./waypointMerger"
+import { preprocessTrack } from "./trackPreprocessor";
+import { detectTurnCandidates } from "./turnDetection";
+import { classifyCandidates } from "./eventClassifier";
+import { mergeWithWaypoints } from "./waypointMerger";
 import { buildRoadbookViews } from "./roadbookFilter";
 
 export function generateRoadbook(stage, options = {}) {
-  validateStage(stage)
+  validateStage(stage);
 
   const config = {
     minPointSpacingM: 5,
@@ -14,17 +14,22 @@ export function generateRoadbook(stage, options = {}) {
     minTurnAngleDeg: 25,
     mergeRadiusM: 20,
     ...options,
-  }
+  };
 
-  const preprocessedTrack = preprocessTrack(stage.trackPoints, config)
-  const candidates = detectTurnCandidates(preprocessedTrack, config)
-  const classified = classifyCandidates(candidates, config)
-  const mergedEvents = mergeWithWaypoints(classified, stage.waypoints || [], config)
-  const rows = buildRoadbookRows(mergedEvents)
-    const views = buildRoadbookViews(rows, {
-    minConfidence: options.minConfidence ?? 0.8,
-    minGapM: options.minGapM ?? 80,
-    clusterRadiusM: options.clusterRadiusM ?? 60,
+  const preprocessed = preprocessTrack(stage.trackPoints, config);
+  const candidates = detectTurnCandidates(preprocessed, config);
+  const classified = classifyCandidates(candidates, config);
+  const mergedEvents = mergeWithWaypoints(
+    classified,
+    stage.waypoints || [],
+    config,
+  );
+  const rows = buildRoadbookRows(mergedEvents);
+  const views = buildRoadbookViews(rows, {
+    minConfidence: options.minConfidence ?? 0.85,
+    minGapM: options.minGapM ?? 130,
+    clusterRadiusM: options.clusterRadiusM ?? 80,
+    manualExclusionRadiusM: options.manualExclusionRadiusM ?? 140,
   });
 
   return {
@@ -40,22 +45,22 @@ export function generateRoadbook(stage, options = {}) {
     rows,
     views,
   };
-
+}
 
 function validateStage(stage) {
   if (!stage || !Array.isArray(stage.trackPoints)) {
-    throw new Error("generateRoadbook: stage.trackPoints is required")
+    throw new Error("generateRoadbook: stage.trackPoints is required");
   }
 }
 
 function buildRoadbookRows(events) {
-  const ordered = [...events].sort((a, b) => a.distanceM - b.distanceM)
-  let previousDistanceM = 0
+  const ordered = [...events].sort((a, b) => a.distanceM - b.distanceM);
+  let previousDistanceM = 0;
 
   return ordered.map((event, index) => {
-    const kmTotal = round3(event.distanceM / 1000)
-    const kmPartial = round3((event.distanceM - previousDistanceM) / 1000)
-    previousDistanceM = event.distanceM
+    const kmTotal = round3(event.distanceM / 1000);
+    const kmPartial = round3((event.distanceM - previousDistanceM) / 1000);
+    previousDistanceM = event.distanceM;
 
     return {
       index: index + 1,
@@ -73,10 +78,10 @@ function buildRoadbookRows(events) {
       source: event.source || "derived",
       confidence: event.confidence ?? 0,
       linkedWaypointIds: event.linkedWaypointIds || [],
-    }
-  })
+    };
+  });
 }
 
 function round3(value) {
-  return Math.round(value * 1000) / 1000
+  return Math.round(value * 1000) / 1000;
 }
