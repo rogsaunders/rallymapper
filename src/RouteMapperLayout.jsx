@@ -466,7 +466,7 @@ export default function RouteMapperLayout() {
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
 
   // Trip meta
-  const [tripName, setTripName] = useState("Survey Trip");
+  const [tripName, setTripName] = useState("Survey");
   const [tripDate, setTripDate] = useState(
     new Date().toISOString().slice(0, 10),
   ); // YYYY-MM-DD
@@ -576,7 +576,7 @@ export default function RouteMapperLayout() {
       );
       if (!ok) return;
 
-      setTripName(draft.tripName ?? "Survey Trip");
+      setTripName(draft.tripName ?? "Survey");
       setTripDate(draft.tripDate ?? new Date().toISOString().slice(0, 10));
       setDayNumber(draft.dayNumber ?? 1);
       setRouteNumber(draft.routeNumber ?? 1);
@@ -902,14 +902,18 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
-        const blob = await buildRoutePackage(stageWithRoadbook, {
-          includeHema: true,
-          includeGarmin: true,
-          includeRallyNav: true,
-          includeGoogleEarth: true,
-          includeGaia: true,
-          includePdf: false,
-        });
+        const blob = await buildRoutePackage(
+          stageWithRoadbook,
+          stageWithRoadbook.roadbook,
+          {
+            includeHema: true,
+            includeGarmin: true,
+            includeRallyNav: true,
+            includeGoogleEarth: true,
+            includeGaia: true,
+            includePdf: false,
+          },
+        );
 
         downloadBlob(`${base}.zip`, blob);
       } catch (e) {
@@ -1332,9 +1336,12 @@ export default function RouteMapperLayout() {
             />
             <div className="leading-tight">
               <div className="text-lg font-semibold">RouteMapper</div>
+              <div className="text-sm font-medium text-gray-800">
+                {tripName || "Untitled Trip / Event"}
+              </div>
               <div className="text-xs text-gray-500">
-                {tripName} • Day {dayNumber} •{" "}
-                {routeName || `Route ${routeNumber}`}
+                Day {dayNumber} • {routeName || `Route ${routeNumber}`} • Stage{" "}
+                {stageNumber}
               </div>
             </div>
           </div>
@@ -1375,73 +1382,95 @@ export default function RouteMapperLayout() {
       <main className="mx-auto max-w-6xl px-3 py-3 space-y-3">
         {/* TOP CONTROLS STRIP */}
         <section className="bg-white rounded-2xl shadow-sm border p-3">
-          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center">
-            <button
-              type="button"
-              className="px-3 py-2 rounded-xl text-white font-semibold disabled:opacity-50"
-              style={{ backgroundColor: "#588233" }}
-              onClick={handleNewDay}
-              disabled={!canChangeMeta}
-              title={
-                stageActive
-                  ? "End stage first"
-                  : "Increment day and reset route/stage"
-              }
-            >
-              New Day
-            </button>
-            <div className="grid grid-cols-[auto_1fr] gap-2 items-center lg:flex lg:flex-wrap">
-              {/* NEW ROUTE (before name) */}
-              <button
-                type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50"
-                onClick={handleNewRoute}
-                disabled={stageActive}
-                title="Increment route, reset stage to 1"
-              >
-                New Route
-              </button>
-              {/* ROUTE NAME (primary) */}
+          <div className="grid grid-cols-1 gap-2">
+            {/* Row 1: Trip / Event + Day */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
               <input
-                className="min-w-[260px] flex-1 px-3 py-2 rounded-xl border bg-gray-50"
-                value={routeName}
-                onChange={(e) => setRouteName(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
+                value={tripName}
+                onChange={(e) => setTripName(e.target.value)}
                 disabled={stageActive}
-                placeholder="Route name (e.g., Barossa to Silverton)"
+                placeholder="Trip / Event (e.g. Barossa to Magnetic Is.)"
               />
-
-              {/* NEW STAGE (replaces 'Stage' label) */}
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50"
-                onClick={handleNewStage}
-                disabled={stageActive}
-                title="Increment stage number"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                onClick={handleNewDay}
+                disabled={!canChangeMeta}
+                title={
+                  stageActive
+                    ? "End stage first"
+                    : "Start a new day within this trip/event"
+                }
               >
-                New Stage
+                New Day
               </button>
-              {/* STAGE NUMBER DISPLAY (readable, compact) */}
-              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold">
-                Stage {stageNumber}
+              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold whitespace-nowrap">
+                Day {dayNumber}
               </div>
             </div>
 
-            <button
-              type="button"
-              className="px-3 py-2 rounded-xl text-white font-semibold disabled:opacity-50"
-              style={{
-                backgroundColor: stageActive ? "#dc2626" : "#588233",
-              }}
-              onClick={stageActive ? handleEndStage : handleStartStage}
-              disabled={isEndingStage}
-              title={stageActive ? "End current stage" : "Start a new stage"}
-            >
-              {isEndingStage
-                ? "Ending..."
-                : stageActive
-                  ? "⏹ End Stage"
-                  : "Start Stage"}
-            </button>
+            {/* Row 2: Route + Stage + Start/End */}
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                onClick={handleNewRoute}
+                disabled={stageActive}
+                title="Start a new route within this trip/event"
+              >
+                New Route
+              </button>
+              <input
+                ref={routeNameRef}
+                className="w-full px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
+                value={routeName}
+                onChange={(e) => setRouteName(e.target.value)}
+                disabled={stageActive}
+                placeholder="Route name (e.g. Barossa to Silverton)"
+              />
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                onClick={handleNewStage}
+                disabled={stageActive}
+                title="Increment stage number within this route"
+              >
+                New Stage
+              </button>
+              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold whitespace-nowrap">
+                Stage {stageNumber}
+              </div>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-white font-semibold disabled:opacity-50 whitespace-nowrap"
+                style={{
+                  backgroundColor: stageActive ? "#dc2626" : "#588233",
+                }}
+                onClick={stageActive ? handleEndStage : handleStartStage}
+                disabled={isEndingStage}
+                title={stageActive ? "End current stage" : "Start a new stage"}
+              >
+                {isEndingStage
+                  ? "Ending..."
+                  : stageActive
+                    ? "⏹ End Stage"
+                    : "Start Stage"}
+              </button>
+            </div>
+
+            {/* Roadbook toggle */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-medium disabled:opacity-50"
+                onClick={() => setShowRoadbookPreview((v) => !v)}
+                disabled={!stageActive && !(roadbookPreview?.rows?.length > 0)}
+                title="Show generated roadbook preview"
+              >
+                {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
+              </button>
+            </div>
           </div>
         </section>
         {/* MAP: horizontal, not tall */}
@@ -1521,7 +1550,7 @@ export default function RouteMapperLayout() {
 
           <button
             type="button"
-            className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
+            className="px-3 py-2 rounded-xl border bg-white text-red-900 disabled:opacity-50"
             onClick={() => setShowRoadbookPreview((v) => !v)}
             disabled={!stageActive && !(roadbookPreview?.rows?.length > 0)}
             title="Show generated roadbook preview"
