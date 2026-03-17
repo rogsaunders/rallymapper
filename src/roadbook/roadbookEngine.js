@@ -16,8 +16,8 @@ export function generateRoadbook(stage, options = {}) {
     ...options,
   };
 
-  const preprocessed = preprocessTrack(stage.trackPoints, config);
-  const candidates = detectTurnCandidates(preprocessed, config);
+  const preprocessedTrack = preprocessTrack(stage.trackPoints, config);
+  const candidates = detectTurnCandidates(preprocessedTrack, config);
   const classified = classifyCandidates(candidates, config);
   const mergedEvents = mergeWithWaypoints(
     classified,
@@ -26,10 +26,9 @@ export function generateRoadbook(stage, options = {}) {
   );
   const rows = buildRoadbookRows(mergedEvents);
   const views = buildRoadbookViews(rows, {
-    minConfidence: options.minConfidence ?? 0.85,
-    minGapM: options.minGapM ?? 130,
-    clusterRadiusM: options.clusterRadiusM ?? 80,
-    manualExclusionRadiusM: options.manualExclusionRadiusM ?? 140,
+    minConfidence: options.minConfidence ?? 0.8,
+    minGapM: options.minGapM ?? 80,
+    clusterRadiusM: options.clusterRadiusM ?? 60,
   });
 
   return {
@@ -37,7 +36,7 @@ export function generateRoadbook(stage, options = {}) {
     config,
     stats: {
       rawTrackPoints: stage.trackPoints.length,
-      processedTrackPoints: preprocessed.length,
+      processedTrackPoints: preprocessedTrack.length,
       candidateCount: candidates.length,
       roadbookRowCount: rows.length,
       driverRowCount: views.driver.length,
