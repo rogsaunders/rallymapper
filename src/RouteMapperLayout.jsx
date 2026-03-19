@@ -22,6 +22,7 @@ import {
 
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
+import { parseGpxToStage } from "./import/parseGpx";
 
 const PENDING_SYNC_KEY = "rm_pending_queue_signal_v1";
 
@@ -790,6 +791,55 @@ export default function RouteMapperLayout() {
   };
 
   const routeNameRef = useRef(null);
+  const gpxFileInputRef = useRef(null);
+
+  // ── GPX import ────────────────────────────────────────────────────────────
+  const handleGpxImport = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result;
+        const {
+          trackPoints: importedTrack,
+          waypoints: importedWaypoints,
+          stageName,
+          startGPS: importedStartGPS,
+        } = parseGpxToStage(String(text ?? ""));
+
+        if (!importedTrack.length && !importedWaypoints.length) {
+          alert("No track points or waypoints found in this GPX file.");
+          return;
+        }
+
+        const lines = [
+          `Track points: ${importedTrack.length}`,
+          `Waypoints:    ${importedWaypoints.length}`,
+          stageName ? `Stage name:   ${stageName}` : "",
+          "",
+          "This will replace any existing track and waypoints.",
+        ]
+          .filter((l) => l !== undefined)
+          .join("\n");
+
+        if (!window.confirm(`Import GPX?\n\n${lines}`)) return;
+
+        setTrackPoints(importedTrack);
+        setWaypoints(importedWaypoints);
+        if (importedStartGPS) setStartGPS(importedStartGPS);
+        if (stageName && !tripName) setTripName(stageName);
+        setShowRoadbookPreview(true);
+      } catch (err) {
+        console.error("GPX import failed:", err);
+        alert("Could not parse GPX file:\n" + err.message);
+      }
+      // Reset so the same file can be re-selected
+      event.target.value = "";
+    };
+    reader.readAsText(file);
+  };
 
   const handleNewRoute = () => {
     if (stageActive)
@@ -1433,8 +1483,17 @@ export default function RouteMapperLayout() {
               </div>
             </div>
 
-            {/* Row 2: Route + Stage + Start/End */}
-            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center">
+            {/* Hidden GPX file input — triggered by the Import GPX button */}
+            <input
+              ref={gpxFileInputRef}
+              type="file"
+              accept=".gpx"
+              className="hidden"
+              onChange={handleGpxImport}
+            />
+
+            {/* Row 2: Route + Stage + Import + Start/End */}
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 items-center">
               <button
                 type="button"
                 className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
@@ -1464,6 +1523,15 @@ export default function RouteMapperLayout() {
               <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold whitespace-nowrap">
                 Stage {stageNumber}
               </div>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50 whitespace-nowrap"
+                disabled={stageActive}
+                onClick={() => gpxFileInputRef.current?.click()}
+                title="Import a GPX file — loads track points and waypoints, then regenerates the roadbook"
+              >
+                📂 GPX
+              </button>
               <button
                 type="button"
                 className="px-4 py-2 rounded-xl text-white font-semibold disabled:opacity-50 whitespace-nowrap"
