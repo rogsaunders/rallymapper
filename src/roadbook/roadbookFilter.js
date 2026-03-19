@@ -105,11 +105,6 @@ function isTooCloseToManualRow(row, manualRows, manualExclusionRadiusM) {
   if (isManualRow(row)) return false;
 
   const rowDistanceM = getDistanceM(row);
-  const eventType = String(row.eventType || "");
-
-  if (eventType.startsWith("hairpin") || eventType.startsWith("sharp")) {
-    return false;
-  }
 
   return manualRows.some((manualRow) => {
     const manualDistanceM = getDistanceM(manualRow);
@@ -124,6 +119,9 @@ function isManualRow(row) {
 function isAlwaysKeepRow(row) {
   const eventType = String(row.eventType || "");
 
+  // Only truly immovable events bypass gap/exclusion filters.
+  // sharp_* and hairpin_* are high-priority but still gap- and exclusion-checked
+  // (they pass via isStrongDerivedRow instead).
   return (
     eventType === "start" ||
     eventType === "finish" ||
@@ -132,9 +130,7 @@ function isAlwaysKeepRow(row) {
     eventType === "water" ||
     eventType === "crest" ||
     eventType === "dip" ||
-    eventType.startsWith("danger_") ||
-    eventType.startsWith("hairpin") ||
-    eventType.startsWith("sharp")
+    eventType.startsWith("danger_")
   );
 }
 

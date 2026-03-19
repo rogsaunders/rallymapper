@@ -28,11 +28,8 @@ export async function flushPendingQueue(user) {
     try {
       const localId = item.local_id || item?.meta?.local_id;
       const meta = item.meta;
-      const payload = {
-        meta,
-        startGPS: item.startGPS,
-        waypoints: item.waypoints,
-      };
+      // Use the full queued item as payload — preserves trackPoints, routePoints, roadbook
+      const payload = item;
 
       const { error } = await upsertStageExport({
         userId: user.id,

@@ -26,9 +26,9 @@ export function generateRoadbook(stage, options = {}) {
   );
   const rows = buildRoadbookRows(mergedEvents);
   const views = buildRoadbookViews(rows, {
-    minConfidence: options.minConfidence ?? 0.8,
-    minGapM: options.minGapM ?? 80,
-    clusterRadiusM: options.clusterRadiusM ?? 60,
+    minConfidence: options.minConfidence ?? 0.85,
+    minGapM: options.minGapM ?? 130,
+    clusterRadiusM: options.clusterRadiusM ?? 100,
   });
 
   return {
