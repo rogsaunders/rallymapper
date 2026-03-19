@@ -1059,12 +1059,12 @@ export default function RouteMapperLayout() {
 
   useEffect(() => {
     if (waypointType !== "hazard") return;
+    if (hazardIconId === "") return; // deliberately cleared after add — wait for user to re-pick
 
     const variants = ICONS.hazard?.variants || {};
     const hasCurrent = Boolean(variants[hazardIconId]);
 
     if (!hasCurrent) {
-      // fallback to danger_1 or first variant
       const fallback = variants.danger_1
         ? "danger_1"
         : Object.keys(variants)[0];
@@ -1074,6 +1074,7 @@ export default function RouteMapperLayout() {
 
   useEffect(() => {
     if (waypointType !== "nav") return;
+    if (navIconId === "") return; // deliberately cleared after add — wait for user to re-pick
 
     const variants = ICONS.nav?.variants || {};
     const hasCurrent = Boolean(variants[navIconId]);
@@ -1088,6 +1089,7 @@ export default function RouteMapperLayout() {
 
   useEffect(() => {
     if (waypointType !== "control") return;
+    if (controlIconId === "") return; // deliberately cleared after add — wait for user to re-pick
 
     const variants = ICONS.control?.variants || {};
     const hasCurrent = Boolean(variants[controlIconId]);
@@ -1217,7 +1219,12 @@ export default function RouteMapperLayout() {
     });
 
     setPoi("");
-    setWaypointType("note"); // reset icon selection after each waypoint add
+    // Keep waypointType so user stays in the same category (e.g. "nav").
+    // Clear only the variant icon so the grid stays visible but nothing is
+    // pre-selected — user must tap a new icon before the next add.
+    if (waypointType === "nav") setNavIconId("");
+    else if (waypointType === "hazard") setHazardIconId("");
+    else if (waypointType === "control") setControlIconId("");
   };
 
   const routePoints = useMemo(() => {
@@ -1883,7 +1890,12 @@ export default function RouteMapperLayout() {
 
             <button
               className="btn btn-primary mt-3 w-full"
-              disabled={!stageActive}
+              disabled={
+                !stageActive ||
+                (waypointType === "nav" && navIconId === "") ||
+                (waypointType === "hazard" && hazardIconId === "") ||
+                (waypointType === "control" && controlIconId === "")
+              }
               onClick={() => handleAddWaypoint(null)}
             >
               ➕ Add Waypoint (Current GPS)
