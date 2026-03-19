@@ -1,4 +1,10 @@
-import { gpxFooter, gpxHeader, symbolForIcon, xmlEscape } from "./gpxShared";
+import {
+  gpxFooter,
+  gpxHeader,
+  openRallyTypeForIcon,
+  symbolForIcon,
+  xmlEscape,
+} from "./gpxShared";
 
 export function exportUniversalTrackGpx(stage, config = {}) {
   const name = xmlEscape(stage?.meta?.stageName || "Stage Track");
@@ -65,12 +71,14 @@ function buildStartWaypoint(startGPS) {
   const name = xmlEscape("START");
   const desc = xmlEscape("Stage Start");
   const sym = xmlEscape(symbolForIcon("start"));
+  const orType = xmlEscape(openRallyTypeForIcon("start"));
 
   return [
     `  <wpt lat="${lat}" lon="${lon}">`,
     `    <name>${name}</name>`,
     `    <desc>${desc}</desc>`,
     `    <sym>${sym}</sym>`,
+    `    <type>${orType}</type>`,
     time ? `    <time>${xmlEscape(time)}</time>` : null,
     `  </wpt>`,
   ]
@@ -102,12 +110,14 @@ function buildWaypointXml(w, index) {
 
   const desc = xmlEscape(descParts.join(" | "));
   const sym = xmlEscape(symbolForIcon(iconId || type));
+  const orType = xmlEscape(openRallyTypeForIcon(iconId || type));
 
   return [
     `  <wpt lat="${lat}" lon="${lon}">`,
     `    <name>${name}</name>`,
     desc ? `    <desc>${desc}</desc>` : null,
     `    <sym>${sym}</sym>`,
+    `    <type>${orType}</type>`,
     time ? `    <time>${xmlEscape(time)}</time>` : null,
     `  </wpt>`,
   ]
