@@ -10,37 +10,54 @@ export function buildRoadbookViews(rows, options = {}) {
 }
 
 export function filterDriverRoadbook(rows, options = {}) {
-  const minConfidence = options.minConfidence ?? 0.8;
-  const minGapM = options.minGapM ?? 80;
-  const clusterRadiusM = options.clusterRadiusM ?? 60;
+  const minConfidence = options.minConfidence ?? 0.85;
+  const minGapM = options.minGapM ?? 130;
+  const clusterRadiusM = options.clusterRadiusM ?? 100;
+  const manualExclusionRadiusM = options.manualExclusionRadiusM ?? 140;
 
   const sorted = [...(rows || [])].sort(
-    (a, b) =>
-      (a.distanceM ?? kmToM(a.kmTotal)) - (b.distanceM ?? kmToM(b.kmTotal)),
+    (a, b) => getDistanceM(a) - getDistanceM(b),
   );
 
   const clustered = collapseDerivedClusters(sorted, clusterRadiusM);
+
+  const manualRows = clustered.filter(isManualRow);
 
   const kept = [];
   let lastKeptDistance = -Infinity;
 
   for (const row of clustered) {
-    const distanceM = row.distanceM ?? kmToM(row.kmTotal);
-    const hasManualIcon = Boolean(row.icon);
-    const isAlwaysKeep = isAlwaysKeepRow(row);
-    const isStrongDerived = isStrongDerivedRow(row, minConfidence);
-    const farEnough = distanceM - lastKeptDistance >= minGapM;
+    const distanceM = getDistanceM(row);
+    const manual = isManualRow(row);
+    const alwaysKeep = isAlwaysKeepRow(row);
+    const strongDerived = isStrongDerivedRow(row, minConfidence);
+    const tooCloseToPreviousKept = distanceM - lastKeptDistance < minGapM;
+    const tooCloseToManual = isTooCloseToManualRow(
+      row,
+      manualRows,
+      manualExclusionRadiusM,
+    );
 
-    if (hasManualIcon || isAlwaysKeep) {
+    if (manual || alwaysKeep) {
       kept.push(row);
       lastKeptDistance = distanceM;
       continue;
     }
 
-    if (isStrongDerived && farEnough) {
-      kept.push(row);
-      lastKeptDistance = distanceM;
+    if (!strongDerived) {
+      continue;
     }
+
+    if (tooCloseToPreviousKept) {
+      continue;
+    }
+
+    if (tooCloseToManual) {
+      continue;
+    }
+
+    kept.push(row);
+    lastKeptDistance = distanceM;
   }
 
   return recalculatePartials(kept);
@@ -50,23 +67,23 @@ function collapseDerivedClusters(rows, clusterRadiusM) {
   const result = [];
 
   for (const row of rows) {
-    const distanceM = row.distanceM ?? kmToM(row.kmTotal);
-    const hasManualIcon = Boolean(row.icon);
-
-    if (hasManualIcon) {
+    if (isManualRow(row)) {
       result.push(row);
       continue;
     }
 
+    const distanceM = getDistanceM(row);
     const last = result[result.length - 1];
+
     if (!last) {
       result.push(row);
       continue;
     }
 
-    const lastDistanceM = last.distanceM ?? kmToM(last.kmTotal);
-    const sameEventType = last.eventType === row.eventType;
-    const bothDerived = !last.icon && !row.icon;
+    const lastDistanceM = getDistanceM(last);
+    const sameEventType =
+      String(last.eventType || "") === String(row.eventType || "");
+    const bothDerived = !isManualRow(last) && !isManualRow(row);
     const closeEnough = Math.abs(distanceM - lastDistanceM) <= clusterRadiusM;
 
     if (sameEventType && bothDerived && closeEnough) {
@@ -84,9 +101,27 @@ function collapseDerivedClusters(rows, clusterRadiusM) {
   return result;
 }
 
+function isTooCloseToManualRow(row, manualRows, manualExclusionRadiusM) {
+  if (isManualRow(row)) return false;
+
+  const rowDistanceM = getDistanceM(row);
+
+  return manualRows.some((manualRow) => {
+    const manualDistanceM = getDistanceM(manualRow);
+    return Math.abs(rowDistanceM - manualDistanceM) <= manualExclusionRadiusM;
+  });
+}
+
+function isManualRow(row) {
+  return Boolean(row.icon);
+}
+
 function isAlwaysKeepRow(row) {
   const eventType = String(row.eventType || "");
 
+  // Only truly immovable events bypass gap/exclusion filters.
+  // sharp_* and hairpin_* are high-priority but still gap- and exclusion-checked
+  // (they pass via isStrongDerivedRow instead).
   return (
     eventType === "start" ||
     eventType === "finish" ||
@@ -95,9 +130,7 @@ function isAlwaysKeepRow(row) {
     eventType === "water" ||
     eventType === "crest" ||
     eventType === "dip" ||
-    eventType.startsWith("danger_") ||
-    eventType.startsWith("hairpin") ||
-    eventType.startsWith("sharp")
+    eventType.startsWith("danger_")
   );
 }
 
@@ -110,7 +143,7 @@ function isStrongDerivedRow(row, minConfidence) {
   }
 
   if (eventType === "left_90" || eventType === "right_90") {
-    return confidence >= Math.max(minConfidence - 0.1, 0.65);
+    return confidence >= Math.max(minConfidence - 0.1, 0.75);
   }
 
   if (eventType === "bear_left" || eventType === "bear_right") {
@@ -144,9 +177,13 @@ function recalculatePartials(rows) {
   });
 }
 
-function kmToM(km) {
-  const n = Number(km ?? 0);
-  return Number.isFinite(n) ? n * 1000 : 0;
+function getDistanceM(row) {
+  if (Number.isFinite(Number(row.distanceM))) {
+    return Number(row.distanceM);
+  }
+
+  const kmTotal = Number(row.kmTotal ?? 0);
+  return Number.isFinite(kmTotal) ? kmTotal * 1000 : 0;
 }
 
 function round3(value) {

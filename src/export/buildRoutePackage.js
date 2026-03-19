@@ -10,11 +10,15 @@ import { exportGarminFiles } from "./exporters/exportGarminFiles";
 import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv";
 import { exportGoogleEarthKml } from "./exporters/exportGoogleEarthKml";
 import { exportGaiaFiles } from "./exporters/exportGaiaFiles";
+import { exportCombinedGpx } from "./exporters/exportCombinedGpx";
+import { exportRoadbookHtml } from ".././roadbook/roadbookHtmlExport";
 
 export async function buildRoutePackage(stage, options = {}) {
   validateStage(stage);
 
   const roadbook = stage?.roadbook ?? null;
+  console.log("buildRoutePackage roadbook?", roadbook);
+  console.log("buildRoutePackage roadbook rows:", roadbook?.rows?.length);
 
   const config = {
     includeHema: true,
@@ -43,15 +47,20 @@ export async function buildRoutePackage(stage, options = {}) {
     stage,
     config,
   );
+  coreFiles[`${safeBase}_combined.gpx`] = exportCombinedGpx(stage, config);
 
   if (roadbook) {
     coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
+
     coreFiles[`${safeBase}_roadbook_raw.csv`] = exportRallyNavCsv(stage, {
       mode: "raw",
     });
+
     coreFiles[`${safeBase}_roadbook_driver.csv`] = exportRallyNavCsv(stage, {
       mode: "driver",
     });
+
+    coreFiles[`${safeBase}_roadbook.html`] = exportRoadbookHtml(stage);
   }
 
   Object.entries(coreFiles).forEach(([name, content]) =>

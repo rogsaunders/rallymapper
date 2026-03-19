@@ -16,8 +16,11 @@ export function mergeWithWaypoints(events, waypoints, config) {
     );
 
     if (nearby) {
+      // Manual waypoint always wins — override classification and note
       nearby.icon = waypoint.icon || nearby.icon;
-      nearby.notes = combineNotes(nearby.notes, waypoint.note);
+      nearby.eventType = waypoint.eventType || nearby.eventType;
+      nearby.tulipTemplate = waypoint.eventType || nearby.tulipTemplate;
+      nearby.notes = waypoint.note || nearby.notes;
       nearby.source = "merged";
 
       const existingIds = Array.isArray(nearby.linkedWaypointIds)

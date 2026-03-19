@@ -466,7 +466,9 @@ export default function RouteMapperLayout() {
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
 
   // Trip meta
-  const [tripName, setTripName] = useState("Survey Trip");
+  const [tripName, setTripName] = useState("");
+  const [editingTripName, setEditingTripName] = useState(false);
+  const tripNameRef = useRef(null);
   const [tripDate, setTripDate] = useState(
     new Date().toISOString().slice(0, 10),
   ); // YYYY-MM-DD
@@ -576,7 +578,7 @@ export default function RouteMapperLayout() {
       );
       if (!ok) return;
 
-      setTripName(draft.tripName ?? "Survey Trip");
+      setTripName(draft.tripName ?? "");
       setTripDate(draft.tripDate ?? new Date().toISOString().slice(0, 10));
       setDayNumber(draft.dayNumber ?? 1);
       setRouteNumber(draft.routeNumber ?? 1);
@@ -673,7 +675,22 @@ export default function RouteMapperLayout() {
     }
   };
 
-  // ✅ Start GPS automatically
+  // Track recording config
+  const TRACK_INTERVAL_MS = 5000; // minimum ms between recorded points
+  const TRACK_MIN_MOVE_M = 5; // minimum movement in metres to record a point
+
+  // Refs used inside the GPS callback (refs avoid stale closure issues)
+  const trackLastRef = useRef(null); // last accepted track point
+  const stageActiveRef = useRef(false); // mirrors stageActive for use inside watchPosition
+  const lastTrackTimeRef = useRef(0); // ms timestamp of last recorded track point
+
+  useEffect(() => {
+    stageActiveRef.current = stageActive;
+  }, [stageActive]);
+
+  // ✅ Start GPS automatically — track recording is done here rather than in a
+  // setInterval, because iOS throttles/suspends timers when the screen dims or
+  // Safari goes to the background. The watchPosition callback remains active.
   useEffect(() => {
     const geo = navigator.geolocation;
     if (!geo) {
@@ -683,15 +700,60 @@ export default function RouteMapperLayout() {
 
     const watchId = geo.watchPosition(
       (pos) => {
-        const { latitude, longitude, accuracy, speed } = pos.coords;
+        const { latitude: lat, longitude: lon, accuracy, speed } = pos.coords;
 
         setCurrentGPS({
-          lat: latitude,
-          lon: longitude,
+          lat,
+          lon,
           accuracy,
-          speed: Number.isFinite(speed) ? speed : null, // m/s (may be null)
-          fixTs: pos.timestamp, // ms epoch
+          speed: Number.isFinite(speed) ? speed : null,
+          fixTs: pos.timestamp,
           timestamp: new Date(pos.timestamp).toISOString(),
+        });
+
+        // ── Track point recording ────────────────────────────────────────────
+        if (!stageActiveRef.current) return;
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+        const now = Date.now();
+        if (now - lastTrackTimeRef.current < TRACK_INTERVAL_MS) return; // time gate
+
+        const curFix = { lat, lon };
+        const lastAccepted = trackLastRef.current;
+
+        if (lastAccepted) {
+          const lastFix = {
+            lat: Number(lastAccepted.lat),
+            lon: Number(lastAccepted.lon),
+          };
+          if (!Number.isFinite(lastFix.lat) || !Number.isFinite(lastFix.lon)) {
+            trackLastRef.current = null;
+          } else {
+            const moved = haversineMeters(lastFix, curFix);
+            if (!Number.isFinite(moved) || moved < TRACK_MIN_MOVE_M) return;
+          }
+        }
+
+        lastTrackTimeRef.current = now;
+        setTrackPoints((prev) => {
+          const lastPoint = prev.length ? prev[prev.length - 1] : null;
+          const segMeters = lastPoint
+            ? haversineMeters(
+                { lat: Number(lastPoint.lat), lon: Number(lastPoint.lon) },
+                curFix,
+              )
+            : 0;
+          const totalMeters =
+            (lastPoint?.distanceFromStartM || 0) +
+            (Number.isFinite(segMeters) ? segMeters : 0);
+          const pt = {
+            lat,
+            lon,
+            time: new Date().toISOString(),
+            distanceFromStartM: totalMeters,
+          };
+          trackLastRef.current = pt;
+          return [...prev, pt];
         });
       },
       (err) => console.warn("GPS watch error:", err),
@@ -703,88 +765,12 @@ export default function RouteMapperLayout() {
     );
 
     return () => geo.clearWatch(watchId);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startText = useMemo(() => {
     if (!startGPS) return "Not set";
     return `${startGPS.lat}, ${startGPS.lon}`;
   }, [startGPS]);
-
-  const WAYPOINT_TYPES = [
-    { id: "note", label: "Note" },
-    { id: "hazard", label: "Hazard" },
-    { id: "nav", label: "Navigation" },
-    { id: "control", label: "Control" },
-  ];
-
-  const trackLastRef = useRef(null); // last point used for distance threshold
-  const gpsRef = useRef(null);
-
-  useEffect(() => {
-    gpsRef.current = currentGPS;
-  }, [currentGPS]);
-
-  const TRACK_INTERVAL_MS = 5000;
-  const TRACK_MIN_MOVE_M = 10; // or 10000
-
-  useEffect(() => {
-    if (!stageActive) return;
-
-    const id = setInterval(() => {
-      const gps = gpsRef.current;
-      if (!gps) return;
-
-      const lat = Number(gps.lat);
-      const lon = Number(gps.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-      const curFix = { lat, lon };
-      const lastAccepted = trackLastRef.current;
-
-      if (lastAccepted) {
-        const lastFix = {
-          lat: Number(lastAccepted.lat),
-          lon: Number(lastAccepted.lon),
-        };
-
-        if (!Number.isFinite(lastFix.lat) || !Number.isFinite(lastFix.lon)) {
-          console.log("⚠️ Invalid last track fix; resetting", lastAccepted);
-          trackLastRef.current = null;
-        } else {
-          const moved = haversineMeters(lastFix, curFix);
-          if (!Number.isFinite(moved)) return;
-          if (moved < TRACK_MIN_MOVE_M) return; // suppress jitter
-        }
-      }
-
-      setTrackPoints((prev) => {
-        const lastPoint = prev.length ? prev[prev.length - 1] : null;
-
-        const segMeters = lastPoint
-          ? haversineMeters(
-              { lat: Number(lastPoint.lat), lon: Number(lastPoint.lon) },
-              { lat, lon },
-            )
-          : 0;
-
-        const totalMeters =
-          (lastPoint?.distanceFromStartM || 0) +
-          (Number.isFinite(segMeters) ? segMeters : 0);
-
-        const pt = {
-          lat,
-          lon,
-          time: new Date().toISOString(),
-          distanceFromStartM: totalMeters,
-        };
-
-        trackLastRef.current = pt;
-        return [...prev, pt];
-      });
-    }, TRACK_INTERVAL_MS);
-
-    return () => clearInterval(id);
-  }, [stageActive, TRACK_INTERVAL_MS, TRACK_MIN_MOVE_M]);
 
   // const [stageStartedAt, setStageStartedAt] = useState(null);
 
@@ -826,6 +812,7 @@ export default function RouteMapperLayout() {
 
     setTrackPoints([]);
     trackLastRef.current = null;
+    lastTrackTimeRef.current = 0; // reset time gate so first GPS fix records immediately
 
     // Optional defaults
     // setWaypointType("note");
@@ -882,6 +869,19 @@ export default function RouteMapperLayout() {
 
     let roadbook = null;
 
+    // Always capture raw stage data BEFORE roadbook generation so we have it even if generation throws
+    try {
+      localStorage.setItem("stage_debug", JSON.stringify(stage));
+      console.log(
+        "[stage_debug] saved to localStorage — trackPoints:",
+        stage.trackPoints?.length,
+        "waypoints:",
+        stage.waypoints?.length,
+      );
+    } catch (storageErr) {
+      console.warn("[stage_debug] localStorage save failed:", storageErr);
+    }
+
     try {
       roadbook = generateRoadbook(stage);
     } catch (err) {
@@ -902,14 +902,18 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
-        const blob = await buildRoutePackage(stageWithRoadbook, {
-          includeHema: true,
-          includeGarmin: true,
-          includeRallyNav: true,
-          includeGoogleEarth: true,
-          includeGaia: true,
-          includePdf: false,
-        });
+        const blob = await buildRoutePackage(
+          stageWithRoadbook,
+          stageWithRoadbook.roadbook,
+          {
+            includeHema: true,
+            includeGarmin: true,
+            includeRallyNav: true,
+            includeGoogleEarth: true,
+            includeGaia: true,
+            includePdf: false,
+          },
+        );
 
         downloadBlob(`${base}.zip`, blob);
       } catch (e) {
@@ -1163,6 +1167,7 @@ export default function RouteMapperLayout() {
     });
 
     setPoi("");
+    setWaypointType("note"); // reset icon selection after each waypoint add
   };
 
   const routePoints = useMemo(() => {
@@ -1332,9 +1337,12 @@ export default function RouteMapperLayout() {
             />
             <div className="leading-tight">
               <div className="text-lg font-semibold">RouteMapper</div>
+              <div className="text-sm font-medium text-gray-800">
+                {tripName || "Untitled Trip / Event"}
+              </div>
               <div className="text-xs text-gray-500">
-                {tripName} • Day {dayNumber} •{" "}
-                {routeName || `Route ${routeNumber}`}
+                Day {dayNumber} • {routeName || `Route ${routeNumber}`} • Stage{" "}
+                {stageNumber}
               </div>
             </div>
           </div>
@@ -1375,73 +1383,106 @@ export default function RouteMapperLayout() {
       <main className="mx-auto max-w-6xl px-3 py-3 space-y-3">
         {/* TOP CONTROLS STRIP */}
         <section className="bg-white rounded-2xl shadow-sm border p-3">
-          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center">
-            <button
-              type="button"
-              className="px-3 py-2 rounded-xl text-white font-semibold disabled:opacity-50"
-              style={{ backgroundColor: "#588233" }}
-              onClick={handleNewDay}
-              disabled={!canChangeMeta}
-              title={
-                stageActive
-                  ? "End stage first"
-                  : "Increment day and reset route/stage"
-              }
-            >
-              New Day
-            </button>
-            <div className="grid grid-cols-[auto_1fr] gap-2 items-center lg:flex lg:flex-wrap">
-              {/* NEW ROUTE (before name) */}
+          <div className="grid grid-cols-1 gap-2">
+            {/* Row 1: Trip / Event + Day */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+              {editingTripName && !stageActive ? (
+                <input
+                  ref={tripNameRef}
+                  className="w-full px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
+                  value={tripName}
+                  onChange={(e) => setTripName(e.target.value)}
+                  onBlur={() => setEditingTripName(false)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && setEditingTripName(false)
+                  }
+                  placeholder="Trip Name (e.g. Barossa to Palm Cove)"
+                />
+              ) : (
+                <div
+                  className={`w-full px-3 py-2 rounded-xl border min-w-0 font-medium truncate ${stageActive ? "text-gray-400 cursor-default" : "cursor-pointer hover:bg-gray-50"}`}
+                  onClick={() => {
+                    if (stageActive) return;
+                    setEditingTripName(true);
+                    setTimeout(() => {
+                      tripNameRef.current?.focus();
+                      tripNameRef.current?.select();
+                    }, 0);
+                  }}
+                >
+                  {tripName || (
+                    <span className="text-gray-400 font-normal">Trip Name</span>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50"
-                onClick={handleNewRoute}
-                disabled={stageActive}
-                title="Increment route, reset stage to 1"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                onClick={handleNewDay}
+                disabled={!canChangeMeta}
+                title={
+                  stageActive
+                    ? "End stage first"
+                    : "Start a new day within this trip/event"
+                }
               >
-                New Route
+                New Day
               </button>
-              {/* ROUTE NAME (primary) */}
-              <input
-                className="min-w-[260px] flex-1 px-3 py-2 rounded-xl border bg-gray-50"
-                value={routeName}
-                onChange={(e) => setRouteName(e.target.value)}
-                disabled={stageActive}
-                placeholder="Route name (e.g., Barossa to Silverton)"
-              />
-
-              {/* NEW STAGE (replaces 'Stage' label) */}
-              <button
-                type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50"
-                onClick={handleNewStage}
-                disabled={stageActive}
-                title="Increment stage number"
-              >
-                New Stage
-              </button>
-              {/* STAGE NUMBER DISPLAY (readable, compact) */}
-              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold">
-                Stage {stageNumber}
+              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold whitespace-nowrap">
+                Day {dayNumber}
               </div>
             </div>
 
-            <button
-              type="button"
-              className="px-3 py-2 rounded-xl text-white font-semibold disabled:opacity-50"
-              style={{
-                backgroundColor: stageActive ? "#dc2626" : "#588233",
-              }}
-              onClick={stageActive ? handleEndStage : handleStartStage}
-              disabled={isEndingStage}
-              title={stageActive ? "End current stage" : "Start a new stage"}
-            >
-              {isEndingStage
-                ? "Ending..."
-                : stageActive
-                  ? "⏹ End Stage"
-                  : "Start Stage"}
-            </button>
+            {/* Row 2: Route + Stage + Start/End */}
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                onClick={handleNewRoute}
+                disabled={stageActive}
+                title="Start a new route within this trip/event"
+              >
+                New Route
+              </button>
+              <input
+                ref={routeNameRef}
+                className="w-full px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
+                value={routeName}
+                onChange={(e) => setRouteName(e.target.value)}
+                disabled={stageActive}
+                placeholder="Route name (e.g. Barossa to Silverton)"
+              />
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                onClick={handleNewStage}
+                disabled={stageActive}
+                title="Increment stage number within this route"
+              >
+                New Stage
+              </button>
+              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold whitespace-nowrap">
+                Stage {stageNumber}
+              </div>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl text-white font-semibold disabled:opacity-50 whitespace-nowrap"
+                style={{
+                  backgroundColor: stageActive ? "#dc2626" : "#588233",
+                }}
+                onClick={stageActive ? handleEndStage : handleStartStage}
+                disabled={isEndingStage}
+                title={stageActive ? "End current stage" : "Start a new stage"}
+              >
+                {isEndingStage
+                  ? "Ending..."
+                  : stageActive
+                    ? "⏹ End Stage"
+                    : "Start Stage"}
+              </button>
+            </div>
+
+            {/* Roadbook toggle */}
           </div>
         </section>
         {/* MAP: horizontal, not tall */}
@@ -1575,7 +1616,7 @@ export default function RouteMapperLayout() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h2 className="font-semibold">Roadbook Preview</h2>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-red-500">
                     {roadbookPreview?.rows?.length || 0} rows
                   </div>
                 </div>
