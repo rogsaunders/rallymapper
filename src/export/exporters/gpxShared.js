@@ -13,6 +13,10 @@ export function symbolForIcon(icon) {
   return getIconExportMeta(icon).gpxSymbol;
 }
 
+export function openRallyTypeForIcon(icon) {
+  return getIconExportMeta(icon).openRallyType ?? "WP";
+}
+
 export function gpxHeader(appName = "RouteMapper") {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="${xmlEscape(appName)}" xmlns="http://www.topografix.com/GPX/1/1">`;
 }
