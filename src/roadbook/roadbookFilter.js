@@ -60,7 +60,14 @@ export function filterDriverRoadbook(rows, options = {}) {
     lastKeptDistance = distanceM;
   }
 
-  return recalculatePartials(kept);
+  // Truncate at the finish marker — rows recorded after the driver tapped
+  // Finish Stage should never appear in the driver view.
+  const finishIdx = kept.findIndex(
+    (r) => String(r.eventType || "") === "finish",
+  );
+  const finalRows = finishIdx >= 0 ? kept.slice(0, finishIdx + 1) : kept;
+
+  return recalculatePartials(finalRows);
 }
 
 function collapseDerivedClusters(rows, clusterRadiusM) {
@@ -139,7 +146,9 @@ function isStrongDerivedRow(row, minConfidence) {
   const eventType = String(row.eventType || "");
 
   if (eventType.startsWith("hairpin") || eventType.startsWith("sharp")) {
-    return true;
+    // High priority turns still need a minimum confidence floor to prevent
+    // extremely noisy detections from passing unconditionally.
+    return confidence >= 0.75;
   }
 
   if (eventType === "left_90" || eventType === "right_90") {
