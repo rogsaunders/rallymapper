@@ -11,18 +11,37 @@ export function exportCombinedGpx(stage, config = {}) {
 
   const waypoints = (stage.waypoints || [])
     .map((w, index) => {
-      const name = xmlEscape(w.name || w.iconId || `WP${index + 1}`);
-      const desc = xmlEscape(w.note || "");
-      const iconId = w.iconId || w.icon;
-      const sym = xmlEscape(symbolForIcon(iconId));
-      const orType = xmlEscape(openRallyTypeForIcon(iconId));
+      const iconId = w.iconId || w.icon || "";
+      const type = w.type || "";
+      const poi = (w.poi || w.name || "").trim();
+      const time = w.timestamp || w.time || "";
+
+      // Fallback name: prefer user's poi note, then iconId, then WP index
+      const fallbackName = iconId
+        ? iconId.toUpperCase()
+        : type
+          ? `${type.toUpperCase()} ${index + 1}`
+          : `WP${index + 1}`;
+      const wptName = xmlEscape(poi || fallbackName);
+
+      // Structured desc — "Type: nav | Icon: right | POI: note" — mirrors
+      // exportUniversalGpx so the importer can recover iconId exactly.
+      const descParts = [];
+      if (type) descParts.push(`Type: ${type}`);
+      if (iconId) descParts.push(`Icon: ${iconId}`);
+      if (poi) descParts.push(`POI: ${poi}`);
+      const desc = xmlEscape(descParts.join(" | "));
+
+      const sym = xmlEscape(symbolForIcon(iconId || type));
+      const orType = xmlEscape(openRallyTypeForIcon(iconId || type));
 
       return [
         `  <wpt lat="${w.lat}" lon="${w.lon}">`,
-        `    <name>${name}</name>`,
+        `    <name>${wptName}</name>`,
         desc ? `    <desc>${desc}</desc>` : null,
         `    <sym>${sym}</sym>`,
         `    <type>${orType}</type>`,
+        time ? `    <time>${xmlEscape(time)}</time>` : null,
         `  </wpt>`,
       ]
         .filter(Boolean)
