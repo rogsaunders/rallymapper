@@ -297,7 +297,7 @@ export function exportRoadbookHtml(stage) {
 function renderRow(row, index, nextRow) {
   const total = formatKm(row.kmTotal);
   const partial = formatKm(row.kmPartial);
-  const tulip = renderTulipSvg(row.tulipTemplate || row.eventType);
+  const tulip = renderTulipSvg(row.tulipTemplate || row.eventType, { angle: row.angle });
   const note = escapeHtml(row.notes || humanizeEventType(row.eventType));
   const gps = formatGps(row.lat, row.lon);
   const cap = formatCap(row, nextRow);
