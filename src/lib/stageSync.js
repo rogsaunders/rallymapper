@@ -1,5 +1,5 @@
 // src/lib/stageSync.js
-import { supabase } from "/Users/Roger/routemapper/src/lib/supabaseClient.js";
+import { supabase } from "./supabaseClient.js";
 import { readPendingQueue, writePendingQueue } from "./pendingQueue";
 
 // Optional helper if you want it in one place
