@@ -1,7 +1,7 @@
 export function renderTulipSvg(eventType, options = {}) {
   const size = options.size ?? 120
   const center = size / 2
-  const stroke = options.strokeWidth ?? 10
+  const stroke = options.strokeWidth ?? 7
   const angle = options.angle  // degrees; positive = right, negative = left; null for manual waypoints
 
   // When a precise angle is available, render the exit arm at the exact measured bearing.
