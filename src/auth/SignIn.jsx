@@ -3,6 +3,8 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
 import { useNavigate } from "react-router-dom";
 
+const isBeta = import.meta.env.VITE_BETA_MODE === "true";
+
 export default function SignIn() {
   const { enableGuest, disableGuest } = useAuth();
   const [mode, setMode] = useState("signin"); // signin | signup | forgot
@@ -135,15 +137,17 @@ export default function SignIn() {
           </button>
 
           <div className="flex justify-between text-sm">
-            <button
-              type="button"
-              className="underline text-green-700"
-              onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
-            >
-              {mode === "signup"
-                ? "Have an account? Sign in"
-                : "New here? Create an account"}
-            </button>
+            {!isBeta && (
+              <button
+                type="button"
+                className="underline text-green-700"
+                onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
+              >
+                {mode === "signup"
+                  ? "Have an account? Sign in"
+                  : "New here? Create an account"}
+              </button>
+            )}
 
             <button
               type="button"
@@ -157,16 +161,24 @@ export default function SignIn() {
           {!!msg && <div className="text-sm text-gray-700">{msg}</div>}
         </form>
         <div className="mt-10 border-t pt-6">
-          <button
-            type="button"
-            className="w-full py-4 rounded-xl font-bold border border-gray-300 text-gray-800 bg-white"
-            onClick={enableGuest}
-          >
-            Continue as Guest
-          </button>
-          <p className="mt-3 text-center text-xs text-gray-500">
-            Guest mode: data is stored locally and won&apos;t sync to cloud.
-          </p>
+          {isBeta ? (
+            <p className="text-center text-sm text-gray-500">
+              This is a private beta. Sign in with the credentials provided to you.
+            </p>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="w-full py-4 rounded-xl font-bold border border-gray-300 text-gray-800 bg-white"
+                onClick={enableGuest}
+              >
+                Continue as Guest
+              </button>
+              <p className="mt-3 text-center text-xs text-gray-500">
+                Guest mode: data is stored locally and won&apos;t sync to cloud.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
