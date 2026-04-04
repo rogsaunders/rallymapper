@@ -22,7 +22,13 @@ export default function SignIn() {
 
     try {
       if (mode === "forgot") {
-        const redirectTo = `${window.location.origin}/auth/reset`;
+        // Use VITE_APP_URL when set (production deployment) so the reset link
+        // in the email always points to the real app, not whatever localhost
+        // the dev server happened to be on when the button was clicked.
+        const appOrigin =
+          import.meta.env.VITE_APP_URL?.replace(/\/$/, "") ||
+          window.location.origin;
+        const redirectTo = `${appOrigin}/auth/reset`;
 
         const { error } = await supabase.auth.resetPasswordForEmail(
           emailTrimmed,
