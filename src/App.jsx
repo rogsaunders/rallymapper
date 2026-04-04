@@ -8,18 +8,18 @@ import SignIn from "./auth/SignIn";
 import ResetPassword from "./auth/ResetPassword";
 
 function GuestOnly({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, guestMode } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user || guestMode) return <Navigate to="/" replace />;
   return children;
 }
 
 function RequireAuth({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, guestMode } = useAuth();
 
   if (loading) return null;
 
-  if (!user) {
+  if (!user && !guestMode) {
     return <Navigate to="/auth" replace />;
   }
 
