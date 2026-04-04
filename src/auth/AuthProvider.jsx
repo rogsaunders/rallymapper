@@ -27,8 +27,14 @@ export function AuthProvider({ children }) {
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         setSession(newSession || null);
+
+        // When a password recovery link is opened, redirect to the reset page
+        // regardless of where Supabase initially lands the user.
+        if (event === "PASSWORD_RECOVERY") {
+          window.location.replace("/auth/reset");
+        }
       },
     );
 
