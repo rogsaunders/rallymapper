@@ -54,54 +54,52 @@ const loaded = JSON.parse(fs.readFileSync(inputPath, "utf8"));
 const stage  = loaded.roadbook ? loaded : { meta: loaded.meta, roadbook: loaded };
 
 // ─── Icon loading ─────────────────────────────────────────────────────────────
-// Reads SVG strings directly from the app source so the palette stays in sync.
+// Reads from iconManifest.json + src/icons/svg/*.svg — add new icons there.
 
-let svgIconsSrc = "";
+const ICON_SVG_DIR = path.join(REPO_ROOT, "src/icons/svg");
+const FALLBACK_SVG = (label) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 144"><rect x="4" y="4" width="136" height="136" rx="8" fill="#eee" stroke="#999" stroke-width="6"/><text x="72" y="80" text-anchor="middle" font-size="24" fill="#555">${label}</text></svg>`;
+
+let ICON_DEFS = [];
 try {
-  svgIconsSrc = fs.readFileSync(path.join(REPO_ROOT, "src/icons/svgIcons.js"), "utf8");
+  const manifest = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "src/icons/iconManifest.json"), "utf8"));
+  ICON_DEFS = manifest.map(d => {
+    let svg = FALLBACK_SVG(d.label);
+    try { svg = fs.readFileSync(path.join(ICON_SVG_DIR, d.file), "utf8").trim(); } catch (_) {}
+    return { ...d, svg };
+  });
 } catch (_) {
-  /* running outside repo — icons will use fallback placeholder */
+  console.warn("⚠ Could not load iconManifest.json — palette will be empty");
 }
 
-function extractSvg(exportName) {
-  const m = svgIconsSrc.match(new RegExp(`export const ${exportName}\\s*=\\s*\`([\\s\\S]*?)\`\\s*;`));
-  if (m) return m[1].trim();
-  // Fallback: a simple labelled square
-  const label = exportName.replace(/_SVG$/, "").replace(/_/g, " ");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 144"><rect x="4" y="4" width="136" height="136" rx="8" fill="#eee" stroke="#999" stroke-width="6"/><text x="72" y="80" text-anchor="middle" font-size="24" fill="#555">${label}</text></svg>`;
-}
-
-// Icon definitions — { id, label, category, svg }
-const ICON_CATEGORIES = ["Note", "Hazard", "Nav", "Control"];
-
-const ICON_DEFS = [
-  { id: "note",        label: "Note",         category: "Note",    export: "NOTE_SVG" },
-  { id: "danger_1",    label: "Danger 1",     category: "Hazard",  export: "DANGER_1_SVG" },
-  { id: "danger_2",    label: "Danger 2",     category: "Hazard",  export: "DANGER_2_SVG" },
-  { id: "danger_3",    label: "Danger 3",     category: "Hazard",  export: "DANGER_3_SVG" },
-  { id: "bump",        label: "Bump",         category: "Hazard",  export: "BUMP_SVG" },
-  { id: "bumps",       label: "Bumps",        category: "Hazard",  export: "BUMPS_SVG" },
-  { id: "dip",         label: "Dip",          category: "Hazard",  export: "DIP_SVG" },
-  { id: "ruts",        label: "Ruts",         category: "Hazard",  export: "RUTS_SVG" },
-  { id: "washout",     label: "Washout",      category: "Hazard",  export: "WASHOUT_SVG" },
-  { id: "left",        label: "Left",         category: "Nav",     export: "LEFT_SVG" },
-  { id: "right",       label: "Right",        category: "Nav",     export: "RIGHT_SVG" },
-  { id: "keep_l",      label: "Keep L",       category: "Nav",     export: "KEEP_L_SVG" },
-  { id: "keep_r",      label: "Keep R",       category: "Nav",     export: "KEEP_R_SVG" },
-  { id: "straight",    label: "Straight",     category: "Nav",     export: "STRAIGHT_SVG" },
-  { id: "caution",     label: "Caution",      category: "Nav",     export: "CAUTION_SVG" },
-  { id: "gate",        label: "Gate",         category: "Nav",     export: "GATE_SVG" },
-  { id: "cattle_gate", label: "Cattle Gate",  category: "Nav",     export: "CATTLE_GATE_SVG" },
-  { id: "start",       label: "Start",        category: "Control", export: "CONTROL_START_SVG" },
-  { id: "finish",      label: "Finish",       category: "Control", export: "CONTROL_FINISH_SVG" },
-  { id: "stop",        label: "Stop/Restart", category: "Control", export: "CONTROL_STOP_SVG" },
-  { id: "checkpoint",  label: "Checkpoint",   category: "Control", export: "CONTROL_CHECKPOINT_SVG" },
-  { id: "time",        label: "Time Control", category: "Control", export: "CONTROL_TIME_SVG" },
-  { id: "service",     label: "Service",      category: "Control", export: "CONTROL_SERVICE_SVG" },
-].map(d => ({ ...d, svg: extractSvg(d.export) }));
+const ICON_CATEGORIES = [...new Set(ICON_DEFS.map(d => d.category))];
 
 // Quick lookup by icon id
 const ICON_BY_ID = Object.fromEntries(ICON_DEFS.map(d => [d.id, d]));
+
+// ─── Start row ────────────────────────────────────────────────────────────────
+
+function ensureStartRow(rows) {
+  if (!rows.length) return rows;
+  if (Math.abs(rows[0].kmTotal || 0) < 0.01) return rows;
+
+  const first = rows[0];
+  let angle = null;
+  if (Number.isFinite(first.bearingIn)) {
+    angle = first.bearingIn;
+  } else if (
+    rows.length > 1 &&
+    Number.isFinite(first.lat) && Number.isFinite(first.lon) &&
+    Number.isFinite(rows[1].lat) && Number.isFinite(rows[1].lon)
+  ) {
+    angle = bearingBetween(first.lat, first.lon, rows[1].lat, rows[1].lon);
+  }
+
+  return [
+    { kmTotal: 0, kmPartial: 0, icon: "start", eventType: "straight", angle, notes: "Start", lat: null, lon: null, confidence: 1, source: "synthetic" },
+    ...rows,
+  ];
+}
 
 // ─── Row filtering ────────────────────────────────────────────────────────────
 
@@ -139,42 +137,54 @@ function detectUTurnZones(rows) {
 // ─── Tulip renderer ───────────────────────────────────────────────────────────
 
 function renderTulipSvg(eventType, options = {}) {
-  const size   = options.size ?? 120;
-  const c      = size / 2;
-  const stroke = options.strokeWidth ?? 10;
-  const angle  = options.angle;
-  if (angle != null) return renderAngleTulip(size, c, stroke, angle);
+  const size = options.size ?? 120;
+  const c    = size / 2;
+  const s    = options.strokeWidth ?? 10;
+  const angle = options.angle;
+  if (angle != null) return renderAngleTulip(size, c, s, angle);
   switch (eventType) {
-    case "right_90":    return svgWrap(size, ln(c,size,c,c,stroke) + ln(c,c,size,c,stroke));
-    case "left_90":     return svgWrap(size, ln(c,size,c,c,stroke) + ln(c,c,0,c,stroke));
-    case "sharp_right": return svgWrap(size, ln(c,size,c,c+10,stroke) + ln(c,c+10,size-10,20,stroke));
-    case "sharp_left":  return svgWrap(size, ln(c,size,c,c+10,stroke) + ln(c,c+10,10,20,stroke));
-    case "bear_right":  return svgWrap(size, ln(c,size,c,c+10,stroke) + ln(c,c+10,c+35,20,stroke));
-    case "bear_left":   return svgWrap(size, ln(c,size,c,c+10,stroke) + ln(c,c+10,c-35,20,stroke));
-    case "hairpin_right": return svgWrap(size, `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 ${size-20} 20 L ${size-20} ${c}" fill="none" stroke="black" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/>`);
-    case "hairpin_left":  return svgWrap(size, `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 20 20 L 20 ${c}" fill="none" stroke="black" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/>`);
-    default:            return svgWrap(size, ln(c,size,c,10,stroke));
+    case "right_90":    return svgWrap(size, seg(c,size,c,c,s) + exitSeg(c,c,size,c,s));
+    case "left_90":     return svgWrap(size, seg(c,size,c,c,s) + exitSeg(c,c,0,c,s));
+    case "sharp_right": return svgWrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,size-10,20,s));
+    case "sharp_left":  return svgWrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,10,20,s));
+    case "bear_right":  return svgWrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,c+35,20,s));
+    case "bear_left":   return svgWrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,c-35,20,s));
+    case "hairpin_right": return svgWrap(size,
+      `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 ${size-20} 20 L ${size-20} ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      arrowHead(size-20, 20, size-20, c, s));
+    case "hairpin_left":  return svgWrap(size,
+      `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 20 20 L 20 ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      arrowHead(20, 20, 20, c, s));
+    default: return svgWrap(size, exitSeg(c,size,c,10,s));
   }
 }
 
-function renderAngleTulip(size, c, stroke, angle) {
+function renderAngleTulip(size, c, s, angle) {
   const arm = c - 10;
   const rad = (angle * Math.PI) / 180;
   const ex  = r(c + arm * Math.sin(rad));
   const ey  = r(c - arm * Math.cos(rad));
   if (Math.abs(angle) > 150) {
     const lx = r(c + (angle > 0 ? 1 : -1) * arm * 0.6);
-    return svgWrap(size, `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 10 ${ex} ${ey} L ${lx} ${c}" fill="none" stroke="black" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/>`);
+    return svgWrap(size,
+      `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 10 ${ex} ${ey} L ${lx} ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      arrowHead(ex, ey, lx, c, s));
   }
-  return svgWrap(size, ln(c,size,c,c,stroke) + ln(c,c,ex,ey,stroke));
+  return svgWrap(size, seg(c,size,c,c,s) + exitSeg(c,c,ex,ey,s));
 }
 
-function ln(x1,y1,x2,y2,s) {
+function seg(x1,y1,x2,y2,s) {
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="black" stroke-width="${s}" stroke-linecap="round"/>`;
+}
+function exitSeg(x1,y1,x2,y2,s) { return seg(x1,y1,x2,y2,s) + arrowHead(x1,y1,x2,y2,s); }
+function arrowHead(x1,y1,x2,y2,s) {
+  const angle = Math.atan2(y2-y1, x2-x1);
+  const sz = s * 1.8, b = 2.45;
+  return `<polygon points="${r(x2)},${r(y2)} ${r(x2+sz*Math.cos(angle+b))},${r(y2+sz*Math.sin(angle+b))} ${r(x2+sz*Math.cos(angle-b))},${r(y2+sz*Math.sin(angle-b))}" fill="black"/>`;
 }
 function r(n) { return Math.round(n * 100) / 100; }
 function svgWrap(size, inner) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect x="0" y="0" width="${size}" height="${size}" fill="white"/>${inner.trim()}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect x="0" y="0" width="${size}" height="${size}" fill="white"/>${inner}</svg>`;
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -347,6 +357,46 @@ document.addEventListener('dblclick', e => {
 </script>`;
 }
 
+let RM_LOGO_DATA_URI = "";
+try {
+  const logoBuf = fs.readFileSync(path.join(REPO_ROOT, "website/assets/RouteMapper-Logo-Pack/Full Colour/fullLogo_transparent.png"));
+  RM_LOGO_DATA_URI = `data:image/png;base64,${logoBuf.toString("base64")}`;
+} catch (_) { /* logo not found — brand row will show text only */ }
+
+function buildRmHeader(stage, rows) {
+  const meta = stage?.meta || {};
+  const title = meta.stageName || "RouteMapper Roadbook";
+  const lastWithKm = [...rows].reverse().find(r => Number.isFinite(Number(r.kmTotal)));
+  const totalKm = lastWithKm ? Number(lastWithKm.kmTotal).toFixed(1) : "—";
+  const waypointCount = rows.filter(r => r.source !== "synthetic").length;
+  const firstGps = rows.find(r => Number.isFinite(Number(r.lat)));
+  const lastGps  = [...rows].reverse().find(r => Number.isFinite(Number(r.lat)));
+  const metaItems = [["Trip",meta.tripName],["Route",meta.routeName],["Day",meta.dayNumber],["Stage",meta.stageNumber],["Date",meta.tripDate]]
+    .filter(([,v]) => v != null && v !== "")
+    .map(([k,v]) => `<div class="rm-meta-row"><span class="rm-meta-k">${k}</span><span>${escapeHtml(String(v))}</span></div>`)
+    .join("");
+  const logoHtml = RM_LOGO_DATA_URI
+    ? `<img src="${RM_LOGO_DATA_URI}" class="rm-logo-img" alt="RouteMapper">`
+    : `<div><div class="rm-wordmark-main"><span class="rm-word-route">ROUTE</span><span class="rm-word-mapper">MAPPER</span></div><div class="rm-tagline">Rally Roadbook System</div></div>`;
+  return `<div class="rm-header">
+  <div class="rm-brand-row">
+    <div class="rm-brand-logo">${logoHtml}</div>
+    <div class="rm-brand-stage"><div class="rm-stage">${escapeHtml(title)}</div></div>
+  </div>
+  <div class="rm-data-row">
+    <div class="rm-stats">
+      <div class="rm-stat"><span class="rm-stat-n">${totalKm}</span><span class="rm-stat-l">Kilometres</span></div>
+      <div class="rm-stat"><span class="rm-stat-n">${waypointCount}</span><span class="rm-stat-l">Waypoints</span></div>
+    </div>
+    <div class="rm-meta-grid">${metaItems}</div>
+  </div>
+  <div class="rm-endpoints">
+    <div class="rm-ep"><div class="rm-ep-label">Start</div><div class="rm-ep-gps">${firstGps ? formatGps(firstGps.lat,firstGps.lon) : "—"}</div></div>
+    <div class="rm-ep"><div class="rm-ep-label">Finish</div><div class="rm-ep-gps">${lastGps ? formatGps(lastGps.lat,lastGps.lon) : "—"}</div></div>
+  </div>
+</div>`;
+}
+
 function buildHtml(stage, rows, flaggedRows) {
   const title  = stage?.meta?.stageName || "RouteMapper Roadbook";
   const rowHtml = rows.map((row, i) => buildRow(row, i, rows[i+1], flaggedRows.has(i))).join("\n");
@@ -388,10 +438,29 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 .pi-icon svg { width: 36px; height: 36px; display: block; }
 .pi-label { font-size: 8px; color: #ccc; text-align: center; margin-top: 2px; line-height: 1.2; }
 
+/* ── RouteMapper branded header ── */
+.rm-header { border: 2px solid #000; margin-bottom: 8px; }
+.rm-brand-row { display: flex; align-items: stretch; border-bottom: 2px solid #000; }
+.rm-brand-logo { display: flex; align-items: center; justify-content: center; padding: 12px 16px; border-right: 2px solid #000; flex-shrink: 0; }
+.rm-logo-img { height: 120px; width: auto; display: block; }
+.rm-brand-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px 20px; }
+.rm-stage { font-size: 24px; font-weight: 900; text-align: center; line-height: 1.2; }
+.rm-data-row { display: flex; border-bottom: 2px solid #000; }
+.rm-stats { display: flex; flex-direction: column; border-right: 2px solid #000; flex-shrink: 0; }
+.rm-stat { padding: 8px 18px; text-align: center; border-bottom: 2px solid #000; }
+.rm-stat:last-child { border-bottom: none; }
+.rm-stat-n { display: block; font-size: 32px; font-weight: 900; line-height: 1; }
+.rm-stat-l { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #444; margin-top: 2px; }
+.rm-meta-grid { flex: 1; padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; justify-content: center; }
+.rm-meta-row { display: flex; gap: 8px; }
+.rm-meta-k { font-weight: 700; min-width: 46px; }
+.rm-endpoints { display: flex; }
+.rm-ep { flex: 1; padding: 8px 12px; text-align: center; border-right: 2px solid #000; }
+.rm-ep:last-child { border-right: none; }
+.rm-ep-label { font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #006b6b; margin-bottom: 2px; }
+.rm-ep-gps { font-size: 12px; font-weight: 700; line-height: 1.5; }
+
 /* ── Roadbook table ── */
-.header { border: 2px solid #000; margin-bottom: 8px; padding: 8px 10px; }
-.title  { font-size: 22px; font-weight: 800; margin: 0 0 4px 0; }
-.meta   { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; }
 .filter-note { margin-bottom: 6px; padding: 5px 10px; background: #f5f5f5; border: 1px solid #ccc; font-size: 11px; color: #555; border-radius: 3px; }
 
 .roadbook { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -455,17 +524,7 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 <body>
 ${buildIconPaletteHtml()}
 <div class="page">
-  <div class="header">
-    <div class="title">${escapeHtml(title)}</div>
-    <div class="meta">
-      ${stage?.meta?.tripName   ? `<div><strong>Trip:</strong> ${escapeHtml(stage.meta.tripName)}</div>`    : ""}
-      ${stage?.meta?.tripDate   ? `<div><strong>Date:</strong> ${escapeHtml(stage.meta.tripDate)}</div>`    : ""}
-      ${stage?.meta?.dayNumber  != null ? `<div><strong>Day:</strong> ${stage.meta.dayNumber}</div>`        : ""}
-      ${stage?.meta?.routeName  ? `<div><strong>Route:</strong> ${escapeHtml(stage.meta.routeName)}</div>`  : ""}
-      ${stage?.meta?.stageNumber!= null ? `<div><strong>Stage:</strong> ${stage.meta.stageNumber}</div>`    : ""}
-      <div><strong>Rows:</strong> ${rows.length}</div>
-    </div>
-  </div>
+  ${buildRmHeader(stage, rows)}
   <div class="filter-note">${flaggedRows.size > 0 ? `⚠ ${flaggedRows.size} row(s) highlighted (possible U-turn). ` : ""}Drag icons from the palette onto any tulip cell · double-click a dropped icon to remove it · click any Note cell to edit text</div>
   <table class="roadbook">
     <thead>
@@ -553,7 +612,7 @@ function buildRow(row, index, next, flagged) {
 
 const roadbook    = stage?.roadbook;
 const allRows     = roadbook?.views?.driver || roadbook?.rows || [];
-const filteredRows = filterRows(allRows, minConfidence);
+const filteredRows = ensureStartRow(filterRows(allRows, minConfidence));
 const flaggedRows  = flagUturnZones ? detectUTurnZones(filteredRows) : new Set();
 
 const html = buildHtml(stage, filteredRows, flaggedRows);

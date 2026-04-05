@@ -21,40 +21,20 @@ const path = require('path');
 // ─── Icon loading ─────────────────────────────────────────────────────────────
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-let _svgSrc = '';
-try { _svgSrc = fs.readFileSync(path.join(REPO_ROOT, 'src/icons/svgIcons.js'), 'utf8'); } catch (_) {}
+const ICON_SVG_DIR = path.join(REPO_ROOT, 'src/icons/svg');
+const FALLBACK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 144"><rect x="4" y="4" width="136" height="136" rx="8" fill="#eee" stroke="#999" stroke-width="8"/></svg>';
 
-function extractSvg(exportName) {
-  const m = _svgSrc.match(new RegExp(`export const ${exportName}\\s*=\\s*\`([\\s\\S]*?)\`\\s*;`));
-  if (m) return m[1].trim();
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 144"><rect x="4" y="4" width="136" height="136" rx="8" fill="#eee" stroke="#999" stroke-width="8"/></svg>`;
+let ICON_DEFS = [];
+try {
+  const manifest = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'src/icons/iconManifest.json'), 'utf8'));
+  ICON_DEFS = manifest.map(d => {
+    let svg = FALLBACK_SVG;
+    try { svg = fs.readFileSync(path.join(ICON_SVG_DIR, d.file), 'utf8').trim(); } catch (_) {}
+    return { ...d, svg };
+  });
+} catch (_) {
+  console.warn('⚠ Could not load iconManifest.json — icons will be unavailable');
 }
-
-const ICON_DEFS = [
-  { id: 'note',        label: 'Note',         category: 'Note',    export: 'NOTE_SVG' },
-  { id: 'danger_1',    label: 'Danger 1',     category: 'Hazard',  export: 'DANGER_1_SVG' },
-  { id: 'danger_2',    label: 'Danger 2',     category: 'Hazard',  export: 'DANGER_2_SVG' },
-  { id: 'danger_3',    label: 'Danger 3',     category: 'Hazard',  export: 'DANGER_3_SVG' },
-  { id: 'bump',        label: 'Bump',         category: 'Hazard',  export: 'BUMP_SVG' },
-  { id: 'bumps',       label: 'Bumps',        category: 'Hazard',  export: 'BUMPS_SVG' },
-  { id: 'dip',         label: 'Dip',          category: 'Hazard',  export: 'DIP_SVG' },
-  { id: 'ruts',        label: 'Ruts',         category: 'Hazard',  export: 'RUTS_SVG' },
-  { id: 'washout',     label: 'Washout',      category: 'Hazard',  export: 'WASHOUT_SVG' },
-  { id: 'left',        label: 'Left',         category: 'Nav',     export: 'LEFT_SVG' },
-  { id: 'right',       label: 'Right',        category: 'Nav',     export: 'RIGHT_SVG' },
-  { id: 'keep_l',      label: 'Keep Left',    category: 'Nav',     export: 'KEEP_L_SVG' },
-  { id: 'keep_r',      label: 'Keep Right',   category: 'Nav',     export: 'KEEP_R_SVG' },
-  { id: 'straight',    label: 'Straight',     category: 'Nav',     export: 'STRAIGHT_SVG' },
-  { id: 'caution',     label: 'Caution',      category: 'Nav',     export: 'CAUTION_SVG' },
-  { id: 'gate',        label: 'Gate',         category: 'Nav',     export: 'GATE_SVG' },
-  { id: 'cattle_gate', label: 'Cattle Gate',  category: 'Nav',     export: 'CATTLE_GATE_SVG' },
-  { id: 'start',       label: 'Start',        category: 'Control', export: 'CONTROL_START_SVG' },
-  { id: 'finish',      label: 'Finish',       category: 'Control', export: 'CONTROL_FINISH_SVG' },
-  { id: 'stop',        label: 'Stop/Restart', category: 'Control', export: 'CONTROL_STOP_SVG' },
-  { id: 'checkpoint',  label: 'Checkpoint',   category: 'Control', export: 'CONTROL_CHECKPOINT_SVG' },
-  { id: 'time',        label: 'Time Control', category: 'Control', export: 'CONTROL_TIME_SVG' },
-  { id: 'service',     label: 'Service',      category: 'Control', export: 'CONTROL_SERVICE_SVG' },
-].map(d => ({ ...d, svg: extractSvg(d.export), buf: () => Buffer.from(extractSvg(d.export), 'utf8') }));
 
 const ICON_BY_ID = Object.fromEntries(ICON_DEFS.map(d => [d.id, d]));
 
@@ -98,6 +78,35 @@ const allRows = (roadbook.views && roadbook.views.driver) || roadbook.rows || []
 const meta    = stage.meta || {};
 const title   = meta.stageName || 'RouteMapper Roadbook';
 
+// ─── Start row ───────────────────────────────────────────────────────────────
+
+function ensureStartRow(rows) {
+  if (!rows.length) return rows;
+  if (Math.abs(rows[0].kmTotal || 0) < 0.01) return rows;
+
+  const first = rows[0];
+  let angle = null;
+  if (Number.isFinite(first.bearingIn)) {
+    angle = first.bearingIn;
+  } else if (
+    rows.length > 1 &&
+    Number.isFinite(first.lat) && Number.isFinite(first.lon) &&
+    Number.isFinite(rows[1].lat) && Number.isFinite(rows[1].lon)
+  ) {
+    const toRad = d => d * Math.PI / 180;
+    const dLon  = toRad(rows[1].lon - first.lon);
+    const y = Math.sin(dLon) * Math.cos(toRad(rows[1].lat));
+    const x = Math.cos(toRad(first.lat)) * Math.sin(toRad(rows[1].lat)) -
+              Math.sin(toRad(first.lat)) * Math.cos(toRad(rows[1].lat)) * Math.cos(dLon);
+    angle = Math.atan2(y, x) * 180 / Math.PI;
+  }
+
+  return [
+    { kmTotal: 0, kmPartial: 0, icon: 'start', eventType: 'straight', angle, notes: 'Start', lat: null, lon: null, confidence: 1, source: 'synthetic' },
+    ...rows,
+  ];
+}
+
 // ─── Row filtering ───────────────────────────────────────────────────────────
 
 function filterRows(rows, threshold) {
@@ -137,69 +146,60 @@ function detectUTurnZones(rows) {
   return flagged;
 }
 
-const rows      = filterRows(allRows, minConfidence);
+const rows      = ensureStartRow(filterRows(allRows, minConfidence));
 const flaggedRows = flagUturnZones ? detectUTurnZones(rows) : new Set();
 
 // ─── Tulip SVG renderer ──────────────────────────────────────────────────────
 
 function renderTulipSvg(eventType, opts) {
   opts = opts || {};
-  const size   = opts.size   || 120;
-  const c      = size / 2;
-  const stroke = opts.strokeWidth || 10;
-  const angle  = (opts.angle != null) ? opts.angle : null;
+  const size  = opts.size || 120;
+  const c     = size / 2;
+  const s     = opts.strokeWidth || 10;
+  const angle = (opts.angle != null) ? opts.angle : null;
 
-  if (angle !== null) return renderAngleTulip(size, c, stroke, angle);
+  if (angle !== null) return renderAngleTulip(size, c, s, angle);
 
-  const s = stroke;
   switch (eventType) {
-    case 'right_90':
-      return wrap(size,
-        line(c,size,c,c,s) + line(c,c,size,c,s));
-    case 'left_90':
-      return wrap(size,
-        line(c,size,c,c,s) + line(c,c,0,c,s));
-    case 'sharp_right':
-      return wrap(size,
-        line(c,size,c,c+10,s) + line(c,c+10,size-10,20,s));
-    case 'sharp_left':
-      return wrap(size,
-        line(c,size,c,c+10,s) + line(c,c+10,10,20,s));
-    case 'bear_right':
-      return wrap(size,
-        line(c,size,c,c+10,s) + line(c,c+10,c+35,20,s));
-    case 'bear_left':
-      return wrap(size,
-        line(c,size,c,c+10,s) + line(c,c+10,c-35,20,s));
-    case 'hairpin_right':
-      return wrap(size,
-        `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 ${size-20} 20 L ${size-20} ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>`);
-    case 'hairpin_left':
-      return wrap(size,
-        `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 20 20 L 20 ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>`);
-    default:
-      return wrap(size, line(c,size,c,10,s));
+    case 'right_90':    return wrap(size, seg(c,size,c,c,s) + exitSeg(c,c,size,c,s));
+    case 'left_90':     return wrap(size, seg(c,size,c,c,s) + exitSeg(c,c,0,c,s));
+    case 'sharp_right': return wrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,size-10,20,s));
+    case 'sharp_left':  return wrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,10,20,s));
+    case 'bear_right':  return wrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,c+35,20,s));
+    case 'bear_left':   return wrap(size, seg(c,size,c,c+10,s) + exitSeg(c,c+10,c-35,20,s));
+    case 'hairpin_right': return wrap(size,
+      `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 ${size-20} 20 L ${size-20} ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      arrowHead(size-20, 20, size-20, c, s));
+    case 'hairpin_left':  return wrap(size,
+      `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 20 20 20 L 20 ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      arrowHead(20, 20, 20, c, s));
+    default: return wrap(size, exitSeg(c,size,c,10,s));
   }
 }
 
-function renderAngleTulip(size, c, stroke, angle) {
-  const arm  = c - 10;
-  const rad  = angle * Math.PI / 180;
-  const ex   = r2(c + arm * Math.sin(rad));
-  const ey   = r2(c - arm * Math.cos(rad));
-  const abs  = Math.abs(angle);
-  const s    = stroke;
+function renderAngleTulip(size, c, s, angle) {
+  const arm = c - 10;
+  const rad = angle * Math.PI / 180;
+  const ex  = r2(c + arm * Math.sin(rad));
+  const ey  = r2(c - arm * Math.cos(rad));
 
-  if (abs > 150) {
+  if (Math.abs(angle) > 150) {
     const lx = r2(c + (angle > 0 ? 1 : -1) * arm * 0.6);
     return wrap(size,
-      `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 10 ${ex} ${ey} L ${lx} ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>`);
+      `<path d="M ${c} ${size} L ${c} ${c+20} Q ${c} 10 ${ex} ${ey} L ${lx} ${c}" fill="none" stroke="black" stroke-width="${s}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      arrowHead(ex, ey, lx, c, s));
   }
-  return wrap(size, line(c,size,c,c,s) + line(c,c,ex,ey,s));
+  return wrap(size, seg(c,size,c,c,s) + exitSeg(c,c,ex,ey,s));
 }
 
-function line(x1,y1,x2,y2,s) {
+function seg(x1,y1,x2,y2,s) {
   return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="black" stroke-width="${s}" stroke-linecap="round"/>`;
+}
+function exitSeg(x1,y1,x2,y2,s) { return seg(x1,y1,x2,y2,s) + arrowHead(x1,y1,x2,y2,s); }
+function arrowHead(x1,y1,x2,y2,s) {
+  const angle = Math.atan2(y2-y1, x2-x1);
+  const sz = s * 1.8, b = 2.45;
+  return `<polygon points="${r2(x2)},${r2(y2)} ${r2(x2+sz*Math.cos(angle+b))},${r2(y2+sz*Math.sin(angle+b))} ${r2(x2+sz*Math.cos(angle-b))},${r2(y2+sz*Math.sin(angle-b))}" fill="black"/>`;
 }
 function r2(n)  { return Math.round(n * 100) / 100; }
 function wrap(size, inner) {
@@ -427,16 +427,119 @@ const dataRows = rows.map((row, i) => {
   });
 });
 
-// ─── Metadata summary line ───────────────────────────────────────────────────
+// ─── Branded header ──────────────────────────────────────────────────────────
 
-const metaSummary = [
-  meta.tripName   ? 'Trip: '  + meta.tripName              : null,
-  meta.tripDate   ? 'Date: '  + meta.tripDate              : null,
-  meta.dayNumber  != null ? 'Day: '  + meta.dayNumber      : null,
-  meta.routeName  ? 'Route: ' + meta.routeName             : null,
-  meta.stageNumber!= null ? 'Stage: '+ meta.stageNumber    : null,
-  'Rows: ' + rows.length,
-].filter(Boolean).join('     ');
+let RM_LOGO_PNG_BUF = FALLBACK_PNG;
+try {
+  RM_LOGO_PNG_BUF = fs.readFileSync(path.join(REPO_ROOT, 'website/assets/RouteMapper-Logo-Pack/Full Colour/fullLogo_transparent.png'));
+} catch (_) { /* use fallback */ }
+
+function buildDocxHeader() {
+  const lastWithKm = [...rows].reverse().find(r => Number.isFinite(Number(r.kmTotal)));
+  const totalKm    = lastWithKm ? Number(lastWithKm.kmTotal).toFixed(1) : '—';
+  const waypointCount = rows.filter(r => r.source !== 'synthetic').length;
+
+  const firstGps = rows.find(r => Number.isFinite(Number(r.lat)));
+  const lastGps  = [...rows].reverse().find(r => Number.isFinite(Number(r.lat)));
+  const startParts  = firstGps ? fmtGps(firstGps.lat,  firstGps.lon)  : ['—'];
+  const finishParts = lastGps  ? fmtGps(lastGps.lat,   lastGps.lon)   : ['—'];
+
+  const metaLines = [
+    ['Trip',  meta.tripName],
+    ['Route', meta.routeName],
+    ['Day',   meta.dayNumber],
+    ['Stage', meta.stageNumber],
+    ['Date',  meta.tripDate],
+  ].filter(([, v]) => v != null && v !== '');
+
+  const BD2 = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+  const NONE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const hdrBorders = { top: BD2, bottom: BD2, left: BD2, right: BD2 };
+
+  const COL1 = 2400, COL2 = CW - COL1; // 2400 + 8372 = 10772
+
+  // Logo image: 1280×1024 native → display at 140×112 pt
+  const logoImg = new ImageRun({
+    type: 'png', data: RM_LOGO_PNG_BUF,
+    transformation: { width: 140, height: 112 },
+    altText: { title: 'RouteMapper', description: 'RouteMapper logo', name: 'RM Logo' },
+  });
+
+  // Row 1: Logo (left) | Stage name (right) — combined, taller row
+  const brandRow = new TableRow({ children: [
+    new TableCell({
+      borders: hdrBorders,
+      width: { size: COL1, type: WidthType.DXA },
+      verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 80, bottom: 80, left: 100, right: 100 },
+      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [logoImg] })],
+    }),
+    new TableCell({
+      borders: hdrBorders,
+      width: { size: COL2, type: WidthType.DXA },
+      verticalAlign: VerticalAlign.CENTER,
+      shading: { fill: 'F8F8F8', type: ShadingType.CLEAR },
+      margins: { top: 80, bottom: 80, left: 160, right: 160 },
+      children: [new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: title, bold: true, size: 40, font: 'Arial' })],
+      })],
+    }),
+  ]});
+
+  // Row 2: Stats (left) | Meta (right)
+  const statsCell = new TableCell({
+    borders: hdrBorders,
+    width: { size: COL1, type: WidthType.DXA },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 60, bottom: 60, left: 120, right: 120 },
+    children: [
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: totalKm, bold: true, size: 52, font: 'Arial' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'KILOMETRES', size: 14, font: 'Arial', color: '444444' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: String(waypointCount), bold: true, size: 52, font: 'Arial' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'WAYPOINTS', size: 14, font: 'Arial', color: '444444' })] }),
+    ],
+  });
+
+  const metaCell = new TableCell({
+    borders: hdrBorders,
+    width: { size: COL2, type: WidthType.DXA },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 60, bottom: 60, left: 160, right: 120 },
+    children: metaLines.length ? metaLines.map(([k, v]) => new Paragraph({
+      children: [
+        new TextRun({ text: k + ':  ', bold: true, size: 20, font: 'Arial' }),
+        new TextRun({ text: String(v), size: 20, font: 'Arial' }),
+      ],
+    })) : [new Paragraph({ children: [] })],
+  });
+
+  const dataRow = new TableRow({ children: [statsCell, metaCell] });
+
+  // Row 4: Start / Finish GPS (2 equal cells)
+  const gpsHalf = Math.floor(CW / 2);
+  const makeGpsCell = (label, parts) => new TableCell({
+    borders: hdrBorders,
+    width: { size: gpsHalf, type: WidthType.DXA },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 60, bottom: 60, left: 120, right: 120 },
+    children: [
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: label, bold: true, size: 20, color: '006b6b', font: 'Arial', characterSpacing: 80 })] }),
+      ...parts.map(p => new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: p, bold: true, size: 20, font: 'Arial Narrow' })] })),
+    ],
+  });
+
+  const gpsRow = new TableRow({ children: [
+    makeGpsCell('START',  startParts),
+    makeGpsCell('FINISH', finishParts),
+  ]});
+
+  return new Table({
+    width: { size: CW, type: WidthType.DXA },
+    columnWidths: [COL1, COL2],
+    rows: [brandRow, dataRow, gpsRow],
+  });
+}
 
 // ─── Icon appendix ────────────────────────────────────────────────────────────
 // Last page: grid of all icons with labels for copy-paste reference.
@@ -518,14 +621,8 @@ const doc = new Document({
         },
       },
       children: [
-        new Paragraph({
-          spacing: { after: 80 },
-          children: [new TextRun({ text: title, bold: true, size: 48, font: 'Arial' })],
-        }),
-        new Paragraph({
-          spacing: { after: 200 },
-          children: [new TextRun({ text: metaSummary, size: 18, color: '555555', font: 'Arial' })],
-        }),
+        buildDocxHeader(),
+        new Paragraph({ spacing: { before: 120 }, children: [] }),
         new Table({
           width: { size: CW, type: WidthType.DXA },
           columnWidths: [COL.total, COL.partial, COL.rowno, COL.tulip, COL.cap, COL.notes, COL.gps],
