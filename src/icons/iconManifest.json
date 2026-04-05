@@ -1,0 +1,164 @@
+[
+  {
+    "id": "note",
+    "label": "Note",
+    "category": "Note",
+    "file": "note.svg"
+  },
+  {
+    "id": "danger_1",
+    "label": "Danger 1",
+    "category": "Hazard",
+    "file": "danger_1.svg"
+  },
+  {
+    "id": "danger_2",
+    "label": "Danger 2",
+    "category": "Hazard",
+    "file": "danger_2.svg"
+  },
+  {
+    "id": "danger_3",
+    "label": "Danger 3",
+    "category": "Hazard",
+    "file": "danger_3.svg"
+  },
+  {
+    "id": "bump",
+    "label": "Bump",
+    "category": "Terrain",
+    "file": "bump.svg"
+  },
+  {
+    "id": "bumps",
+    "label": "Bumps",
+    "category": "Terrain",
+    "file": "bumps.svg"
+  },
+  {
+    "id": "dip",
+    "label": "Dip",
+    "category": "Terrain",
+    "file": "dip.svg"
+  },
+  {
+    "id": "ruts",
+    "label": "Ruts",
+    "category": "Terrain",
+    "file": "ruts.svg"
+  },
+  {
+    "id": "washout",
+    "label": "Washout",
+    "category": "Terrain",
+    "file": "washout.svg"
+  },
+  {
+    "id": "fuel",
+    "label": "Fuel Stop",
+    "category": "Control",
+    "file": "fuel.svg"
+  },
+  {
+    "id": "left",
+    "label": "Left",
+    "category": "Nav",
+    "file": "left.svg"
+  },
+  {
+    "id": "right",
+    "label": "Right",
+    "category": "Nav",
+    "file": "right.svg"
+  },
+  {
+    "id": "keep_l",
+    "label": "Keep Left",
+    "category": "Nav",
+    "file": "keep_l.svg"
+  },
+  {
+    "id": "keep_r",
+    "label": "Keep Right",
+    "category": "Nav",
+    "file": "keep_r.svg"
+  },
+  {
+    "id": "straight",
+    "label": "Straight",
+    "category": "Nav",
+    "file": "straight.svg"
+  },
+
+  {
+    "id": "gate",
+    "label": "Gate",
+    "category": "Nav",
+    "file": "gate.svg"
+  },
+
+  {
+    "id": "cattle_gate",
+    "label": "Cattle Gate",
+    "category": "Nav",
+    "file": "cattle_gate.svg"
+  },
+
+  {
+    "id": "give_way",
+    "label": "give_way",
+    "category": "Nav",
+    "file": "give_way.svg"
+  },
+
+  {
+    "id": "caution",
+    "label": "Caution",
+    "category": "Nav",
+    "file": "caution.svg"
+  },
+
+  {
+    "id": "start",
+    "label": "Start",
+    "category": "Control",
+    "file": "start.svg"
+  },
+  {
+    "id": "finish",
+    "label": "Finish",
+    "category": "Control",
+    "file": "finish.svg"
+  },
+  {
+    "id": "stop",
+    "label": "Stop/Restart",
+    "category": "Control",
+    "file": "stop.svg"
+  },
+  {
+    "id": "checkpoint",
+    "label": "Checkpoint",
+    "category": "Control",
+    "file": "checkpoint.svg"
+  },
+  {
+    "id": "time",
+    "label": "Time Control",
+    "category": "Control",
+    "file": "time.svg"
+  },
+  {
+    "id": "service",
+    "label": "Service",
+    "category": "Control",
+    "file": "service.svg"
+  },
+
+  {
+    "id": "twisty",
+    "label": "twisty",
+    "category": "Terrain",
+    "file": "twisty.svg"
+  }
+]
