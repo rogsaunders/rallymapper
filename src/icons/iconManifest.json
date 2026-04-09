@@ -41,6 +41,14 @@
     "category": "Terrain",
     "file": "dip.svg"
   },
+
+  {
+    "id": "twisty",
+    "label": "twisty",
+    "category": "Terrain",
+    "file": "twisty.svg"
+  },
+
   {
     "id": "ruts",
     "label": "Ruts",
@@ -53,12 +61,7 @@
     "category": "Terrain",
     "file": "washout.svg"
   },
-  {
-    "id": "fuel",
-    "label": "Fuel Stop",
-    "category": "Control",
-    "file": "fuel.svg"
-  },
+
   {
     "id": "left",
     "label": "Left",
@@ -105,6 +108,13 @@
   },
 
   {
+    "id": "Railroad",
+    "label": "railroad",
+    "category": "Nav",
+    "file": "railroad.svg"
+  },
+
+  {
     "id": "give_way",
     "label": "give_way",
     "category": "Nav",
@@ -148,6 +158,14 @@
     "category": "Control",
     "file": "time.svg"
   },
+
+  {
+    "id": "fuel",
+    "label": "Fuel Stop",
+    "category": "Control",
+    "file": "fuel.svg"
+  },
+
   {
     "id": "service",
     "label": "Service",
@@ -156,9 +174,16 @@
   },
 
   {
-    "id": "twisty",
-    "label": "twisty",
+    "id": "up_hill",
+    "label": "up_hill",
     "category": "Terrain",
-    "file": "twisty.svg"
+    "file": "up_hill.svg"
+  },
+
+  {
+    "id": "down_hill",
+    "label": "down_hill",
+    "category": "Terrain",
+    "file": "down_hill.svg"
   }
 ]

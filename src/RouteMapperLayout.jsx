@@ -455,7 +455,8 @@ export default function RouteMapperLayout() {
   const [followMap, setFollowMap] = useState(true);
   const [hazardIconId, setHazardIconId] = useState("danger_1");
   const [navIconId, setNavIconId] = useState("straight");
-  const [controlIconId, setControlIconId] = useState("start"); // pick a sensible default
+  const [controlIconId, setControlIconId] = useState("start");
+  const [terrainIconId, setTerrainIconId] = useState("bump");
   const recognitionRef = useRef(null);
   // const localOwner = getGuestOwnerId();
   // const user = null;
@@ -532,6 +533,7 @@ export default function RouteMapperLayout() {
       hazardIconId,
       navIconId,
       controlIconId,
+      terrainIconId,
       poi,
     };
 
@@ -595,6 +597,7 @@ export default function RouteMapperLayout() {
       setHazardIconId(draft.hazardIconId ?? "danger_1");
       setNavIconId(draft.navIconId ?? "straight");
       setControlIconId(draft.controlIconId ?? "start");
+      setTerrainIconId(draft.terrainIconId ?? "bump");
       setPoi(draft.poi ?? "");
     } catch (e) {
       console.warn("Stage restore failed:", e);
@@ -819,6 +822,7 @@ export default function RouteMapperLayout() {
     setHazardIconId("danger_1");
     setNavIconId("straight");
     setControlIconId("start");
+    setTerrainIconId("bump");
   };
 
   // Add this state near your other state hooks (once):
@@ -1048,6 +1052,18 @@ export default function RouteMapperLayout() {
     }
   }, [waypointType, controlIconId]);
 
+  useEffect(() => {
+    if (waypointType !== "terrain") return;
+
+    const variants = ICONS.terrain?.variants || {};
+    const hasCurrent = Boolean(variants[terrainIconId]);
+
+    if (!hasCurrent) {
+      const fallback = variants.bump ? "bump" : Object.keys(variants)[0];
+      setTerrainIconId(fallback || "bump");
+    }
+  }, [waypointType, terrainIconId]);
+
   const handleAddWaypoint = (typeOverride) => {
     if (typeOverride && typeof typeOverride !== "string") typeOverride = null;
     if (!currentGPS)
@@ -1110,7 +1126,9 @@ export default function RouteMapperLayout() {
             ? navIconId || "straight"
             : typeToSave === "control"
               ? controlIconId || "start"
-              : null;
+              : typeToSave === "terrain"
+                ? terrainIconId || "bump"
+                : null;
 
       const lastWaypointDistance =
         prev.length > 0
@@ -1786,6 +1804,23 @@ export default function RouteMapperLayout() {
                       label={v.label}
                       active={controlIconId === id}
                       onClick={() => setControlIconId(id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {waypointType === "terrain" && ICONS.terrain?.variants && (
+              <div className="mt-3">
+                <div className="text-sm mb-2">Terrain</div>
+                <div className="flex gap-2 flex-wrap">
+                  {Object.entries(ICONS.terrain.variants).map(([id, v]) => (
+                    <IconButton
+                      key={id}
+                      svg={v.svg}
+                      label={v.label}
+                      active={terrainIconId === id}
+                      onClick={() => setTerrainIconId(id)}
                     />
                   ))}
                 </div>

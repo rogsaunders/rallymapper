@@ -251,8 +251,11 @@ function buildIconPaletteHtml() {
   return `
 <div id="palette" class="palette">
   <div class="palette-hdr">
-    <span>🗂 Icon Stash &mdash; drag onto any Note cell &nbsp;&nbsp; <small>&#x2318;P to print (palette hides automatically)</small></span>
-    <button onclick="togglePalette()" id="palette-btn">Hide</button>
+    <span>🗂 Icon Stash &mdash; drag onto any tulip cell &nbsp;&nbsp; <small>&#x2318;P to print (palette hides automatically)</small></span>
+    <div style="display:flex;gap:6px;">
+      <button onclick="undoLastDrop()" id="undo-btn" disabled title="Undo last icon drop (⌘Z)">↩ Undo</button>
+      <button onclick="togglePalette()" id="palette-btn">Hide</button>
+    </div>
   </div>
   <div class="palette-body" id="palette-body">
     ${sections}
@@ -272,17 +275,59 @@ ${buildIconSvgsJs()}
 
 const NAV_IDS = new Set(['left','right','keep_l','keep_r','straight','caution','gate','cattle_gate']);
 let _dragId = null;
+const _undoStack = [];
 
-// Palette toggle
+// ── Keep spacer in sync with fixed palette height ──
+function updateBodyPadding() {
+  const pal = document.getElementById('palette');
+  const sp  = document.getElementById('palette-spacer');
+  if (pal && sp) sp.style.height = (pal.offsetHeight + 6) + 'px';
+}
+window.addEventListener('resize', updateBodyPadding);
+
+// ── Palette toggle ──
 function togglePalette() {
   const body = document.getElementById('palette-body');
   const btn  = document.getElementById('palette-btn');
   const hidden = body.style.display === 'none';
   body.style.display = hidden ? '' : 'none';
   btn.textContent = hidden ? 'Hide' : 'Show';
+  setTimeout(updateBodyPadding, 50);
 }
 
-// Drag from palette
+// ── Undo last icon drop ──
+function undoLastDrop() {
+  if (!_undoStack.length) return;
+  const { cell, wrap, newIcon, removedIcon, wasHasOverlay, wrapWasCreated } = _undoStack.pop();
+
+  newIcon.remove();
+
+  if (removedIcon) wrap.appendChild(removedIcon);
+
+  if (!wasHasOverlay) wrap.classList.remove('tulip-has-overlay');
+
+  // If wrap was created by this drop and has no remaining dropped icons, dissolve it
+  if (wrapWasCreated && !wrap.querySelector('.dropped')) {
+    while (wrap.firstChild) cell.insertBefore(wrap.firstChild, wrap);
+    wrap.remove();
+  }
+
+  const undoBtn = document.getElementById('undo-btn');
+  if (undoBtn) {
+    undoBtn.disabled = _undoStack.length === 0;
+    undoBtn.style.opacity = _undoStack.length === 0 ? '0.5' : '1';
+  }
+}
+
+// Cmd+Z / Ctrl+Z to undo
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undoLastDrop();
+  }
+});
+
+// ── Drag from palette ──
 document.querySelectorAll('.pi').forEach(item => {
   item.addEventListener('dragstart', e => {
     _dragId = item.dataset.id;
@@ -293,7 +338,7 @@ document.querySelectorAll('.pi').forEach(item => {
   item.addEventListener('dragend', () => item.classList.remove('dragging'));
 });
 
-// Drop onto tulip cells
+// ── Drop onto tulip cells ──
 document.querySelectorAll('.tulip-box').forEach(cell => {
   cell.addEventListener('dragover', e => {
     e.preventDefault();
@@ -313,22 +358,27 @@ document.querySelectorAll('.tulip-box').forEach(cell => {
 
     // Ensure a .tulip-wrap exists as the positioning parent
     let wrap = cell.querySelector('.tulip-wrap');
+    let wrapWasCreated = false;
     if (!wrap) {
       wrap = document.createElement('div');
       wrap.className = 'tulip-wrap';
       while (cell.firstChild) wrap.appendChild(cell.firstChild);
       cell.appendChild(wrap);
+      wrapWasCreated = true;
     }
 
-    // Remove any previously dropped icon of the same slot
     const isNav = NAV_IDS.has(_dragId);
     const slotClass = isNav ? 'tulip-icon-corner' : 'tulip-icon-overlay';
-    wrap.querySelectorAll('.' + slotClass + '.dropped').forEach(el => el.remove());
 
-    // Add/remove the dimming class on the tulip diagram
-    if (!isNav) {
-      wrap.classList.add('tulip-has-overlay');
-    }
+    // Save state before changes for undo
+    const wasHasOverlay = wrap.classList.contains('tulip-has-overlay');
+    let removedIcon = null;
+    wrap.querySelectorAll('.' + slotClass + '.dropped').forEach(el => {
+      removedIcon = el;
+      el.remove();
+    });
+
+    if (!isNav) wrap.classList.add('tulip-has-overlay');
 
     const icon = document.createElement('div');
     icon.className = slotClass + ' dropped';
@@ -336,15 +386,22 @@ document.querySelectorAll('.tulip-box').forEach(cell => {
     icon.innerHTML = svg;
     wrap.appendChild(icon);
 
+    _undoStack.push({ cell, wrap, newIcon: icon, removedIcon, wasHasOverlay, wrapWasCreated });
+
+    const undoBtn = document.getElementById('undo-btn');
+    if (undoBtn) {
+      undoBtn.disabled = false;
+      undoBtn.style.opacity = '1';
+    }
+
     _dragId = null;
   });
 });
 
-// Double-click to remove a dropped icon
+// ── Double-click to remove a dropped icon ──
 document.addEventListener('dblclick', e => {
   const dropped = e.target.closest('.dropped');
   if (dropped && dropped.closest('.tulip-box')) {
-    // If removing an overlay, un-dim the tulip
     if (dropped.classList.contains('tulip-icon-overlay')) {
       const wrap = dropped.closest('.tulip-wrap');
       if (wrap && !wrap.querySelector('.tulip-icon-overlay:not(.dropped)')) {
@@ -352,6 +409,14 @@ document.addEventListener('dblclick', e => {
       }
     }
     dropped.remove();
+    // Clear undo stack entry for this icon if it's still there
+    const idx = _undoStack.findIndex(u => u.newIcon === dropped);
+    if (idx !== -1) _undoStack.splice(idx, 1);
+    const undoBtn = document.getElementById('undo-btn');
+    if (undoBtn) {
+      undoBtn.disabled = _undoStack.length === 0;
+      undoBtn.style.opacity = _undoStack.length === 0 ? '0.5' : '1';
+    }
   }
 });
 </script>`;
@@ -359,38 +424,40 @@ document.addEventListener('dblclick', e => {
 
 let RM_LOGO_DATA_URI = "";
 try {
-  const logoBuf = fs.readFileSync(path.join(REPO_ROOT, "website/assets/RouteMapper-Logo-Pack/Full Colour/fullLogo_transparent.png"));
+  const logoBuf = fs.readFileSync(path.join(REPO_ROOT, "website/assets/RouteMapper-Logo-Pack/Full Colour/fullLogo_transparent 02.png"));
   RM_LOGO_DATA_URI = `data:image/png;base64,${logoBuf.toString("base64")}`;
 } catch (_) { /* logo not found — brand row will show text only */ }
 
 function buildRmHeader(stage, rows) {
   const meta = stage?.meta || {};
-  const title = meta.stageName || "RouteMapper Roadbook";
   const lastWithKm = [...rows].reverse().find(r => Number.isFinite(Number(r.kmTotal)));
   const totalKm = lastWithKm ? Number(lastWithKm.kmTotal).toFixed(1) : "—";
   const waypointCount = rows.filter(r => r.source !== "synthetic").length;
   const firstGps = rows.find(r => Number.isFinite(Number(r.lat)));
   const lastGps  = [...rows].reverse().find(r => Number.isFinite(Number(r.lat)));
-  const metaItems = [["Trip",meta.tripName],["Route",meta.routeName],["Day",meta.dayNumber],["Stage",meta.stageNumber],["Date",meta.tripDate]]
-    .filter(([,v]) => v != null && v !== "")
-    .map(([k,v]) => `<div class="rm-meta-row"><span class="rm-meta-k">${k}</span><span>${escapeHtml(String(v))}</span></div>`)
-    .join("");
+
+  // Right-column stage info lines
+  const tripLine  = meta.tripName
+    ? `<div class="rm-hdr-line">Trip: ${escapeHtml(meta.tripName)}</div>` : "";
+  const dayParts  = [meta.dayNumber && `Day ${meta.dayNumber}`, meta.stageNumber && `Stage ${meta.stageNumber}`].filter(Boolean).join(" ");
+  const dayLine   = dayParts ? `<div class="rm-hdr-line">${escapeHtml(dayParts)}</div>` : "";
+  const routeLine = meta.routeName
+    ? `<div class="rm-hdr-line rm-hdr-route">Route: ${escapeHtml(meta.routeName)}</div>` : "";
+  const stageLine = meta.stageName && !meta.routeName
+    ? `<div class="rm-hdr-line rm-hdr-route">${escapeHtml(meta.stageName)}</div>` : "";
+
   const logoHtml = RM_LOGO_DATA_URI
     ? `<img src="${RM_LOGO_DATA_URI}" class="rm-logo-img" alt="RouteMapper">`
-    : `<div><div class="rm-wordmark-main"><span class="rm-word-route">ROUTE</span><span class="rm-word-mapper">MAPPER</span></div><div class="rm-tagline">Rally Roadbook System</div></div>`;
+    : `<div class="rm-wordmark">ROUTEMAPPER</div>`;
+
   return `<div class="rm-header">
   <div class="rm-brand-row">
     <div class="rm-brand-logo">${logoHtml}</div>
-    <div class="rm-brand-stage"><div class="rm-stage">${escapeHtml(title)}</div></div>
+    <div class="rm-brand-stage">${tripLine}${dayLine}${routeLine}${stageLine}</div>
   </div>
   <div class="rm-data-row">
-    <div class="rm-stats">
-      <div class="rm-stat"><span class="rm-stat-n">${totalKm}</span><span class="rm-stat-l">Kilometres</span></div>
-      <div class="rm-stat"><span class="rm-stat-n">${waypointCount}</span><span class="rm-stat-l">Waypoints</span></div>
-    </div>
-    <div class="rm-meta-grid">${metaItems}</div>
-  </div>
-  <div class="rm-endpoints">
+    <div class="rm-stat"><span class="rm-stat-n">${totalKm}</span><span class="rm-stat-l">Kilometers</span></div>
+    <div class="rm-stat"><span class="rm-stat-n">${waypointCount}</span><span class="rm-stat-l">Waypoints</span></div>
     <div class="rm-ep"><div class="rm-ep-label">Start</div><div class="rm-ep-gps">${firstGps ? formatGps(firstGps.lat,firstGps.lon) : "—"}</div></div>
     <div class="rm-ep"><div class="rm-ep-label">Finish</div><div class="rm-ep-gps">${lastGps ? formatGps(lastGps.lat,lastGps.lon) : "—"}</div></div>
   </div>
@@ -411,9 +478,11 @@ function buildHtml(stage, rows, flaggedRows) {
 @page { size: A4 portrait; margin: 10mm; }
 @media print {
   .palette { display: none !important; }
+  #palette-spacer { display: none !important; }
   body { background: #fff; }
   .rb-row { break-inside: avoid; }
   .filter-note { display: none; }
+  .no-print { display: none; }
 }
 
 /* ── Base ── */
@@ -422,43 +491,47 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 .page { max-width: 900px; margin: 0 auto; background: #fff; padding: 10px; }
 
 /* ── Icon Palette ── */
-.palette { background: #1a1a2e; color: #fff; padding: 8px 12px; margin-bottom: 10px; border-radius: 6px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.palette { background: #e8e8e8; color: #111; padding: 8px 12px; border-radius: 0 0 6px 6px; position: fixed; top: 0; left: 0; right: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
 .palette-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }
-.palette-hdr small { color: #aaa; }
-.palette-hdr button { background: #444; color: #fff; border: none; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+.palette-hdr small { color: #666; }
+.palette-hdr button { background: #bbb; color: #111; border: none; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; }
 .palette-body { display: flex; gap: 6px; flex-wrap: wrap; }
-.ps { display: flex; align-items: flex-start; gap: 2px; border-right: 1px solid #444; padding-right: 6px; margin-right: 2px; }
+.ps { display: flex; align-items: flex-start; gap: 2px; border-right: 1px solid #bbb; padding-right: 6px; margin-right: 2px; }
 .ps:last-child { border-right: none; }
-.ps-cat { writing-mode: vertical-lr; text-orientation: mixed; transform: rotate(180deg); font-size: 9px; font-weight: 700; color: #aaa; letter-spacing: 0.08em; text-transform: uppercase; align-self: center; margin-right: 2px; }
+.ps-cat { writing-mode: vertical-lr; text-orientation: mixed; transform: rotate(180deg); font-size: 9px; font-weight: 700; color: #666; letter-spacing: 0.08em; text-transform: uppercase; align-self: center; margin-right: 2px; }
 .ps-icons { display: flex; flex-wrap: wrap; gap: 3px; }
 .pi { display: flex; flex-direction: column; align-items: center; width: 52px; cursor: grab; padding: 3px; border-radius: 4px; border: 1px solid transparent; transition: background 0.15s, border-color 0.15s; }
-.pi:hover { background: rgba(255,255,255,0.12); border-color: #666; }
+.pi:hover { background: rgba(0,0,0,0.08); border-color: #999; }
 .pi.dragging { opacity: 0.4; }
 .pi-icon { width: 36px; height: 36px; }
 .pi-icon svg { width: 36px; height: 36px; display: block; }
-.pi-label { font-size: 8px; color: #ccc; text-align: center; margin-top: 2px; line-height: 1.2; }
+.pi-label { font-size: 8px; color: #444; text-align: center; margin-top: 2px; line-height: 1.2; }
 
 /* ── RouteMapper branded header ── */
 .rm-header { border: 2px solid #000; margin-bottom: 8px; }
 .rm-brand-row { display: flex; align-items: stretch; border-bottom: 2px solid #000; }
-.rm-brand-logo { display: flex; align-items: center; justify-content: center; padding: 12px 16px; border-right: 2px solid #000; flex-shrink: 0; }
+.rm-brand-logo { display: flex; align-items: center; justify-content: center; padding: 12px 16px; border-right: 2px solid #000; flex: 0 0 25%; }
 .rm-logo-img { height: 120px; width: auto; display: block; }
-.rm-brand-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px 20px; }
-.rm-stage { font-size: 24px; font-weight: 900; text-align: center; line-height: 1.2; }
-.rm-data-row { display: flex; border-bottom: 2px solid #000; }
-.rm-stats { display: flex; flex-direction: column; border-right: 2px solid #000; flex-shrink: 0; }
-.rm-stat { padding: 8px 18px; text-align: center; border-bottom: 2px solid #000; }
-.rm-stat:last-child { border-bottom: none; }
+.rm-brand-stage { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 16px 24px; gap: 2px; }
+.rm-hdr-line { font-size: 20px; font-weight: 700; line-height: 1.3; }
+.rm-hdr-route { font-size: 22px; font-weight: 900; }
+.rm-wordmark { font-size: 18px; font-weight: 900; letter-spacing: 0.1em; }
+.rm-data-row { display: flex; }
+.rm-stat { flex: 1; padding: 8px 12px; text-align: center; border-right: 2px solid #000; }
 .rm-stat-n { display: block; font-size: 32px; font-weight: 900; line-height: 1; }
 .rm-stat-l { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #444; margin-top: 2px; }
-.rm-meta-grid { flex: 1; padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; justify-content: center; }
-.rm-meta-row { display: flex; gap: 8px; }
-.rm-meta-k { font-weight: 700; min-width: 46px; }
-.rm-endpoints { display: flex; }
 .rm-ep { flex: 1; padding: 8px 12px; text-align: center; border-right: 2px solid #000; }
 .rm-ep:last-child { border-right: none; }
-.rm-ep-label { font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #006b6b; margin-bottom: 2px; }
+.rm-ep-label { font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #006b6b; margin-bottom: 4px; }
 .rm-ep-gps { font-size: 12px; font-weight: 700; line-height: 1.5; }
+
+/* ── Warning block ── */
+.rm-warning { border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; background: #fff; }
+.rm-warning-title { font-size: 13px; font-weight: 900; text-align: center; letter-spacing: 0.08em; margin-bottom: 6px; }
+.rm-warning-body { font-size: 10px; line-height: 1.5; color: #111; }
+.rm-warning-body p { margin: 0 0 5px 0; }
+.rm-warning-body p:last-child { margin-bottom: 0; font-weight: 700; }
+@media print { .rm-warning { break-inside: avoid; } }
 
 /* ── Roadbook table ── */
 .filter-note { margin-bottom: 6px; padding: 5px 10px; background: #f5f5f5; border: 1px solid #ccc; font-size: 11px; color: #555; border-radius: 3px; }
@@ -523,9 +596,27 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 </head>
 <body>
 ${buildIconPaletteHtml()}
+<div id="palette-spacer"></div>
+<script>
+(function(){
+  var pal=document.getElementById('palette');
+  var sp=document.getElementById('palette-spacer');
+  if(pal&&sp) sp.style.height=(pal.offsetHeight+6)+'px';
+})();
+</script>
 <div class="page">
   ${buildRmHeader(stage, rows)}
-  <div class="filter-note">${flaggedRows.size > 0 ? `⚠ ${flaggedRows.size} row(s) highlighted (possible U-turn). ` : ""}Drag icons from the palette onto any tulip cell · double-click a dropped icon to remove it · click any Note cell to edit text</div>
+  <div class="rm-warning">
+    <div class="rm-warning-title">WARNING</div>
+    <div class="rm-warning-body">
+      <p>THIS ROUTE MAY INVOLVE HAZARDOUS CONDITIONS. NAVIGATE THIS ROUTE AT YOUR OWN RISK.</p>
+      <p>Conditions on any route can change at any time without notice. This route may pass through or lead to remote areas far from assistance. This is not a closed or controlled course. The route crosses and travels on public roads and tracks where other vehicles, pedestrians, livestock, and wildlife may be present.</p>
+      <p>Some hazards have been identified in this roadbook for guidance purposes only. The absence of a hazard marker does not mean the route is safe. Most hazards are not identified or marked. All distances, bearings, and GPS coordinates are approximate and should not be treated as precise navigation data.</p>
+      <p>If at any point signs, conditions, landowner instructions, or other indicators suggest the route passes through restricted, private, closed, or otherwise prohibited areas, this roadbook must not be followed into those areas.</p>
+      <p>ROUTEMAPPER ACCEPTS NO RESPONSIBILITY FOR THE ACCURACY, COMPLETENESS, OR SAFETY OF THIS ROUTE. THE USER ACCEPTS FULL RESPONSIBILITY FOR THEIR OWN SAFETY AND THE SAFETY OF THEIR PASSENGERS AND VEHICLE AT ALL TIMES.</p>
+    </div>
+  </div>
+  <div class="filter-note no-print">${flaggedRows.size > 0 ? `⚠ ${flaggedRows.size} row(s) highlighted (possible U-turn). ` : ""}Drag icons from the palette onto any tulip cell · double-click a dropped icon to remove it · click any Note cell to edit text</div>
   <table class="roadbook">
     <thead>
       <tr>

@@ -345,10 +345,16 @@ export default function MapView({
               ICONS.nav?.svg ||
               ICONS.note?.svg;
           } else if (type === "control") {
-            const controlKey = iconId || "start"; // whatever your default is
+            const controlKey = iconId || "start";
             svgFallback =
               ICONS.control?.variants?.[controlKey]?.svg ||
               ICONS.control?.svg ||
+              ICONS.note?.svg;
+          } else if (type === "terrain") {
+            const terrainKey = iconId || "bump";
+            svgFallback =
+              ICONS.terrain?.variants?.[terrainKey]?.svg ||
+              ICONS.terrain?.svg ||
               ICONS.note?.svg;
           } else if (ICONS[type]?.svg) {
             svgFallback = ICONS[type].svg;
