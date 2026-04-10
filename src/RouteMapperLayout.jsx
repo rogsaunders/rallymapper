@@ -22,6 +22,11 @@ import {
 
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
+import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
+import { createWakeWordListener } from "./voice/wakeWordListener";
+import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
+import startSoundUrl from "./assets/sounds/start.wav";
+import stopSoundUrl from "./assets/sounds/stop.wav";
 
 const PENDING_SYNC_KEY = "rm_pending_queue_signal_v1";
 
@@ -462,6 +467,20 @@ export default function RouteMapperLayout() {
   // const user = null;
 
   const [isListening, setIsListening] = useState(false);
+  const [dictationDraft, setDictationDraft] = useState("");
+  const [handsFreeActive, setHandsFreeActive] = useState(false);
+  const [handsFreeMode, setHandsFreeMode] = useState("off"); // "off" | "standby" | "command"
+  const [handsFreeListening, setHandsFreeListening] = useState(false);
+  const [handsFreeTranscript, setHandsFreeTranscript] = useState("");
+  const [handsFreeLastCommand, setHandsFreeLastCommand] = useState(null);
+  const [handsFreeShowSettings, setHandsFreeShowSettings] = useState(false);
+  const [handsFreeSilenceMs, setHandsFreeSilenceMs] = useState(
+    () => Number(localStorage.getItem("rm_handsfree_silence_ms")) || 2500,
+  );
+  const [handsFreeToast, setHandsFreeToast] = useState(null); // { type, iconId, poi } for large toast
+  const handsFreeRef = useRef(null); // voice command handler
+  const wakeWordRef = useRef(null); // wake word listener
+  const handsFreeActiveRef = useRef(false); // mirrors handsFreeActive for async callbacks
   const [showMap, setShowMap] = useState(true);
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
@@ -488,6 +507,11 @@ export default function RouteMapperLayout() {
   const [stageStartedAt, setStageStartedAt] = useState(null);
   const [showRoadbookPreview, setShowRoadbookPreview] = useState(false);
   const [trackPoints, setTrackPoints] = useState([]); // {lat, lon, ts}
+
+  // Initialise audio feedback (once)
+  useEffect(() => {
+    initSounds(startSoundUrl, stopSoundUrl);
+  }, []);
 
   const handleNewStage = () => {
     if (stageActive) {
@@ -677,6 +701,197 @@ export default function RouteMapperLayout() {
       setDictationDraft("");
     }
   };
+
+  // ── Hands-free voice command mode (Phase 2 — wake word) ────────────
+  //
+  // Flow: Activate → Standby (listening for "Mapper") → Command (recording)
+  //       → commit waypoint → back to Standby → … → Stop
+
+  // Helper: add a waypoint from a parsed voice command
+  const commitVoiceWaypoint = (cmd) => {
+    if (!currentGPS) {
+      console.warn("Hands-free: GPS not ready, command dropped:", cmd);
+      return;
+    }
+
+    setWaypoints((prev) => {
+      const curFix = {
+        lat: Number(currentGPS.lat),
+        lon: Number(currentGPS.lon),
+      };
+
+      const lastWaypointDistance =
+        prev.length > 0
+          ? Number(prev[prev.length - 1]?.distanceFromStartM || 0)
+          : 0;
+
+      const segmentFromLastWaypoint =
+        prev.length > 0
+          ? haversineMeters(
+              {
+                lat: Number(prev[prev.length - 1].lat),
+                lon: Number(prev[prev.length - 1].lon),
+              },
+              curFix,
+            )
+          : startGPS &&
+              Number.isFinite(Number(startGPS.lat)) &&
+              Number.isFinite(Number(startGPS.lon))
+            ? haversineMeters(
+                {
+                  lat: Number(startGPS.lat),
+                  lon: Number(startGPS.lon),
+                },
+                curFix,
+              )
+            : 0;
+
+      const distanceFromStartM =
+        prev.length > 0
+          ? lastWaypointDistance +
+            (Number.isFinite(segmentFromLastWaypoint)
+              ? segmentFromLastWaypoint
+              : 0)
+          : Number.isFinite(segmentFromLastWaypoint)
+            ? segmentFromLastWaypoint
+            : 0;
+
+      const next = {
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        lat: currentGPS.lat,
+        lon: currentGPS.lon,
+        poi: cmd.poi,
+        timestamp: new Date().toISOString(),
+        kind: "waypoint",
+        type: cmd.type,
+        iconId: cmd.iconId,
+        distanceFromStartM,
+      };
+
+      return [...prev, next];
+    });
+  };
+
+  // Start wake word listening (Standby mode)
+  const armWakeWord = () => {
+    // Clean up any existing listener
+    wakeWordRef.current?.stop();
+
+    const listener = createWakeWordListener({
+      wakeWord: "mapper",
+
+      onWake: () => {
+        // Wake word detected — switch to command mode
+        setHandsFreeMode("command");
+        startCommandListening();
+      },
+
+      onListening: () => {
+        setHandsFreeMode("standby");
+      },
+
+      onStopped: () => {
+        // Only update if we're still in standby (not transitioning to command)
+      },
+
+      onError: (msg) => {
+        console.warn("Wake word error:", msg);
+      },
+    });
+
+    listener.start();
+    wakeWordRef.current = listener;
+  };
+
+  // Start command listening (after wake word detected)
+  const startCommandListening = () => {
+    // Clean up any existing command handler
+    handsFreeRef.current?.stop();
+
+    const handler = createVoiceCommandHandler({
+      silenceMs: handsFreeSilenceMs,
+      singleCommand: true,
+
+      onListeningStart: () => {
+        setHandsFreeListening(true);
+        playStartSound();
+      },
+
+      onListeningStop: () => {
+        setHandsFreeListening(false);
+      },
+
+      onInterim: (text) => {
+        setHandsFreeTranscript(text);
+      },
+
+      onCommand: (cmd) => {
+        playStopSound();
+        setHandsFreeLastCommand(cmd);
+        setHandsFreeTranscript("");
+        commitVoiceWaypoint(cmd);
+
+        // Show large driving toast
+        setHandsFreeToast(cmd);
+        setTimeout(() => setHandsFreeToast(null), 3000);
+
+        // Clear inline confirmation after 4 seconds
+        setTimeout(() => setHandsFreeLastCommand(null), 4000);
+      },
+
+      onComplete: () => {
+        // Command cycle done — return to standby (re-arm wake word)
+        handsFreeRef.current = null;
+        if (handsFreeActiveRef.current) {
+          armWakeWord();
+        }
+      },
+
+      onError: (msg) => {
+        console.warn("Hands-free command error:", msg);
+      },
+
+      onReady: () => {
+        setHandsFreeTranscript("");
+      },
+    });
+
+    handler.start();
+    handsFreeRef.current = handler;
+  };
+
+  const startHandsFree = () => {
+    if (handsFreeActive) return;
+    // Stop manual dictation if running
+    stopDictation();
+
+    setHandsFreeActive(true);
+    handsFreeActiveRef.current = true;
+    setHandsFreeMode("standby");
+    armWakeWord();
+  };
+
+  const stopHandsFree = () => {
+    wakeWordRef.current?.stop();
+    wakeWordRef.current = null;
+    handsFreeRef.current?.stop();
+    handsFreeRef.current = null;
+    setHandsFreeActive(false);
+    handsFreeActiveRef.current = false;
+    setHandsFreeMode("off");
+    setHandsFreeListening(false);
+    setHandsFreeTranscript("");
+  };
+
+  // Clean up hands-free when stage ends
+  useEffect(() => {
+    if (!stageActive && handsFreeActive) {
+      stopHandsFree();
+    }
+  }, [stageActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track recording config
   const TRACK_INTERVAL_MS = 5000; // minimum ms between recorded points
@@ -1847,6 +2062,191 @@ export default function RouteMapperLayout() {
                 onChange={(e) => setPoi(e.target.value)}
               />
             </div>
+
+            {/* ── Hands-Free Voice Mode ─────────────────────────── */}
+            <div
+              className="mt-3 border-2 rounded-xl p-2"
+              style={{
+                borderColor:
+                  handsFreeMode === "command"
+                    ? "#dc2626"
+                    : handsFreeMode === "standby"
+                      ? "#2563eb"
+                      : "#e5e7eb",
+                backgroundColor:
+                  handsFreeMode === "command"
+                    ? "#fef2f2"
+                    : handsFreeMode === "standby"
+                      ? "#eff6ff"
+                      : "white",
+              }}
+            >
+              {/* Header row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">Hands-Free</span>
+                  {handsFreeMode === "standby" && (
+                    <>
+                      <span
+                        className="inline-block w-3 h-3 rounded-full"
+                        style={{ backgroundColor: "#2563eb" }}
+                      />
+                      <span className="text-sm text-blue-600 font-medium">
+                        Say "Mapper"
+                      </span>
+                    </>
+                  )}
+                  {handsFreeMode === "command" && (
+                    <>
+                      <span
+                        className="inline-block w-3 h-3 rounded-full animate-pulse"
+                        style={{ backgroundColor: "#dc2626" }}
+                      />
+                      <span className="text-sm text-red-600 font-medium">
+                        Listening...
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Settings cog — only when not actively listening for a command */}
+                  {handsFreeMode !== "command" && (
+                    <button
+                      type="button"
+                      onClick={() => setHandsFreeShowSettings((v) => !v)}
+                      className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                      title="Hands-free settings"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                        />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handsFreeActive ? stopHandsFree : startHandsFree}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      if (stageActive) {
+                        handsFreeActive ? stopHandsFree() : startHandsFree();
+                      }
+                    }}
+                    className="px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors min-w-[90px]"
+                    style={{
+                      backgroundColor: !stageActive
+                        ? "#9ca3af"
+                        : handsFreeActive
+                          ? "#dc2626"
+                          : "#2563eb",
+                      opacity: !stageActive ? 0.5 : 1,
+                    }}
+                    disabled={!stageActive}
+                  >
+                    {handsFreeActive ? "Stop" : "Activate"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Settings panel (collapsible) */}
+              {handsFreeShowSettings && (
+                <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        Silence timeout
+                      </label>
+                      <span className="text-xs text-gray-500 tabular-nums">
+                        {(handsFreeSilenceMs / 1000).toFixed(1)}s
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1500}
+                      max={5000}
+                      step={250}
+                      value={handsFreeSilenceMs}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setHandsFreeSilenceMs(val);
+                        localStorage.setItem("rm_handsfree_silence_ms", val);
+                      }}
+                      className="w-full accent-blue-600"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                      <span>1.5s (fast)</span>
+                      <span>5s (relaxed)</span>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-gray-400 leading-snug">
+                    A Bluetooth headset with mic improves accuracy in noisy
+                    environments.
+                  </div>
+                </div>
+              )}
+
+              {/* Active state feedback */}
+              {handsFreeActive && (
+                <div className="mt-3 space-y-1.5">
+                  {handsFreeTranscript && (
+                    <div className="text-sm text-gray-700 italic bg-white/70 rounded-lg px-3 py-2 border border-gray-200">
+                      {handsFreeTranscript}
+                    </div>
+                  )}
+                  {handsFreeLastCommand && (
+                    <div className="text-sm text-green-800 bg-green-50 rounded-lg px-3 py-2 border border-green-200 font-medium">
+                      Added: {handsFreeLastCommand.type}
+                      {handsFreeLastCommand.iconId
+                        ? ` (${handsFreeLastCommand.iconId})`
+                        : ""}
+                      {handsFreeLastCommand.poi
+                        ? ` — ${handsFreeLastCommand.poi}`
+                        : ""}
+                    </div>
+                  )}
+                  {!handsFreeTranscript &&
+                    !handsFreeLastCommand &&
+                    handsFreeMode !== "command" && (
+                      <div className="text-xs text-gray-400">
+                        Say "Mapper" then your command. E.g. "Mapper" ...
+                        "hazard danger two — rocks on track"
+                      </div>
+                    )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Driving Toast (fixed overlay, visible at arm's length) ── */}
+            {handsFreeToast && (
+              <div
+                className="fixed inset-x-0 top-8 mx-auto z-50 pointer-events-none flex justify-center"
+                style={{ animation: "fadeInOut 3s ease-in-out forwards" }}
+              >
+                <div className="bg-green-600 text-white rounded-2xl shadow-2xl px-6 py-4 max-w-md text-center">
+                  <div className="text-lg font-bold tracking-wide">
+                    {handsFreeToast.type.toUpperCase()}
+                    {handsFreeToast.iconId
+                      ? ` — ${handsFreeToast.iconId.replace(/_/g, " ")}`
+                      : ""}
+                  </div>
+                  {handsFreeToast.poi && (
+                    <div className="text-sm mt-1 opacity-90">
+                      {handsFreeToast.poi}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               className="btn btn-primary mt-3 w-full"
