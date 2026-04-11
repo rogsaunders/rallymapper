@@ -18,7 +18,21 @@ const NAV_ICON_IDS = new Set(
 );
 
 
-export function exportRoadbookHtml(stage) {
+export async function exportRoadbookHtml(stage) {
+  // Inline logo as base64 so the HTML works as a standalone file
+  let logoSrc = logoUrl;
+  try {
+    const res = await fetch(logoUrl);
+    const blob = await res.blob();
+    logoSrc = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    // Fall back to the URL if fetch fails (works when served from web server)
+  }
+
   const roadbook = stage?.roadbook;
   const rawRows = roadbook?.views?.driver || roadbook?.rows || [];
   const rows = ensureStartRow(rawRows);
@@ -28,8 +42,8 @@ export function exportRoadbookHtml(stage) {
   const lastWithKm = [...rows].reverse().find(r => Number.isFinite(Number(r.kmTotal)));
   const totalKm = lastWithKm ? Number(lastWithKm.kmTotal).toFixed(1) : "—";
   const waypointCount = rows.filter(r => r.source !== "synthetic").length;
-  const firstGps = rows.find(r => Number.isFinite(Number(r.lat)));
-  const lastGps  = [...rows].reverse().find(r => Number.isFinite(Number(r.lat)));
+  const firstGps = rows.find(r => r.lat != null && Number.isFinite(Number(r.lat)));
+  const lastGps  = [...rows].reverse().find(r => r.lat != null && Number.isFinite(Number(r.lat)));
 
   const rowHtml = rows.map((row, index) =>
     renderRow(row, index, rows[index + 1]),
@@ -339,7 +353,7 @@ export function exportRoadbookHtml(stage) {
   <div class="page">
     <div class="rm-header">
       <div class="rm-brand-row">
-        <div class="rm-brand-logo"><img src="${logoUrl}" class="rm-logo-img" alt="RouteMapper"></div>
+        <div class="rm-brand-logo"><img src="${logoSrc}" class="rm-logo-img" alt="RouteMapper"></div>
         <div class="rm-brand-stage"><div class="rm-stage">${escapeHtml(title)}</div></div>
       </div>
       <div class="rm-data-row">
@@ -531,6 +545,7 @@ function bearingBetween(lat1, lon1, lat2, lon2) {
 }
 
 function formatGps(lat, lon) {
+  if (lat == null || lon == null) return "";
   const latN = Number(lat);
   const lonN = Number(lon);
 

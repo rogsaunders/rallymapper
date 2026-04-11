@@ -9,17 +9,6 @@ import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-} from "docx";
-
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
@@ -1126,18 +1115,14 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
-        const blob = await buildRoutePackage(
-          stageWithRoadbook,
-          stageWithRoadbook.roadbook,
-          {
-            includeHema: true,
-            includeGarmin: true,
-            includeRallyNav: true,
-            includeGoogleEarth: true,
-            includeGaia: true,
-            includePdf: false,
-          },
-        );
+        const blob = await buildRoutePackage(stageWithRoadbook, {
+          includeHema: true,
+          includeGarmin: true,
+          includeRallyNav: true,
+          includeGoogleEarth: true,
+          includeGaia: true,
+          includePdf: false,
+        });
 
         downloadBlob(`${base}.zip`, blob);
       } catch (e) {

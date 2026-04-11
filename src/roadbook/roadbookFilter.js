@@ -60,7 +60,11 @@ export function filterDriverRoadbook(rows, options = {}) {
     lastKeptDistance = distanceM;
   }
 
-  return recalculatePartials(kept);
+  // Drop any rows after the finish marker
+  const finishIdx = kept.findIndex((r) => String(r.eventType) === "finish");
+  const truncated = finishIdx === -1 ? kept : kept.slice(0, finishIdx + 1);
+
+  return recalculatePartials(truncated);
 }
 
 function collapseDerivedClusters(rows, clusterRadiusM) {
@@ -139,7 +143,7 @@ function isStrongDerivedRow(row, minConfidence) {
   const eventType = String(row.eventType || "");
 
   if (eventType.startsWith("hairpin") || eventType.startsWith("sharp")) {
-    return true;
+    return confidence >= 0.75;
   }
 
   if (eventType === "left_90" || eventType === "right_90") {
