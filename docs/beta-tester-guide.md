@@ -105,7 +105,9 @@ When something goes wrong or feels off, please tell us! Here's what helps most:
 - Your device and browser (e.g. "iPhone 14, Safari" — or visit [whatismybrowser.com](https://www.whatismybrowser.com) and share the result)
 
 **Where to report:**
-- *(Your preferred channel — WhatsApp group / email / feedback form link)*
+
+- **Quick questions or "is this a bug?"** — post in the WhatsApp group: *(INSERT GROUP LINK)*
+- **Actual bug reports** — fill in the short form: *(INSERT GOOGLE FORM LINK)*
 
 Even small things matter — if something felt confusing or you hesitated, that's worth reporting.
 

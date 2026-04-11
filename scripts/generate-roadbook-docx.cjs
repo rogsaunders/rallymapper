@@ -431,9 +431,10 @@ const dataRows = rows.map((row, i) => {
 
 let RM_LOGO_PNG_BUF = FALLBACK_PNG;
 try {
-  RM_LOGO_PNG_BUF = fs.readFileSync(path.join(REPO_ROOT, 'website/assets/RouteMapper-Logo-Pack/Full Colour/fullLogo_transparent.png'));
+  RM_LOGO_PNG_BUF = fs.readFileSync(path.join(REPO_ROOT, 'website/assets/RouteMapper-Logo-Pack/Full Colour/fullLogo_transparent 02.png'));
 } catch (_) { /* use fallback */ }
 
+// Returns an array: [brandTable, statsGpsTable] — spread into document children
 function buildDocxHeader() {
   const lastWithKm = [...rows].reverse().find(r => Number.isFinite(Number(r.kmTotal)));
   const totalKm    = lastWithKm ? Number(lastWithKm.kmTotal).toFixed(1) : '—';
@@ -441,103 +442,113 @@ function buildDocxHeader() {
 
   const firstGps = rows.find(r => Number.isFinite(Number(r.lat)));
   const lastGps  = [...rows].reverse().find(r => Number.isFinite(Number(r.lat)));
-  const startParts  = firstGps ? fmtGps(firstGps.lat,  firstGps.lon)  : ['—'];
-  const finishParts = lastGps  ? fmtGps(lastGps.lat,   lastGps.lon)   : ['—'];
-
-  const metaLines = [
-    ['Trip',  meta.tripName],
-    ['Route', meta.routeName],
-    ['Day',   meta.dayNumber],
-    ['Stage', meta.stageNumber],
-    ['Date',  meta.tripDate],
-  ].filter(([, v]) => v != null && v !== '');
+  const startParts  = firstGps ? fmtGps(firstGps.lat, firstGps.lon) : ['—'];
+  const finishParts = lastGps  ? fmtGps(lastGps.lat,  lastGps.lon)  : ['—'];
 
   const BD2 = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
-  const NONE = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
   const hdrBorders = { top: BD2, bottom: BD2, left: BD2, right: BD2 };
 
-  const COL1 = 2400, COL2 = CW - COL1; // 2400 + 8372 = 10772
+  const Q    = Math.floor(CW / 4);
+  const COL1 = Q, COL2 = CW - COL1;
 
-  // Logo image: 1280×1024 native → display at 140×112 pt
+  // Logo image
   const logoImg = new ImageRun({
     type: 'png', data: RM_LOGO_PNG_BUF,
     transformation: { width: 140, height: 112 },
     altText: { title: 'RouteMapper', description: 'RouteMapper logo', name: 'RM Logo' },
   });
 
-  // Row 1: Logo (left) | Stage name (right) — combined, taller row
-  const brandRow = new TableRow({ children: [
-    new TableCell({
-      borders: hdrBorders,
-      width: { size: COL1, type: WidthType.DXA },
-      verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 80, bottom: 80, left: 100, right: 100 },
-      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [logoImg] })],
-    }),
-    new TableCell({
-      borders: hdrBorders,
-      width: { size: COL2, type: WidthType.DXA },
-      verticalAlign: VerticalAlign.CENTER,
-      shading: { fill: 'F8F8F8', type: ShadingType.CLEAR },
-      margins: { top: 80, bottom: 80, left: 160, right: 160 },
-      children: [new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: title, bold: true, size: 40, font: 'Arial' })],
-      })],
-    }),
-  ]});
+  // Right column: Trip / Day+Stage / Route stacked
+  const tripText  = meta.tripName  ? `Trip: ${meta.tripName}`   : null;
+  const dayParts  = [meta.dayNumber && `Day ${meta.dayNumber}`, meta.stageNumber && `Stage ${meta.stageNumber}`].filter(Boolean).join(' ');
+  const routeText = meta.routeName ? `Route: ${meta.routeName}` : (meta.stageName || null);
 
-  // Row 2: Stats (left) | Meta (right)
-  const statsCell = new TableCell({
+  const stageInfoParas = [
+    tripText  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: tripText,  bold: true, size: 28, font: 'Arial' })] }),
+    dayParts  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: dayParts,  bold: true, size: 28, font: 'Arial' })] }),
+    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 32, font: 'Arial' })] }),
+  ].filter(Boolean);
+
+  // Table 1: Logo | Stage info
+  const brandTable = new Table({
+    width: { size: CW, type: WidthType.DXA },
+    columnWidths: [COL1, COL2],
+    rows: [new TableRow({ children: [
+      new TableCell({
+        borders: hdrBorders,
+        width: { size: COL1, type: WidthType.DXA },
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 80, bottom: 80, left: 100, right: 100 },
+        children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [logoImg] })],
+      }),
+      new TableCell({
+        borders: hdrBorders,
+        width: { size: COL2, type: WidthType.DXA },
+        verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 80, bottom: 80, left: 160, right: 160 },
+        children: stageInfoParas.length ? stageInfoParas : [new Paragraph({ children: [] })],
+      }),
+    ]})],
+  });
+
+  // Table 2: Km | Waypoints | START GPS | FINISH GPS (4 equal columns)
+  const makeStatCell = (num, lbl) => new TableCell({
     borders: hdrBorders,
-    width: { size: COL1, type: WidthType.DXA },
+    width: { size: Q, type: WidthType.DXA },
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 60, bottom: 60, left: 120, right: 120 },
+    margins: { top: 60, bottom: 60, left: 80, right: 80 },
     children: [
-      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: totalKm, bold: true, size: 52, font: 'Arial' })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'KILOMETRES', size: 14, font: 'Arial', color: '444444' })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: String(waypointCount), bold: true, size: 52, font: 'Arial' })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'WAYPOINTS', size: 14, font: 'Arial', color: '444444' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: num, bold: true, size: 52, font: 'Arial' })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: lbl, size: 14, font: 'Arial', color: '444444' })] }),
     ],
   });
-
-  const metaCell = new TableCell({
-    borders: hdrBorders,
-    width: { size: COL2, type: WidthType.DXA },
-    verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 60, bottom: 60, left: 160, right: 120 },
-    children: metaLines.length ? metaLines.map(([k, v]) => new Paragraph({
-      children: [
-        new TextRun({ text: k + ':  ', bold: true, size: 20, font: 'Arial' }),
-        new TextRun({ text: String(v), size: 20, font: 'Arial' }),
-      ],
-    })) : [new Paragraph({ children: [] })],
-  });
-
-  const dataRow = new TableRow({ children: [statsCell, metaCell] });
-
-  // Row 4: Start / Finish GPS (2 equal cells)
-  const gpsHalf = Math.floor(CW / 2);
   const makeGpsCell = (label, parts) => new TableCell({
     borders: hdrBorders,
-    width: { size: gpsHalf, type: WidthType.DXA },
+    width: { size: Q, type: WidthType.DXA },
     verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 60, bottom: 60, left: 120, right: 120 },
+    margins: { top: 60, bottom: 60, left: 80, right: 80 },
     children: [
       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: label, bold: true, size: 20, color: '006b6b', font: 'Arial', characterSpacing: 80 })] }),
       ...parts.map(p => new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: p, bold: true, size: 20, font: 'Arial Narrow' })] })),
     ],
   });
 
-  const gpsRow = new TableRow({ children: [
-    makeGpsCell('START',  startParts),
-    makeGpsCell('FINISH', finishParts),
-  ]});
+  const statsGpsTable = new Table({
+    width: { size: CW, type: WidthType.DXA },
+    columnWidths: [Q, Q, Q, Q],
+    rows: [new TableRow({ children: [
+      makeStatCell(totalKm,           'KILOMETERS'),
+      makeStatCell(String(waypointCount), 'WAYPOINTS'),
+      makeGpsCell('START',  startParts),
+      makeGpsCell('FINISH', finishParts),
+    ]})],
+  });
 
+  return [brandTable, statsGpsTable];
+}
+
+function buildDocxWarning() {
+  const BD2 = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+  const borders = { top: BD2, bottom: BD2, left: BD2, right: BD2 };
+  const p = (text, bold = false, size = 14) => new Paragraph({
+    spacing: { before: 0, after: 60 },
+    children: [new TextRun({ text, bold, size, font: 'Arial' })],
+  });
   return new Table({
     width: { size: CW, type: WidthType.DXA },
-    columnWidths: [COL1, COL2],
-    rows: [brandRow, dataRow, gpsRow],
+    columnWidths: [CW],
+    rows: [new TableRow({ children: [new TableCell({
+      borders,
+      margins: { top: 80, bottom: 80, left: 160, right: 160 },
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 80 }, children: [new TextRun({ text: 'WARNING', bold: true, size: 22, font: 'Arial', characterSpacing: 80 })] }),
+        p('THIS ROUTE MAY INVOLVE HAZARDOUS CONDITIONS. NAVIGATE THIS ROUTE AT YOUR OWN RISK.', true, 14),
+        p('Conditions on any route can change at any time without notice. This route may pass through or lead to remote areas far from assistance. This is not a closed or controlled course. The route crosses and travels on public roads and tracks where other vehicles, pedestrians, livestock, and wildlife may be present.'),
+        p('Some hazards have been identified in this roadbook for guidance purposes only. The absence of a hazard marker does not mean the route is safe. Most hazards are not identified or marked. All distances, bearings, and GPS coordinates are approximate and should not be treated as precise navigation data.'),
+        p('If at any point signs, conditions, landowner instructions, or other indicators suggest the route passes through restricted, private, closed, or otherwise prohibited areas, this roadbook must not be followed into those areas.'),
+        new Paragraph({ spacing: { before: 0, after: 0 }, children: [new TextRun({ text: 'ROUTEMAPPER ACCEPTS NO RESPONSIBILITY FOR THE ACCURACY, COMPLETENESS, OR SAFETY OF THIS ROUTE. THE USER ACCEPTS FULL RESPONSIBILITY FOR THEIR OWN SAFETY AND THE SAFETY OF THEIR PASSENGERS AND VEHICLE AT ALL TIMES.', bold: true, size: 14, font: 'Arial' })] }),
+      ],
+    })]})],
   });
 }
 
@@ -549,7 +560,7 @@ const iconCellW = Math.floor(CW / APPENDIX_COLS); // ~2693 DXA each
 
 function iconAppendixRows() {
   const appRows = [];
-  const categories = ['Note', 'Hazard', 'Nav', 'Control'];
+  const categories = [...new Set(ICON_DEFS.map(d => d.category))];
 
   for (const cat of categories) {
     const icons = ICON_DEFS.filter(d => d.category === cat);
@@ -589,7 +600,7 @@ function iconAppendixRows() {
                 type: 'svg',
                 data: Buffer.from(d.svg, 'utf8'),
                 fallback: { type: 'png', data: FALLBACK_PNG },
-                transformation: { width: 64, height: 64 },
+                transformation: { width: d.category === 'Nav' ? 36 : 72, height: d.category === 'Nav' ? 36 : 72 },
                 altText: { title: d.label, description: d.label, name: d.label },
               })],
             }),
@@ -621,7 +632,8 @@ const doc = new Document({
         },
       },
       children: [
-        buildDocxHeader(),
+        ...buildDocxHeader(),
+        buildDocxWarning(),
         new Paragraph({ spacing: { before: 120 }, children: [] }),
         new Table({
           width: { size: CW, type: WidthType.DXA },
