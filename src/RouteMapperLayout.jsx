@@ -1405,7 +1405,6 @@ export default function RouteMapperLayout() {
     });
 
     setPoi("");
-    setWaypointType("note"); // reset icon selection after each waypoint add
   };
 
   const routePoints = useMemo(() => {
