@@ -452,6 +452,7 @@ export default function RouteMapperLayout() {
   });
 
   const [currentGPS, setCurrentGPS] = useState(null); // ✅ LIVE GPS
+  const currentGPSRef = useRef(null); // mirrors currentGPS for async/voice callbacks
   const [startGPS, setStartGPS] = useState(null);
   const [waypoints, setWaypoints] = useState([]);
   const [_stageArchive, setStageArchive] = useState([]);
@@ -709,15 +710,17 @@ export default function RouteMapperLayout() {
 
   // Helper: add a waypoint from a parsed voice command
   const commitVoiceWaypoint = (cmd) => {
-    if (!currentGPS) {
+    // Use the ref to always get the latest GPS fix, not a stale closure value
+    const gps = currentGPSRef.current;
+    if (!gps) {
       console.warn("Hands-free: GPS not ready, command dropped:", cmd);
       return;
     }
 
     setWaypoints((prev) => {
       const curFix = {
-        lat: Number(currentGPS.lat),
-        lon: Number(currentGPS.lon),
+        lat: Number(gps.lat),
+        lon: Number(gps.lon),
       };
 
       const lastWaypointDistance =
@@ -761,8 +764,8 @@ export default function RouteMapperLayout() {
           typeof crypto !== "undefined" && crypto.randomUUID
             ? crypto.randomUUID()
             : `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        lat: currentGPS.lat,
-        lon: currentGPS.lon,
+        lat: gps.lat,
+        lon: gps.lon,
         poi: cmd.poi,
         timestamp: new Date().toISOString(),
         kind: "waypoint",
@@ -920,14 +923,16 @@ export default function RouteMapperLayout() {
       (pos) => {
         const { latitude: lat, longitude: lon, accuracy, speed } = pos.coords;
 
-        setCurrentGPS({
+        const gpsFix = {
           lat,
           lon,
           accuracy,
           speed: Number.isFinite(speed) ? speed : null,
           fixTs: pos.timestamp,
           timestamp: new Date(pos.timestamp).toISOString(),
-        });
+        };
+        setCurrentGPS(gpsFix);
+        currentGPSRef.current = gpsFix;
 
         // ── Track point recording ────────────────────────────────────────────
         if (!stageActiveRef.current) return;
