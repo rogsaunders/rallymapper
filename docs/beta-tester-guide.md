@@ -68,13 +68,23 @@ Please work through these steps and note anything that feels confusing, slow, or
 - **Expected**: Track points appear on the map as you move
 
 ### Step 5 — Add waypoints
-Try all three methods:
+Try all four methods:
 
 1. **Manual text**: Type a note in the POI text field (e.g. "Junction with gravel road"), select an icon type, then tap **Add Waypoint (Current GPS)**
 2. **Voice dictation**: Tap the **Dictate** button, speak your note, then tap **Add Waypoint (Current GPS)**
-3. **Different icon types**: Try adding waypoints with Hazard, Navigation, Control, and Note icons
+3. **Different icon types**: Try adding waypoints with Hazard, Navigation, Control, Terrain, and Note icons. Your selected type persists between waypoint additions — no need to reselect each time.
+4. **Hands-Free voice mode** *(new — for solo drivers)*:
+   - Tap **Activate** in the Hands-Free panel
+   - The panel shows a blue dot and **Say "Mapper"** — the app is listening for the wake word
+   - Say **"Mapper"** — you'll hear a start tone and the panel turns red (**Listening...**)
+   - Speak your command using the format: *type + icon + dash + note*
+     - Examples: "hazard danger two — deep ruts ahead", "left — onto gravel road", "terrain washout", "bump", "note — fuel stop in 5 km"
+   - After a short silence (default 2.5s), the waypoint is automatically created and a green confirmation toast appears
+   - The app returns to standby, ready for the next "Mapper" command
+   - Tap **Stop** to deactivate
+   - Use the settings cog to adjust the silence timeout (1.5s–5s)
 
-- **Expected**: Each waypoint appears in the Waypoints panel with its type, time, and distance from the previous waypoint
+- **Expected**: Each waypoint appears in the Waypoints panel with its type, icon, time, and distance from the previous waypoint. On the map, waypoints appear at the GPS position where the command was spoken.
 
 ### Step 6 — Stop recording
 - Tap the red **End Stage** button
@@ -118,7 +128,7 @@ Even small things matter — if something felt confusing or you hesitated, that'
 These are things we already know about — no need to report them:
 
 - **iOS background tracking**: If you switch away from RouteMapper while recording, iOS may pause GPS tracking. Keep the app in the foreground.
-- **Voice dictation**: Not available in all browsers. Works best in Safari (iOS) and Chrome (Android/desktop).
+- **Voice dictation & Hands-Free**: Requires a browser that supports the Web Speech API. Works best in Safari (iOS/iPad) and Chrome (Android/desktop). Hands-Free mode uses the device microphone continuously while active — a Bluetooth headset with mic significantly improves accuracy in noisy/windy conditions.
 - **Large stages**: Very long recordings (1000+ track points) may be slow to save on some devices.
 - **Offline mode**: The app works offline, but your data won't sync to the cloud until you're back online.
 
@@ -138,7 +148,9 @@ If you have any concerns about your data, please reach out.
 ## Tips
 
 - **Charge your device** before recording — GPS usage drains battery quickly
-- **Use a phone mount** if recording while driving
+- **Use a phone mount** if recording while driving — essential for Hands-Free mode
+- **Hands-Free driving tip**: Speak clearly and leave a brief pause after "Mapper" before your command. The dash separator ("dash" or a natural pause) separates the icon type from your note text.
+- **Bluetooth headset**: If you're surveying in a noisy vehicle or windy conditions, a Bluetooth headset with mic dramatically improves voice recognition accuracy
 - **Don't worry about breaking things** — that's the whole point of a beta!
 
 ---
