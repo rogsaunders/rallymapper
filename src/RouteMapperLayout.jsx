@@ -93,17 +93,6 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function buildMetaHeader(meta, base) {
-  const safeBase = typeof base === "string" && base.trim() ? base : "stage";
-
-  return {
-    name: meta?.stageName || safeBase,
-    desc: `${meta?.tripName || ""} Day ${meta?.dayNumber ?? ""} Route ${meta?.routeNumber ?? ""} Stage ${meta?.stageNumber ?? ""}`.trim(),
-    time: new Date().toISOString(),
-    creator: "RouteMapper",
-  };
-}
-
 function dynamicMinMoveMeters(gps) {
   const baseMeters = 6; // meters, beats normal GPS jitter
   const factor = 0.8;
@@ -117,13 +106,6 @@ function dynamicMinMoveMeters(gps) {
 function fmtKmNumber(meters) {
   const km = Number(meters || 0) / 1000;
   return km.toFixed(2); // "3.10"
-}
-
-function formatRoadbookEventLabel(value) {
-  if (!value) return "Unknown";
-  return String(value)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function makeLocalId(meta) {
@@ -153,46 +135,7 @@ function xmlEscape(s) {
     .replace(/'/g, "&apos;");
 }
 
-// Your icon mapping (unchanged)
-function mapIconToRNSymbol(wp) {
-  const type = String(wp?.type || "").toLowerCase();
-  const iconId = String(wp?.iconId || "").toLowerCase();
-
-  if (type === "hazard") {
-    if (iconId === "danger_3") return "Danger 3";
-    if (iconId === "danger_2") return "Danger 2";
-    return "Danger 1";
-  }
-
-  if (type === "nav") {
-    if (iconId === "left") return "Left";
-    if (iconId === "right") return "Right";
-    if (iconId === "keep_l") return "Keep Left";
-    if (iconId === "keep_r") return "Keep Right";
-    if (iconId === "straight") return "Straight";
-    if (iconId === "caution") return "Caution";
-    return "Navigation";
-  }
-
-  if (type === "control") return "Control";
-  if (type === "note") return "Note";
-
-  return "Waypoint";
-}
-
-/**
- * exportOpenRallyGpx
- *
- * @param {Object} args
- * @param {Array}  args.waypoints - your stored waypoint objects
- * @param {string} [args.name] - track/route name
- * @param {boolean} [args.includeTrack] - include <trk> breadcrumb for non-rally apps
- * @param {string} [args.creator] - GPX creator attribute
- * @param {Function} [args.getTulipDataUrl] - optional (wp)=> "data:image/png;base64,..." (or null)
- *
- * Returns: GPX XML string
- */
-function exportOpenRallyGpx(
+function _exportOpenRallyGpx(
   routePoints,
   trackName = "Route",
   meta = {},
@@ -457,10 +400,10 @@ export default function RouteMapperLayout() {
   // const user = null;
 
   const [isListening, setIsListening] = useState(false);
-  const [dictationDraft, setDictationDraft] = useState("");
+  const [_dictationDraft, setDictationDraft] = useState("");
   const [handsFreeActive, setHandsFreeActive] = useState(false);
   const [handsFreeMode, setHandsFreeMode] = useState("off"); // "off" | "standby" | "command"
-  const [handsFreeListening, setHandsFreeListening] = useState(false);
+  const [_handsFreeListening, setHandsFreeListening] = useState(false);
   const [handsFreeTranscript, setHandsFreeTranscript] = useState("");
   const [handsFreeLastCommand, setHandsFreeLastCommand] = useState(null);
   const [handsFreeShowSettings, setHandsFreeShowSettings] = useState(false);
@@ -2073,7 +2016,7 @@ export default function RouteMapperLayout() {
               {/* Header row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">Hands-Free</span>
+                  <span className="text-sm text-gray-700 mt-1">Hands-Free</span>
                   {handsFreeMode === "standby" && (
                     <>
                       <span
