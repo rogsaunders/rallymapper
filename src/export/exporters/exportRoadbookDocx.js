@@ -5,9 +5,9 @@ import {
   HeightRule,
   ImageRun,
   Packer,
-  PageNumber,
   Paragraph,
   ShadingType,
+  SimpleField,
   Table,
   TableCell,
   TableRow,
@@ -150,7 +150,7 @@ function buildDocxHeader(rows, meta, logoPngData) {
   const stageInfoParas = [
     tripText  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: tripText,  bold: true, size: 28, font: "Arial" })] }),
     dayParts  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: dayParts,  bold: true, size: 28, font: "Arial" })] }),
-    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 32, font: "Arial" })] }),
+    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 28, font: "Arial" })] }),
   ].filter(Boolean);
 
   const brandTable = new Table({
@@ -255,9 +255,9 @@ function buildInfoRow(meta, title) {
         children: [
           new TextRun({ text: labelText, bold: true, size: 18, color: "FFFFFF", font: "Arial" }),
           new TextRun({ text: "     \u2014     Page ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
-          new TextRun({ bold: true, size: 18, color: "FFFFFF", font: "Arial", children: [PageNumber.CURRENT] }),
+          new SimpleField({ instruction: "PAGE" }),
           new TextRun({ text: " of ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
-          new TextRun({ bold: false, size: 18, color: "AAAAAA", font: "Arial", children: [PageNumber.TOTAL_PAGES] }),
+          new SimpleField({ instruction: "NUMPAGES" }),
         ],
       })],
     })],

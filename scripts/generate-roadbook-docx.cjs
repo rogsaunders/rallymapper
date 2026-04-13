@@ -12,7 +12,7 @@
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, AlignmentType, BorderStyle, WidthType, ShadingType,
-  VerticalAlign, HeightRule, PageNumber,
+  VerticalAlign, HeightRule, SimpleField,
 } = require('docx');
 
 const fs   = require('fs');
@@ -338,9 +338,9 @@ function buildInfoRow() {
         children: [
           new TextRun({ text: labelParts || title, bold: true, size: 18, color: 'FFFFFF', font: 'Arial' }),
           new TextRun({ text: '     \u2014     Page ', bold: false, size: 18, color: 'AAAAAA', font: 'Arial' }),
-          new TextRun({ bold: true, size: 18, color: 'FFFFFF', font: 'Arial', children: [PageNumber.CURRENT] }),
+          new SimpleField({ instruction: 'PAGE' }),
           new TextRun({ text: ' of ', bold: false, size: 18, color: 'AAAAAA', font: 'Arial' }),
-          new TextRun({ bold: false, size: 18, color: 'AAAAAA', font: 'Arial', children: [PageNumber.TOTAL_PAGES] }),
+          new SimpleField({ instruction: 'NUMPAGES' }),
         ],
       })],
     })],
@@ -503,7 +503,7 @@ function buildDocxHeader() {
   const stageInfoParas = [
     tripText  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: tripText,  bold: true, size: 28, font: 'Arial' })] }),
     dayParts  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: dayParts,  bold: true, size: 28, font: 'Arial' })] }),
-    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 32, font: 'Arial' })] }),
+    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 28, font: 'Arial' })] }),
   ].filter(Boolean);
 
   // Table 1: Logo | Stage info
