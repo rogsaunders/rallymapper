@@ -12,7 +12,7 @@
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, AlignmentType, BorderStyle, WidthType, ShadingType,
-  VerticalAlign, HeightRule, PageNumber,
+  VerticalAlign, HeightRule,
 } = require('docx');
 
 const fs   = require('fs');
@@ -310,9 +310,10 @@ function dataCell(children, width, opts) {
 
 // ─── Build rows ──────────────────────────────────────────────────────────────
 
-// ── Per-page recurring info row ───────────────────────────────────────────────
-// Repeats at the top of every printed page (tableHeader: true).
-// Shows stage identity and current page number so printed pages are self-contained.
+// ── Stage info row ────────────────────────────────────────────────────────────
+// First row of the roadbook table — shows stage identity at the top.
+// NOT a tableHeader (repeating header) because a spanning row with columnSpan:7
+// combined with tableHeader corrupts Word's column grid on pages 2+.
 
 function buildInfoRow() {
   const dayPart   = [meta.dayNumber   && `Day ${meta.dayNumber}`,
@@ -326,7 +327,6 @@ function buildInfoRow() {
   const infoBorders = { top: BD2, bottom: BD2, left: BD2, right: BD2 };
 
   return new TableRow({
-    tableHeader: true,
     children: [new TableCell({
       borders: infoBorders,
       columnSpan: 7,
@@ -337,10 +337,6 @@ function buildInfoRow() {
         alignment: AlignmentType.CENTER,
         children: [
           new TextRun({ text: labelParts || title, bold: true, size: 18, color: 'FFFFFF', font: 'Arial' }),
-          new TextRun({ text: '     \u2014     Page ', bold: false, size: 18, color: 'AAAAAA', font: 'Arial' }),
-          new TextRun({ bold: true, size: 18, color: 'FFFFFF', font: 'Arial', children: [PageNumber.CURRENT] }),
-          new TextRun({ text: ' of ', bold: false, size: 18, color: 'AAAAAA', font: 'Arial' }),
-          new TextRun({ bold: false, size: 18, color: 'AAAAAA', font: 'Arial', children: [PageNumber.TOTAL_PAGES] }),
         ],
       })],
     })],
@@ -491,7 +487,7 @@ function buildDocxHeader() {
   // Logo image
   const logoImg = new ImageRun({
     type: 'png', data: RM_LOGO_PNG_BUF,
-    transformation: { width: 140, height: 112 },
+    transformation: { width: 140, height: 88 },
     altText: { title: 'RouteMapper', description: 'RouteMapper logo', name: 'RM Logo' },
   });
 

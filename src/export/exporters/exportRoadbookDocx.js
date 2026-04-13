@@ -5,7 +5,6 @@ import {
   HeightRule,
   ImageRun,
   Packer,
-  PageNumber,
   Paragraph,
   ShadingType,
   Table,
@@ -139,7 +138,7 @@ function buildDocxHeader(rows, meta, logoPngData) {
   const logoImg = new ImageRun({
     type: "png",
     data: logoPngData,
-    transformation: { width: 140, height: 112 },
+    transformation: { width: 140, height: 88 },
     altText: { title: "RouteMapper", description: "RouteMapper logo", name: "RM Logo" },
   });
 
@@ -242,8 +241,9 @@ function buildInfoRow(meta, title) {
   const labelText = [tripPart, dayPart, routePart].filter(Boolean).join("   \u2022   ") || title;
 
   const BD2 = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
+  // NOT tableHeader — a spanning columnSpan:7 row as tableHeader corrupts
+  // Word's column grid on pages 2+ causing garbled content.
   return new TableRow({
-    tableHeader: true,
     children: [new TableCell({
       borders: { top: BD2, bottom: BD2, left: BD2, right: BD2 },
       columnSpan: 7,
@@ -254,10 +254,6 @@ function buildInfoRow(meta, title) {
         alignment: AlignmentType.CENTER,
         children: [
           new TextRun({ text: labelText, bold: true, size: 18, color: "FFFFFF", font: "Arial" }),
-          new TextRun({ text: "     \u2014     Page ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
-          new TextRun({ bold: true, size: 18, color: "FFFFFF", font: "Arial", children: [PageNumber.CURRENT] }),
-          new TextRun({ text: " of ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
-          new TextRun({ bold: false, size: 18, color: "AAAAAA", font: "Arial", children: [PageNumber.TOTAL_PAGES] }),
         ],
       })],
     })],
