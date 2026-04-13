@@ -255,9 +255,9 @@ function buildInfoRow(meta, title) {
         children: [
           new TextRun({ text: labelText, bold: true, size: 18, color: "FFFFFF", font: "Arial" }),
           new TextRun({ text: "     \u2014     Page ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
-          new SimpleField({ instruction: "PAGE" }),
+          new SimpleField("PAGE"),
           new TextRun({ text: " of ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
-          new SimpleField({ instruction: "NUMPAGES" }),
+          new SimpleField("NUMPAGES"),
         ],
       })],
     })],
