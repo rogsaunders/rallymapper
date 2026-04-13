@@ -12,7 +12,7 @@
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, AlignmentType, BorderStyle, WidthType, ShadingType,
-  VerticalAlign, HeightRule, SimpleField,
+  VerticalAlign, HeightRule, PageNumber,
 } = require('docx');
 
 const fs   = require('fs');
@@ -338,9 +338,9 @@ function buildInfoRow() {
         children: [
           new TextRun({ text: labelParts || title, bold: true, size: 18, color: 'FFFFFF', font: 'Arial' }),
           new TextRun({ text: '     \u2014     Page ', bold: false, size: 18, color: 'AAAAAA', font: 'Arial' }),
-          new SimpleField('PAGE'),
+          new TextRun({ bold: true, size: 18, color: 'FFFFFF', font: 'Arial', children: [PageNumber.CURRENT] }),
           new TextRun({ text: ' of ', bold: false, size: 18, color: 'AAAAAA', font: 'Arial' }),
-          new SimpleField('NUMPAGES'),
+          new TextRun({ bold: false, size: 18, color: 'AAAAAA', font: 'Arial', children: [PageNumber.TOTAL_PAGES] }),
         ],
       })],
     })],
