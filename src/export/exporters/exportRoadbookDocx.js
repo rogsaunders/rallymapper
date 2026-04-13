@@ -5,6 +5,7 @@ import {
   HeightRule,
   ImageRun,
   Packer,
+  PageNumber,
   Paragraph,
   ShadingType,
   Table,
@@ -38,14 +39,14 @@ const PAGE_W = 11906;
 const CW     = PAGE_W - MARGIN * 2; // 10772
 
 const COL = {
-  total:   1000,
-  partial: 1000,
-  rowno:    480,
-  tulip:   1440,
-  cap:      720,
-  notes:   4532,
-  gps:     1600,
-}; // 1000+1000+480+1440+720+4532+1600 = 10772 ✓
+  total:    900,  // ~0.63"
+  partial:  900,  // ~0.63"
+  rowno:    440,  // ~0.31"
+  tulip:   2160,  // ~1.50" — wider for clear tulip diagrams
+  cap:      540,  // ~0.38"
+  notes:   4312,  // ~3.00" — editorial column
+  gps:     1520,  // ~1.06"
+}; // 900+900+440+2160+540+4312+1520 = 10772 ✓
 
 const BD       = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
 const BORDERS  = { top: BD, bottom: BD, left: BD, right: BD };
@@ -73,7 +74,7 @@ export async function exportRoadbookDocx(stage) {
 
   const headerTables  = buildDocxHeader(rows, meta, logoPngData);
   const warningTable  = buildDocxWarning();
-  const roadbookTable = buildRoadbookTable(rows, flaggedRows);
+  const roadbookTable = buildRoadbookTable(rows, flaggedRows, meta, title);
   const appendixTable = buildIconAppendix();
 
   const doc = new Document({
@@ -233,7 +234,38 @@ function buildDocxWarning() {
 
 // ─── Roadbook table ───────────────────────────────────────────────────────────
 
-function buildRoadbookTable(rows, flaggedRows) {
+function buildInfoRow(meta, title) {
+  const dayPart   = [meta.dayNumber   && `Day ${meta.dayNumber}`,
+                     meta.stageNumber && `Stage ${meta.stageNumber}`].filter(Boolean).join("  ");
+  const routePart = meta.routeName ? `Route: ${meta.routeName}` : (meta.stageName || null);
+  const tripPart  = meta.tripName  ? `Trip: ${meta.tripName}`   : null;
+  const labelText = [tripPart, dayPart, routePart].filter(Boolean).join("   \u2022   ") || title;
+
+  const BD2 = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
+  return new TableRow({
+    tableHeader: true,
+    children: [new TableCell({
+      borders: { top: BD2, bottom: BD2, left: BD2, right: BD2 },
+      columnSpan: 7,
+      width: { size: CW, type: WidthType.DXA },
+      shading: { fill: "222222", type: ShadingType.CLEAR },
+      margins: { top: 40, bottom: 40, left: 140, right: 140 },
+      children: [new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: labelText, bold: true, size: 18, color: "FFFFFF", font: "Arial" }),
+          new TextRun({ text: "     \u2014     Page ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
+          new TextRun({ bold: true, size: 18, color: "FFFFFF", font: "Arial", children: [PageNumber.CURRENT] }),
+          new TextRun({ text: " of ", bold: false, size: 18, color: "AAAAAA", font: "Arial" }),
+          new TextRun({ bold: false, size: 18, color: "AAAAAA", font: "Arial", children: [PageNumber.TOTAL_PAGES] }),
+        ],
+      })],
+    })],
+  });
+}
+
+function buildRoadbookTable(rows, flaggedRows, meta, title) {
+  const infoRow = buildInfoRow(meta, title);
   const headerRow = new TableRow({
     tableHeader: true,
     children: [
@@ -347,7 +379,7 @@ function buildRoadbookTable(rows, flaggedRows) {
   return new Table({
     width: { size: CW, type: WidthType.DXA },
     columnWidths: [COL.total, COL.partial, COL.rowno, COL.tulip, COL.cap, COL.notes, COL.gps],
-    rows: [headerRow, ...dataRows],
+    rows: [infoRow, headerRow, ...dataRows],
   });
 }
 
