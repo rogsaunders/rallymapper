@@ -12,7 +12,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Optional: guard against accidentally pointing at the wrong project
-const EXPECTED_PROJECT_REF = "rfmvyachiypzvtxpdvma"; // <-- put YOUR correct project ref here
+const EXPECTED_PROJECT_REF = "rfmvyachiypzvtxpdvma";
 const actualRef = (() => {
   try {
     return new URL(supabaseUrl).host.split(".")[0];

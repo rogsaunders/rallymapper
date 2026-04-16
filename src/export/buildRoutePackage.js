@@ -11,6 +11,7 @@ import { exportGoogleEarthKml } from "./exporters/exportGoogleEarthKml";
 import { exportGaiaFiles } from "./exporters/exportGaiaFiles";
 import { exportCombinedGpx } from "./exporters/exportCombinedGpx";
 import { exportRoadbookHtml } from ".././roadbook/roadbookHtmlExport";
+import { exportRoadbookDocx } from "./exporters/exportRoadbookDocx";
 
 export async function buildRoutePackage(stage, options = {}) {
   validateStage(stage);
@@ -50,7 +51,8 @@ export async function buildRoutePackage(stage, options = {}) {
 
   if (roadbook) {
     coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
-    coreFiles[`${safeBase}_roadbook.html`] = exportRoadbookHtml(stage);
+    coreFiles[`${safeBase}_roadbook.html`] = await exportRoadbookHtml(stage);
+    coreFiles[`${safeBase}_roadbook.docx`] = await exportRoadbookDocx(stage);
   }
 
   Object.entries(coreFiles).forEach(([name, content]) =>

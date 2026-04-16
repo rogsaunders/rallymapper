@@ -263,3 +263,11 @@ bg_blue.wp-svg-wrap {
 .btn-amber:hover:not(:disabled) {
   background-color: #d97706;
 }
+
+/* Hands-free driving toast animation */
+@keyframes fadeInOut {
+  0%   { opacity: 0; transform: translateY(-12px) scale(0.95); }
+  10%  { opacity: 1; transform: translateY(0) scale(1); }
+  80%  { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+}

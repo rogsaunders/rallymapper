@@ -1,76 +1,46 @@
-import {
-  NOTE_SVG,
-  DANGER_1_SVG,
-  DANGER_2_SVG,
-  DANGER_3_SVG,
-  NAV_SVG,
-  CONTROL_SVG,
-  LEFT_SVG,
-  RIGHT_SVG,
-  KEEP_L_SVG,
-  KEEP_R_SVG,
-  STRAIGHT_SVG,
-  CAUTION_SVG,
-  CONTROL_START_SVG,
-  CONTROL_FINISH_SVG,
-  CONTROL_STOP_SVG,
-  CONTROL_CHECKPOINT_SVG,
-  CONTROL_TIME_SVG,
-  CONTROL_SERVICE_SVG,
-  GATE_SVG,
-  CATTLE_GATE_SVG,
-  BUMP_SVG,
-  BUMPS_SVG,
-  RUTS_SVG,
-  WASHOUT_SVG,
-  DIP_SVG,
-} from "./svgIcons";
+/**
+ * Icon registry — built from iconManifest.json + src/icons/svg/*.svg
+ *
+ * To add a new icon:
+ *   1. Drop <id>.svg into src/icons/svg/
+ *   2. Add one entry to iconManifest.json  { id, label, category, file }
+ *   Done — no other files need editing.
+ */
 
-export const ICON_ORDER = ["note", "hazard", "nav", "control"];
+import manifest from "./iconManifest.json";
 
-export const ICONS = {
-  note: { label: "Note", svg: NOTE_SVG },
+const _svgModules = import.meta.glob("./svg/*.svg", { as: "raw", eager: true });
 
-  hazard: {
-    label: "Hazard",
-    svg: DANGER_1_SVG,
-    variants: {
-      danger_1: { label: "Danger 1", svg: DANGER_1_SVG },
-      danger_2: { label: "Danger 2", svg: DANGER_2_SVG },
-      danger_3: { label: "Danger 3", svg: DANGER_3_SVG },
-      bump: { label: "Bump", svg: BUMP_SVG },
-      bumps: { label: "Bumps", svg: BUMPS_SVG },
-      dip: { label: "Dip", svg: DIP_SVG },
-      ruts: { label: "Ruts", svg: RUTS_SVG },
-      washout: { label: "Washout", svg: WASHOUT_SVG },
-    },
-  },
+// Flat list: [{ id, label, category, file, svg }, ...]
+export const ICON_DEFS = manifest.map(d => ({
+  ...d,
+  svg: _svgModules[`./svg/${d.file}`] ?? "",
+}));
 
-  nav: {
-    label: "Navigation",
-    svg: NAV_SVG, // default if no variant chosen
-    variants: {
-      left: { label: "Left", svg: LEFT_SVG },
-      right: { label: "Right", svg: RIGHT_SVG },
-      keep_l: { label: "Keep L", svg: KEEP_L_SVG },
-      keep_r: { label: "Keep R", svg: KEEP_R_SVG },
-      straight: { label: "Straight", svg: STRAIGHT_SVG },
-      caution: { label: "Caution", svg: CAUTION_SVG },
-      gate: { label: "Gate", svg: GATE_SVG },
-      cattle_gate: { label: "Cattle Gate", svg: CATTLE_GATE_SVG },
-    },
-  },
+// Quick lookup by id
+export const ICON_BY_ID = Object.fromEntries(ICON_DEFS.map(d => [d.id, d]));
 
-  control: {
-    label: "Control",
-    svg: CONTROL_SVG,
-    variants: {
-      start: { label: "Start", svg: CONTROL_START_SVG },
-      finish: { label: "Finish", svg: CONTROL_FINISH_SVG },
-      stop: { label: "Stop for Restart", svg: CONTROL_STOP_SVG },
-      checkpoint: { label: "Checkpoint", svg: CONTROL_CHECKPOINT_SVG },
-      time: { label: "Time Control", svg: CONTROL_TIME_SVG },
-      service: { label: "Service", svg: CONTROL_SERVICE_SVG },
-    },
-  },
-};
+// Nav icons appear as corner badge; all others overlay the tulip
+export const NAV_ICON_IDS = new Set(
+  ICON_DEFS.filter(d => d.category === "Nav").map(d => d.id)
+);
+
+// Ordered unique categories as they appear in the manifest
+export const ICON_CATEGORIES = [...new Set(ICON_DEFS.map(d => d.category))];
+
+// Legacy shape — ICONS object keyed by category, with variants
+// Kept so existing app components that import ICONS don't break.
+export const ICON_ORDER = ICON_CATEGORIES.map(c => c.toLowerCase());
+
+export const ICONS = Object.fromEntries(
+  ICON_CATEGORIES.map(cat => {
+    const members = ICON_DEFS.filter(d => d.category === cat);
+    const first = members[0];
+    const entry = {
+      label: cat,
+      svg: first?.svg ?? "",
+      variants: Object.fromEntries(members.map(d => [d.id, { label: d.label, svg: d.svg }])),
+    };
+    return [cat.toLowerCase(), entry];
+  })
+);
