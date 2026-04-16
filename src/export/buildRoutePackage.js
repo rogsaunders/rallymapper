@@ -7,7 +7,6 @@ import {
 } from "./exporters/exportUniversalGpx";
 import { exportHemaFiles } from "./exporters/exportHemaFiles";
 import { exportGarminFiles } from "./exporters/exportGarminFiles";
-import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv";
 import { exportGoogleEarthKml } from "./exporters/exportGoogleEarthKml";
 import { exportGaiaFiles } from "./exporters/exportGaiaFiles";
 import { exportCombinedGpx } from "./exporters/exportCombinedGpx";
@@ -51,15 +50,6 @@ export async function buildRoutePackage(stage, options = {}) {
 
   if (roadbook) {
     coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
-
-    coreFiles[`${safeBase}_roadbook_raw.csv`] = exportRallyNavCsv(stage, {
-      mode: "raw",
-    });
-
-    coreFiles[`${safeBase}_roadbook_driver.csv`] = exportRallyNavCsv(stage, {
-      mode: "driver",
-    });
-
     coreFiles[`${safeBase}_roadbook.html`] = exportRoadbookHtml(stage);
   }
 
@@ -85,16 +75,18 @@ export async function buildRoutePackage(stage, options = {}) {
     );
   }
 
-  if (config.includeRallyNav && roadbook) {
+  if (config.includeRallyNav) {
     addFolderFiles(
       zip.folder("rallynav"),
       {
-        [`${safeBase}_rallynav_raw.csv`]: exportRallyNavCsv(stage, {
-          mode: "raw",
-        }),
-        [`${safeBase}_rallynav_driver.csv`]: exportRallyNavCsv(stage, {
-          mode: "driver",
-        }),
+        [`${safeBase}_rallynav_track.gpx`]: exportUniversalTrackGpx(
+          stage,
+          config,
+        ),
+        [`${safeBase}_rallynav_waypoints.gpx`]: exportUniversalWaypointsGpx(
+          stage,
+          config,
+        ),
       },
       manifest.files.rallynav,
     );
