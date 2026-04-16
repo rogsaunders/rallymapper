@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
+import { exportMapAsPdf } from "./export/exportMapPdf";
 import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
 import { ICON_ORDER } from "./icons/iconRegistry";
@@ -464,6 +465,8 @@ export default function RouteMapperLayout() {
   const [showMap, setShowMap] = useState(true);
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
+  const [leafletMap, setLeafletMap] = useState(null);
+  const [exportingMapPdf, setExportingMapPdf] = useState(false);
 
   // Trip meta
   const [tripName, setTripName] = useState("");
@@ -1507,6 +1510,7 @@ export default function RouteMapperLayout() {
               mapMode={mapMode}
               mapSource={mapSource}
               resizeKey={showMap ? 1 : 0}
+              onMapReady={setLeafletMap}
             />
           </div>
         ) : (
@@ -1526,6 +1530,7 @@ export default function RouteMapperLayout() {
                 mapMode={mapMode}
                 mapSource={mapSource}
                 resizeKey={showMap ? 1 : 0}
+                onMapReady={setLeafletMap}
               />
             </div>
           </section>
@@ -1568,6 +1573,69 @@ export default function RouteMapperLayout() {
             title="Show generated roadbook preview"
           >
             {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
+            disabled={!showMap || !leafletMap || exportingMapPdf}
+            title="Export the current map view as a printable PDF. Tip: zoom/pan to frame the whole route before exporting."
+            onClick={async () => {
+              if (!leafletMap) return;
+              setExportingMapPdf(true);
+              try {
+                const lastWp = waypoints?.[waypoints.length - 1];
+                const totalKm = lastWp?.totalMeters
+                  ? Number(lastWp.totalMeters) / 1000
+                  : 0;
+
+                // Build bounds from start + waypoints + track so fitBounds
+                // captures the whole route on the PDF regardless of current pan/zoom.
+                const pts = [];
+                if (startGPS?.lat && startGPS?.lon) {
+                  pts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+                }
+                (trackPoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    pts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+                (waypoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    pts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+
+                const baseTitle =
+                  `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+
+                await exportMapAsPdf(leafletMap, {
+                  title: baseTitle,
+                  date: new Date(),
+                  totalDistanceKm: totalKm,
+                  waypointCount: (waypoints || []).filter(
+                    (w) => w.kind !== "start" && w.poi !== "START",
+                  ).length,
+                  tileAttribution:
+                    mapSource === "esri_imagery"
+                      ? "Tiles © Esri"
+                      : mapSource === "opentopo"
+                        ? "© OpenTopoMap (CC-BY-SA)"
+                        : "© OpenStreetMap contributors",
+                  fitBoundsTo: pts.length >= 2 ? pts : null,
+                  filename: baseTitle || "routemapper-map",
+                });
+              } catch (err) {
+                console.error("Export Map PDF failed", err);
+                alert(
+                  `Could not export map PDF.\n\n${err?.message || err}\n\nIf you're using satellite or topo tiles, try switching to OSM and exporting again.`,
+                );
+              } finally {
+                setExportingMapPdf(false);
+              }
+            }}
+          >
+            {exportingMapPdf ? "Exporting…" : "Export Map PDF"}
           </button>
         </div>
 
