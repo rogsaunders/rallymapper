@@ -7,11 +7,11 @@ import {
 } from "./exporters/exportUniversalGpx";
 import { exportHemaFiles } from "./exporters/exportHemaFiles";
 import { exportGarminFiles } from "./exporters/exportGarminFiles";
-import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv";
 import { exportGoogleEarthKml } from "./exporters/exportGoogleEarthKml";
 import { exportGaiaFiles } from "./exporters/exportGaiaFiles";
 import { exportCombinedGpx } from "./exporters/exportCombinedGpx";
 import { exportRoadbookHtml } from ".././roadbook/roadbookHtmlExport";
+import { exportRoadbookDocx } from "./exporters/exportRoadbookDocx";
 
 export async function buildRoutePackage(stage, options = {}) {
   validateStage(stage);
@@ -27,6 +27,10 @@ export async function buildRoutePackage(stage, options = {}) {
     includeGoogleEarth: true,
     includeGaia: true,
     includePdf: false,
+    // Optional printable map PDF blob captured from the live Leaflet map.
+    // When provided, it's embedded in the ZIP as `${safeBase}_map.pdf` so
+    // organisers/entrants get the printable map alongside the track files.
+    mapPdfBlob: null,
     exportedAt: new Date().toISOString(),
     appName: "RouteMapper",
     version: "0.1.0",
@@ -51,16 +55,14 @@ export async function buildRoutePackage(stage, options = {}) {
 
   if (roadbook) {
     coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
+    coreFiles[`${safeBase}_roadbook.html`] = await exportRoadbookHtml(stage);
+    coreFiles[`${safeBase}_roadbook.docx`] = await exportRoadbookDocx(stage);
+  }
 
-    coreFiles[`${safeBase}_roadbook_raw.csv`] = exportRallyNavCsv(stage, {
-      mode: "raw",
-    });
-
-    coreFiles[`${safeBase}_roadbook_driver.csv`] = exportRallyNavCsv(stage, {
-      mode: "driver",
-    });
-
-    coreFiles[`${safeBase}_roadbook.html`] = exportRoadbookHtml(stage);
+  // Embed the printable map PDF (captured while the map was still visible)
+  // so the ZIP is a complete, share-ready package.
+  if (config.mapPdfBlob) {
+    coreFiles[`${safeBase}_map.pdf`] = config.mapPdfBlob;
   }
 
   Object.entries(coreFiles).forEach(([name, content]) =>
@@ -85,16 +87,18 @@ export async function buildRoutePackage(stage, options = {}) {
     );
   }
 
-  if (config.includeRallyNav && roadbook) {
+  if (config.includeRallyNav) {
     addFolderFiles(
       zip.folder("rallynav"),
       {
-        [`${safeBase}_rallynav_raw.csv`]: exportRallyNavCsv(stage, {
-          mode: "raw",
-        }),
-        [`${safeBase}_rallynav_driver.csv`]: exportRallyNavCsv(stage, {
-          mode: "driver",
-        }),
+        [`${safeBase}_rallynav_track.gpx`]: exportUniversalTrackGpx(
+          stage,
+          config,
+        ),
+        [`${safeBase}_rallynav_waypoints.gpx`]: exportUniversalWaypointsGpx(
+          stage,
+          config,
+        ),
       },
       manifest.files.rallynav,
     );

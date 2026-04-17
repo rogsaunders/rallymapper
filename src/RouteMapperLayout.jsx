@@ -3,23 +3,13 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
+import { exportMapAsPdf, buildMapPdfBlob } from "./export/exportMapPdf";
 import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
 import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-} from "docx";
-
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
@@ -104,17 +94,6 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function buildMetaHeader(meta, base) {
-  const safeBase = typeof base === "string" && base.trim() ? base : "stage";
-
-  return {
-    name: meta?.stageName || safeBase,
-    desc: `${meta?.tripName || ""} Day ${meta?.dayNumber ?? ""} Route ${meta?.routeNumber ?? ""} Stage ${meta?.stageNumber ?? ""}`.trim(),
-    time: new Date().toISOString(),
-    creator: "RouteMapper",
-  };
-}
-
 function dynamicMinMoveMeters(gps) {
   const baseMeters = 6; // meters, beats normal GPS jitter
   const factor = 0.8;
@@ -128,13 +107,6 @@ function dynamicMinMoveMeters(gps) {
 function fmtKmNumber(meters) {
   const km = Number(meters || 0) / 1000;
   return km.toFixed(2); // "3.10"
-}
-
-function formatRoadbookEventLabel(value) {
-  if (!value) return "Unknown";
-  return String(value)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function makeLocalId(meta) {
@@ -164,46 +136,7 @@ function xmlEscape(s) {
     .replace(/'/g, "&apos;");
 }
 
-// Your icon mapping (unchanged)
-function mapIconToRNSymbol(wp) {
-  const type = String(wp?.type || "").toLowerCase();
-  const iconId = String(wp?.iconId || "").toLowerCase();
-
-  if (type === "hazard") {
-    if (iconId === "danger_3") return "Danger 3";
-    if (iconId === "danger_2") return "Danger 2";
-    return "Danger 1";
-  }
-
-  if (type === "nav") {
-    if (iconId === "left") return "Left";
-    if (iconId === "right") return "Right";
-    if (iconId === "keep_l") return "Keep Left";
-    if (iconId === "keep_r") return "Keep Right";
-    if (iconId === "straight") return "Straight";
-    if (iconId === "caution") return "Caution";
-    return "Navigation";
-  }
-
-  if (type === "control") return "Control";
-  if (type === "note") return "Note";
-
-  return "Waypoint";
-}
-
-/**
- * exportOpenRallyGpx
- *
- * @param {Object} args
- * @param {Array}  args.waypoints - your stored waypoint objects
- * @param {string} [args.name] - track/route name
- * @param {boolean} [args.includeTrack] - include <trk> breadcrumb for non-rally apps
- * @param {string} [args.creator] - GPX creator attribute
- * @param {Function} [args.getTulipDataUrl] - optional (wp)=> "data:image/png;base64,..." (or null)
- *
- * Returns: GPX XML string
- */
-function exportOpenRallyGpx(
+function _exportOpenRallyGpx(
   routePoints,
   trackName = "Route",
   meta = {},
@@ -468,10 +401,10 @@ export default function RouteMapperLayout() {
   // const user = null;
 
   const [isListening, setIsListening] = useState(false);
-  const [dictationDraft, setDictationDraft] = useState("");
+  const [_dictationDraft, setDictationDraft] = useState("");
   const [handsFreeActive, setHandsFreeActive] = useState(false);
   const [handsFreeMode, setHandsFreeMode] = useState("off"); // "off" | "standby" | "command"
-  const [handsFreeListening, setHandsFreeListening] = useState(false);
+  const [_handsFreeListening, setHandsFreeListening] = useState(false);
   const [handsFreeTranscript, setHandsFreeTranscript] = useState("");
   const [handsFreeLastCommand, setHandsFreeLastCommand] = useState(null);
   const [handsFreeShowSettings, setHandsFreeShowSettings] = useState(false);
@@ -485,6 +418,8 @@ export default function RouteMapperLayout() {
   const [showMap, setShowMap] = useState(true);
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
+  const [leafletMap, setLeafletMap] = useState(null);
+  const [exportingMapPdf, setExportingMapPdf] = useState(false);
 
   // Trip meta
   const [tripName, setTripName] = useState("");
@@ -1024,6 +959,16 @@ export default function RouteMapperLayout() {
   };
 
   const handleStartStage = () => {
+    // If the previous (just-ended) stage is still on-screen — i.e. the user
+    // skipped "Start New Stage" and went straight to "Start Stage" — bump
+    // the stage counter so we don't overwrite the last stage's numbering.
+    const resumingAfterSavedStage =
+      trackPoints?.length > 0 || waypoints?.length > 0 || Boolean(startGPS);
+    if (resumingAfterSavedStage) {
+      setStageNumber((n) => n + 1);
+      setShowRoadbookPreview(false);
+    }
+
     // Stage starts: clear current stage data and "arm" the UI
     setStageActive(true);
     setStageStartedAt(new Date().toISOString());
@@ -1126,18 +1071,74 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
-        const blob = await buildRoutePackage(
-          stageWithRoadbook,
-          stageWithRoadbook.roadbook,
-          {
-            includeHema: true,
-            includeGarmin: true,
-            includeRallyNav: true,
-            includeGoogleEarth: true,
-            includeGaia: true,
-            includePdf: false,
-          },
-        );
+        // Capture the printable map PDF BEFORE the ZIP is built, while the
+        // Leaflet map is still mounted and populated with this stage's
+        // track/waypoints. Best-effort — if capture fails we still ship the
+        // rest of the ZIP.
+        let mapPdfBlob = null;
+        if (leafletMap && showMap) {
+          try {
+            // Use the already-assembled stageWithRoadbook for metadata —
+            // raw waypoints/trackPoints in state carry distanceFromStartM,
+            // not totalMeters, so reading totalMeters from them gives 0.
+            const lastTrackPt = stageWithRoadbook.trackPoints?.at(-1);
+            const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
+
+            const stageWaypoints = stageWithRoadbook.waypoints || [];
+            const wpCount = stageWaypoints.filter(
+              (w) => w.kind !== "start" && w.poi !== "START",
+            ).length;
+
+            const pts = [];
+            if (startGPS?.lat && startGPS?.lon) {
+              pts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+            }
+            (stageWithRoadbook.trackPoints || []).forEach((p) => {
+              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                pts.push([Number(p.lat), Number(p.lon)]);
+              }
+            });
+            stageWaypoints.forEach((p) => {
+              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                pts.push([Number(p.lat), Number(p.lon)]);
+              }
+            });
+
+            const baseTitle =
+              `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+
+            const result = await buildMapPdfBlob(leafletMap, {
+              title: baseTitle,
+              date: new Date(),
+              totalDistanceKm: totalKm,
+              waypointCount: wpCount,
+              tileAttribution:
+                mapSource === "esri_imagery"
+                  ? "Tiles © Esri"
+                  : mapSource === "opentopo"
+                    ? "© OpenTopoMap (CC-BY-SA)"
+                    : "© OpenStreetMap contributors",
+              fitBoundsTo: pts.length >= 2 ? pts : null,
+              filename: baseTitle || "routemapper-map",
+            });
+            mapPdfBlob = result?.blob ?? null;
+          } catch (mapErr) {
+            console.warn(
+              "Map PDF capture failed — continuing with ZIP without it",
+              mapErr,
+            );
+          }
+        }
+
+        const blob = await buildRoutePackage(stageWithRoadbook, {
+          includeHema: true,
+          includeGarmin: true,
+          includeRallyNav: true,
+          includeGoogleEarth: true,
+          includeGaia: true,
+          includePdf: false,
+          mapPdfBlob,
+        });
 
         downloadBlob(`${base}.zip`, blob);
       } catch (e) {
@@ -1189,17 +1190,13 @@ export default function RouteMapperLayout() {
 
       setStageArchive((prev) => [...prev, stageWithRoadbook]);
     } finally {
+      // Stage is complete. We intentionally DO NOT clear the on-screen
+      // state (trackPoints, waypoints, startGPS, roadbook, map view) here —
+      // the user needs the map populated to manually export a printable
+      // Map PDF after save if the auto-capture in the ZIP wasn't enough.
+      // Cleanup happens when they click "Start New Stage" or "Start Stage".
       setStageActive(false);
       setStageStartedAt(null);
-      setWaypoints([]);
-      setStartGPS(null);
-      setPoi("");
-      setHazardIconId("danger_1");
-      setNavIconId("straight");
-      setControlIconId("start");
-      setStageNumber((n) => n + 1);
-      setTrackPoints([]);
-      trackLastRef.current = null;
 
       try {
         localStorage.removeItem(STAGE_DRAFT_KEY);
@@ -1209,6 +1206,36 @@ export default function RouteMapperLayout() {
 
       setIsEndingStage(false);
     }
+  };
+
+  // Tracks whether the last-ended stage is still on-screen (i.e. the user
+  // hasn't yet clicked "Start New Stage" or re-armed "Start Stage"). Used
+  // to show the reset button only when it's relevant.
+  const hasSavedStageOnScreen =
+    !stageActive &&
+    (trackPoints?.length > 0 ||
+      waypoints?.length > 0 ||
+      Boolean(startGPS));
+
+  // Explicit reset that the user triggers once they're done with the
+  // post-save actions (Map PDF export, review, etc.). Clears the stage-
+  // scoped data and bumps the stage counter so the next recording slots
+  // in cleanly.
+  const handleStartNewStage = () => {
+    if (stageActive) {
+      alert("End the current stage before starting a new one.");
+      return;
+    }
+    setWaypoints([]);
+    setStartGPS(null);
+    setPoi("");
+    setHazardIconId("danger_1");
+    setNavIconId("straight");
+    setControlIconId("start");
+    setStageNumber((n) => n + 1);
+    setTrackPoints([]);
+    trackLastRef.current = null;
+    setShowRoadbookPreview(false);
   };
 
   const handleSetStart = () => {
@@ -1717,6 +1744,16 @@ export default function RouteMapperLayout() {
                     ? "⏹ End Stage"
                     : "Start Stage"}
               </button>
+              {hasSavedStageOnScreen && (
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white whitespace-nowrap"
+                  onClick={handleStartNewStage}
+                  title="Clear the last stage from the map and get ready for the next one"
+                >
+                  Start New Stage
+                </button>
+              )}
             </div>
 
             {/* Roadbook toggle */}
@@ -1744,6 +1781,7 @@ export default function RouteMapperLayout() {
               mapMode={mapMode}
               mapSource={mapSource}
               resizeKey={showMap ? 1 : 0}
+              onMapReady={setLeafletMap}
             />
           </div>
         ) : (
@@ -1763,6 +1801,7 @@ export default function RouteMapperLayout() {
                 mapMode={mapMode}
                 mapSource={mapSource}
                 resizeKey={showMap ? 1 : 0}
+                onMapReady={setLeafletMap}
               />
             </div>
           </section>
@@ -1805,6 +1844,69 @@ export default function RouteMapperLayout() {
             title="Show generated roadbook preview"
           >
             {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
+            disabled={!showMap || !leafletMap || exportingMapPdf}
+            title="Export the current map view as a printable PDF. Tip: zoom/pan to frame the whole route before exporting."
+            onClick={async () => {
+              if (!leafletMap) return;
+              setExportingMapPdf(true);
+              try {
+                // Raw trackPoints carry distanceFromStartM (not totalMeters).
+                // The last track point's cumulative value is the total distance.
+                const lastTrackPt = trackPoints?.[trackPoints.length - 1];
+                const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
+
+                // Build bounds from start + waypoints + track so fitBounds
+                // captures the whole route on the PDF regardless of current pan/zoom.
+                const pts = [];
+                if (startGPS?.lat && startGPS?.lon) {
+                  pts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+                }
+                (trackPoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    pts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+                (waypoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    pts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+
+                const baseTitle =
+                  `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+
+                await exportMapAsPdf(leafletMap, {
+                  title: baseTitle,
+                  date: new Date(),
+                  totalDistanceKm: totalKm,
+                  waypointCount: (waypoints || []).filter(
+                    (w) => w.kind !== "start" && w.poi !== "START",
+                  ).length,
+                  tileAttribution:
+                    mapSource === "esri_imagery"
+                      ? "Tiles © Esri"
+                      : mapSource === "opentopo"
+                        ? "© OpenTopoMap (CC-BY-SA)"
+                        : "© OpenStreetMap contributors",
+                  fitBoundsTo: pts.length >= 2 ? pts : null,
+                  filename: baseTitle || "routemapper-map",
+                });
+              } catch (err) {
+                console.error("Export Map PDF failed", err);
+                alert(
+                  `Could not export map PDF.\n\n${err?.message || err}\n\nIf you're using satellite or topo tiles, try switching to OSM and exporting again.`,
+                );
+              } finally {
+                setExportingMapPdf(false);
+              }
+            }}
+          >
+            {exportingMapPdf ? "Exporting…" : "Export Map PDF"}
           </button>
         </div>
 
@@ -2088,7 +2190,7 @@ export default function RouteMapperLayout() {
               {/* Header row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">Hands-Free</span>
+                  <span className="text-sm text-gray-700 mt-1">Hands-Free</span>
                   {handsFreeMode === "standby" && (
                     <>
                       <span

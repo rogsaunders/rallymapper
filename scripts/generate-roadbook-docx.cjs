@@ -267,15 +267,15 @@ const CW     = PAGE_W - MARGIN * 2; // 10772
 
 // Column widths — must sum to CW (10772)
 const COL = {
-  total:   1000,  // 0.69"
-  partial: 1000,
-  rowno:    480,  // 0.33"
-  tulip:   1440,  // 1"
-  cap:      720,  // 0.5"
-  notes:   4532,  // ~3.15" — the editorial column
-  gps:     1600,  // ~1.11"
+  total:    900,  // ~0.63"
+  partial:  900,  // ~0.63"
+  rowno:    440,  // ~0.31"
+  tulip:   2160,  // ~1.50" — wider for clear tulip diagrams
+  cap:      540,  // ~0.38"
+  notes:   4312,  // ~3.00" — editorial column
+  gps:     1520,  // ~1.06"
 };
-// 1000+1000+480+1440+720+4532+1600 = 10772 ✓
+// 900+900+440+2160+540+4312+1520 = 10772 ✓
 
 const BD = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
 const BORDERS = { top: BD, bottom: BD, left: BD, right: BD };
@@ -309,6 +309,39 @@ function dataCell(children, width, opts) {
 }
 
 // ─── Build rows ──────────────────────────────────────────────────────────────
+
+// ── Stage info row ────────────────────────────────────────────────────────────
+// First row of the roadbook table — shows stage identity at the top.
+// NOT a tableHeader (repeating header) because a spanning row with columnSpan:7
+// combined with tableHeader corrupts Word's column grid on pages 2+.
+
+function buildInfoRow() {
+  const dayPart   = [meta.dayNumber   && `Day ${meta.dayNumber}`,
+                     meta.stageNumber && `Stage ${meta.stageNumber}`].filter(Boolean).join('  ');
+  const routePart = meta.routeName ? `Route: ${meta.routeName}` : (meta.stageName || null);
+  const tripPart  = meta.tripName  ? `Trip: ${meta.tripName}`   : null;
+
+  const labelParts = [tripPart, dayPart, routePart].filter(Boolean).join('   \u2022   ');
+
+  const BD2 = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+  const infoBorders = { top: BD2, bottom: BD2, left: BD2, right: BD2 };
+
+  return new TableRow({
+    children: [new TableCell({
+      borders: infoBorders,
+      columnSpan: 7,
+      width: { size: CW, type: WidthType.DXA },
+      shading: { fill: '222222', type: ShadingType.CLEAR },
+      margins: { top: 40, bottom: 40, left: 140, right: 140 },
+      children: [new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: labelParts || title, bold: true, size: 18, color: 'FFFFFF', font: 'Arial' }),
+        ],
+      })],
+    })],
+  });
+}
 
 const headerRow = new TableRow({
   tableHeader: true,
@@ -454,7 +487,7 @@ function buildDocxHeader() {
   // Logo image
   const logoImg = new ImageRun({
     type: 'png', data: RM_LOGO_PNG_BUF,
-    transformation: { width: 140, height: 112 },
+    transformation: { width: 140, height: 88 },
     altText: { title: 'RouteMapper', description: 'RouteMapper logo', name: 'RM Logo' },
   });
 
@@ -466,7 +499,7 @@ function buildDocxHeader() {
   const stageInfoParas = [
     tripText  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: tripText,  bold: true, size: 28, font: 'Arial' })] }),
     dayParts  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: dayParts,  bold: true, size: 28, font: 'Arial' })] }),
-    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 32, font: 'Arial' })] }),
+    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 28, font: 'Arial' })] }),
   ].filter(Boolean);
 
   // Table 1: Logo | Stage info
@@ -638,7 +671,7 @@ const doc = new Document({
         new Table({
           width: { size: CW, type: WidthType.DXA },
           columnWidths: [COL.total, COL.partial, COL.rowno, COL.tulip, COL.cap, COL.notes, COL.gps],
-          rows: [headerRow, ...dataRows],
+          rows: [buildInfoRow(), headerRow, ...dataRows],
         }),
       ],
     },

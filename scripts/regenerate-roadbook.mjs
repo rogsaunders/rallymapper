@@ -254,6 +254,7 @@ function buildIconPaletteHtml() {
     <span>🗂 Icon Stash &mdash; drag onto any tulip cell &nbsp;&nbsp; <small>&#x2318;P to print (palette hides automatically)</small></span>
     <div style="display:flex;gap:6px;">
       <button onclick="undoLastDrop()" id="undo-btn" disabled title="Undo last icon drop (⌘Z)">↩ Undo</button>
+      <button onclick="saveHtml()" title="Save your edits as an HTML file">💾 Save</button>
       <button onclick="togglePalette()" id="palette-btn">Hide</button>
     </div>
   </div>
@@ -276,6 +277,19 @@ ${buildIconSvgsJs()}
 const NAV_IDS = new Set(['left','right','keep_l','keep_r','straight','caution','gate','cattle_gate']);
 let _dragId = null;
 const _undoStack = [];
+
+// ── Save edited HTML to disk ──
+function saveHtml() {
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'roadbook_edited.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
 
 // ── Keep spacer in sync with fixed palette height ──
 function updateBodyPadding() {
@@ -483,6 +497,24 @@ function buildHtml(stage, rows, flaggedRows) {
   .rb-row { break-inside: avoid; }
   .filter-note { display: none; }
   .no-print { display: none; }
+
+  /* A4 usable width ≈ 190mm. Fixed pixel columns overflow it, collapsing
+     the auto note column to zero. Switch to percentage widths for print. */
+  .col-total   { width: 11% !important; }
+  .col-partial { width: 11% !important; }
+  .col-rowno   { width:  5% !important; }
+  .col-tulip   { width: 22% !important; }
+  .col-cap     { width:  8% !important; }
+  .col-gps     { width: 15% !important; }
+  .col-note    { width: 28% !important; }   /* remainder — keep explicit so table-layout: fixed honours it */
+
+  /* Allow rows to breathe on print — fixed pixel heights cause overflow */
+  .rb-row,
+  .distance-box, .rowno-box, .tulip-box,
+  .cap-box, .note-box, .gps-box { height: auto !important; min-height: 80px; }
+
+  /* Slightly smaller note text so it fits the narrower print column */
+  .note-main { font-size: 14px !important; }
 }
 
 /* ── Base ── */
