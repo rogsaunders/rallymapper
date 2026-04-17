@@ -1850,7 +1850,7 @@ export default function RouteMapperLayout() {
             type="button"
             className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
             disabled={!showMap || !leafletMap || exportingMapPdf}
-            title="Export the current map view as a printable PDF. Tip: zoom/pan to frame the whole route before exporting."
+            title="Export the current map view as a printable PDF. Tip: let the map fully load before exporting — tiles may take up to 30 seconds on a mobile connection."
             onClick={async () => {
               if (!leafletMap) return;
               setExportingMapPdf(true);
