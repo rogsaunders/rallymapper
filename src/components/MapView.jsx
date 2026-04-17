@@ -54,6 +54,14 @@ function FixResize({ resizeKey }) {
   return null;
 }
 
+function MapReadyBridge({ onMapReady }) {
+  const map = useMap();
+  useEffect(() => {
+    if (typeof onMapReady === "function") onMapReady(map);
+  }, [map, onMapReady]);
+  return null;
+}
+
 function Recenter({ center, zoom, enabled }) {
   const map = useMap();
 
@@ -81,6 +89,7 @@ export default function MapView({
   mapMode = "normal",
   mapSource = "osm",
   resizeKey = 0,
+  onMapReady,
 }) {
   const tile = useMemo(() => {
     switch (mapSource) {
@@ -253,6 +262,7 @@ export default function MapView({
         center={[defaultCenter.lat, defaultCenter.lon]}
         zoom={14}
         style={{ height: "100%", width: "100%" }}
+        preferCanvas={true}
       >
         <FixResize showMap={showMap} />
         <FixResize resizeKey={resizeKey} />
@@ -261,7 +271,10 @@ export default function MapView({
           attribution={tile.attribution}
           url={tile.url}
           maxZoom={tile.maxZoom}
+          crossOrigin="anonymous"
         />
+
+        <MapReadyBridge onMapReady={onMapReady} />
 
         <Recenter center={recenterTarget} zoom={14} enabled={followMap} />
 

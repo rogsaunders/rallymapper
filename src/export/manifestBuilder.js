@@ -19,6 +19,7 @@ export function buildManifest(stage, config, baseName, roadbook) {
         `${baseName}_track.gpx`,
         `${baseName}_waypoints.gpx`,
         ...(roadbook ? [`${baseName}_roadbook.json`, `${baseName}_roadbook.csv`] : []),
+        ...(config.mapPdfBlob ? [`${baseName}_map.pdf`] : []),
       ],
       hema: [],
       garmin: [],
