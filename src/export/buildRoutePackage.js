@@ -27,6 +27,10 @@ export async function buildRoutePackage(stage, options = {}) {
     includeGoogleEarth: true,
     includeGaia: true,
     includePdf: false,
+    // Optional printable map PDF blob captured from the live Leaflet map.
+    // When provided, it's embedded in the ZIP as `${safeBase}_map.pdf` so
+    // organisers/entrants get the printable map alongside the track files.
+    mapPdfBlob: null,
     exportedAt: new Date().toISOString(),
     appName: "RouteMapper",
     version: "0.1.0",
@@ -53,6 +57,12 @@ export async function buildRoutePackage(stage, options = {}) {
     coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
     coreFiles[`${safeBase}_roadbook.html`] = await exportRoadbookHtml(stage);
     coreFiles[`${safeBase}_roadbook.docx`] = await exportRoadbookDocx(stage);
+  }
+
+  // Embed the printable map PDF (captured while the map was still visible)
+  // so the ZIP is a complete, share-ready package.
+  if (config.mapPdfBlob) {
+    coreFiles[`${safeBase}_map.pdf`] = config.mapPdfBlob;
   }
 
   Object.entries(coreFiles).forEach(([name, content]) =>

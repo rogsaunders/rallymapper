@@ -51,13 +51,17 @@ function formatDate(d) {
 }
 
 /**
- * Capture the given Leaflet map instance and download it as a PDF.
+ * Build a printable map PDF from a Leaflet map instance.
  *
- * Returns a Promise that resolves when the download has been triggered,
- * or rejects if the screenshot / PDF build fails.
+ * Returns `{ blob, filename }` — the caller decides whether to download it,
+ * embed it in a ZIP, upload it, etc. Rejects if the screenshot / PDF build
+ * fails.
+ *
+ * Shared by the user-facing "Export Map PDF" button (which downloads the
+ * blob) and by the ZIP export path (which embeds the blob into the package).
  */
-export async function exportMapAsPdf(map, meta = {}) {
-  if (!map) throw new Error("exportMapAsPdf: map instance is required");
+export async function buildMapPdfBlob(map, meta = {}) {
+  if (!map) throw new Error("buildMapPdfBlob: map instance is required");
 
   const {
     title = "RouteMapper Map",
@@ -207,10 +211,21 @@ export async function exportMapAsPdf(map, meta = {}) {
   const safeAttr = String(tileAttribution).replace(/<[^>]*>/g, "").replace(/&copy;/gi, "©");
   pdf.text(safeAttr, pageW - 12, footerY, { align: "right" });
 
-  // ---- Save ----------------------------------------------------------------
+  // ---- Output --------------------------------------------------------------
   const blob = pdf.output("blob");
   const finalName = `${slugify(filename || title)}.pdf`;
-  downloadBlob(finalName, blob);
 
-  return { filename: finalName, size: blob.size };
+  return { blob, filename: finalName };
+}
+
+/**
+ * Capture the given Leaflet map instance and download it as a PDF.
+ *
+ * Thin wrapper around `buildMapPdfBlob` for the user-facing button. Returns
+ * `{ filename, size }` once the download has been triggered.
+ */
+export async function exportMapAsPdf(map, meta = {}) {
+  const { blob, filename } = await buildMapPdfBlob(map, meta);
+  downloadBlob(filename, blob);
+  return { filename, size: blob.size };
 }

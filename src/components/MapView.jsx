@@ -262,6 +262,7 @@ export default function MapView({
         center={[defaultCenter.lat, defaultCenter.lon]}
         zoom={14}
         style={{ height: "100%", width: "100%" }}
+        preferCanvas={true}
       >
         <FixResize showMap={showMap} />
         <FixResize resizeKey={resizeKey} />
