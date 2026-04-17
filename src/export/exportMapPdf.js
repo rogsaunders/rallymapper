@@ -114,8 +114,10 @@ export async function buildMapPdfBlob(map, meta = {}) {
     }
   }
 
-  // Let the tiles settle before capture
-  await new Promise((r) => setTimeout(r, 900));
+  // Let the tiles settle before capture.
+  // 2 s gives mobile connections enough time to load the new viewport's
+  // tiles after the fitBounds re-zoom, reducing blank tile grid lines.
+  await new Promise((r) => setTimeout(r, 2000));
 
   const screenshoter = new SimpleMapScreenshoter({ hidden: true }).addTo(map);
 
