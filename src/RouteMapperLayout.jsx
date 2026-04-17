@@ -411,6 +411,13 @@ export default function RouteMapperLayout() {
   const [handsFreeSilenceMs, setHandsFreeSilenceMs] = useState(
     () => Number(localStorage.getItem("rm_handsfree_silence_ms")) || 2500,
   );
+  const [snapWindowMs, setSnapWindowMs] = useState(
+    () => Number(localStorage.getItem("rm_snap_window_ms")) || 5000,
+  );
+  const [pendingWaypoint, setPendingWaypoint] = useState(null);
+  const [pendingRemainingMs, setPendingRemainingMs] = useState(0);
+  const pendingWaypointRef = useRef(null);
+  const pendingTimerRef = useRef(null);
   const [handsFreeToast, setHandsFreeToast] = useState(null); // { type, iconId, poi } for large toast
   const handsFreeRef = useRef(null); // voice command handler
   const wakeWordRef = useRef(null); // wake word listener
@@ -643,20 +650,35 @@ export default function RouteMapperLayout() {
   // Flow: Activate → Standby (listening for "Mapper") → Command (recording)
   //       → commit waypoint → back to Standby → … → Stop
 
-  // Helper: add a waypoint from a parsed voice command
-  const commitVoiceWaypoint = (cmd) => {
-    // Use the ref to always get the latest GPS fix, not a stale closure value
-    const gps = currentGPSRef.current;
-    if (!gps) {
-      console.warn("Hands-free: GPS not ready, command dropped:", cmd);
-      return;
+  // ── Pending waypoint (snap-first) helpers ──────────────────────────
+
+  const clearPendingTimer = () => {
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
     }
+  };
+
+  const startPendingTimer = (ms) => {
+    clearPendingTimer();
+    pendingTimerRef.current = setTimeout(
+      () => {
+        commitPendingWaypoint();
+      },
+      Math.max(500, ms ?? snapWindowMs),
+    );
+  };
+
+  const commitPendingWaypoint = () => {
+    clearPendingTimer();
+    const pending = pendingWaypointRef.current;
+    if (!pending) return;
+
+    pendingWaypointRef.current = null;
+    setPendingWaypoint(null);
 
     setWaypoints((prev) => {
-      const curFix = {
-        lat: Number(gps.lat),
-        lon: Number(gps.lon),
-      };
+      const curFix = { lat: Number(pending.lat), lon: Number(pending.lon) };
 
       const lastWaypointDistance =
         prev.length > 0
@@ -695,22 +717,80 @@ export default function RouteMapperLayout() {
             : 0;
 
       const next = {
-        id:
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        lat: gps.lat,
-        lon: gps.lon,
-        poi: cmd.poi,
-        timestamp: new Date().toISOString(),
+        id: pending.id,
+        lat: pending.lat,
+        lon: pending.lon,
+        poi: (pending.poi || "").trim(),
+        timestamp: pending.timestamp,
         kind: "waypoint",
-        type: cmd.type,
-        iconId: cmd.iconId,
+        type: pending.type,
+        iconId: pending.iconId,
         distanceFromStartM,
       };
 
       return [...prev, next];
     });
+
+    setPoi("");
+  };
+
+  const discardPendingWaypoint = () => {
+    clearPendingTimer();
+    pendingWaypointRef.current = null;
+    setPendingWaypoint(null);
+    setPoi("");
+  };
+
+  // Helper: add a waypoint from a parsed voice command
+  const commitVoiceWaypoint = (cmd) => {
+    // Use the ref to always get the latest GPS fix, not a stale closure value
+    const gps = currentGPSRef.current;
+
+    // If a pending waypoint already exists, voice refines it in place
+    // (type/iconId/POI update the pending slot; timer resets via useEffect).
+    if (pendingWaypointRef.current) {
+      if (cmd.type) setWaypointType(cmd.type);
+      if (cmd.type === "hazard" && cmd.iconId) setHazardIconId(cmd.iconId);
+      else if (cmd.type === "nav" && cmd.iconId) setNavIconId(cmd.iconId);
+      else if (cmd.type === "control" && cmd.iconId)
+        setControlIconId(cmd.iconId);
+      else if (cmd.type === "terrain" && cmd.iconId)
+        setTerrainIconId(cmd.iconId);
+      if (cmd.poi) setPoi(cmd.poi);
+      return;
+    }
+
+    if (!gps) {
+      console.warn("Hands-free: GPS not ready, command dropped:", cmd);
+      return;
+    }
+
+    // No pending — create a new pending snapshot from current GPS.
+    // Also sync the UI selections so the panel reflects the voice command.
+    if (cmd.type) setWaypointType(cmd.type);
+    if (cmd.type === "hazard" && cmd.iconId) setHazardIconId(cmd.iconId);
+    else if (cmd.type === "nav" && cmd.iconId) setNavIconId(cmd.iconId);
+    else if (cmd.type === "control" && cmd.iconId) setControlIconId(cmd.iconId);
+    else if (cmd.type === "terrain" && cmd.iconId)
+      setTerrainIconId(cmd.iconId);
+    if (cmd.poi) setPoi(cmd.poi);
+
+    const pending = {
+      id:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      lat: gps.lat,
+      lon: gps.lon,
+      timestamp: new Date().toISOString(),
+      type: cmd.type,
+      iconId: cmd.iconId,
+      poi: cmd.poi || "",
+      expiresAt: Date.now() + snapWindowMs,
+    };
+    pendingWaypointRef.current = pending;
+    setPendingWaypoint(pending);
+    startPendingTimer(snapWindowMs);
   };
 
   // Start wake word listening (Standby mode)
@@ -997,6 +1077,11 @@ export default function RouteMapperLayout() {
     if (isEndingStage) return;
     if (!stageActive) return;
 
+    // Commit any pending waypoint before ending so it isn't lost.
+    if (pendingWaypointRef.current) {
+      commitPendingWaypoint();
+    }
+
     setIsEndingStage(true);
 
     await new Promise((r) => setTimeout(r, 0));
@@ -1226,6 +1311,7 @@ export default function RouteMapperLayout() {
       alert("End the current stage before starting a new one.");
       return;
     }
+    discardPendingWaypoint();
     setWaypoints([]);
     setStartGPS(null);
     setPoi("");
@@ -1311,127 +1397,147 @@ export default function RouteMapperLayout() {
     }
   }, [waypointType, terrainIconId]);
 
+  // While a waypoint is pending, apply user edits (type/icon/poi) to the
+  // pending slot and reset the auto-commit timer so the user gets a fresh
+  // edit window after each change.
+  useEffect(() => {
+    const pending = pendingWaypointRef.current;
+    if (!pending) return;
+
+    const iconId =
+      waypointType === "hazard"
+        ? hazardIconId
+        : waypointType === "nav"
+          ? navIconId
+          : waypointType === "control"
+            ? controlIconId
+            : waypointType === "terrain"
+              ? terrainIconId
+              : null;
+
+    const updated = {
+      ...pending,
+      type: waypointType,
+      iconId,
+      poi: poi.trim(),
+      expiresAt: Date.now() + snapWindowMs,
+    };
+    pendingWaypointRef.current = updated;
+    setPendingWaypoint(updated);
+    startPendingTimer(snapWindowMs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    waypointType,
+    hazardIconId,
+    navIconId,
+    controlIconId,
+    terrainIconId,
+    poi,
+    snapWindowMs,
+  ]);
+
+  // Tick the countdown display while a waypoint is pending.
+  useEffect(() => {
+    if (!pendingWaypoint) {
+      setPendingRemainingMs(0);
+      return;
+    }
+    const tick = () => {
+      const remaining = Math.max(
+        0,
+        (pendingWaypoint.expiresAt ?? 0) - Date.now(),
+      );
+      setPendingRemainingMs(remaining);
+    };
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [pendingWaypoint?.expiresAt, pendingWaypoint]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+    };
+  }, []);
+
   const handleAddWaypoint = (typeOverride) => {
     if (typeOverride && typeof typeOverride !== "string") typeOverride = null;
     if (!currentGPS)
       return alert("GPS not ready yet — wait a moment and try again.");
 
-    setWaypoints((prev) => {
-      const last =
-        [...prev]
-          .reverse()
-          .find(
-            (p) =>
-              Number.isFinite(Number(p?.lat)) &&
-              Number.isFinite(Number(p?.lon)),
-          ) || null;
+    // Snap-first: a tap that arrives while another pending is still open
+    // commits the previous pending immediately, then snaps a new one.
+    if (pendingWaypointRef.current) {
+      commitPendingWaypoint();
+    }
 
-      const curFix = {
-        lat: Number(currentGPS.lat),
-        lon: Number(currentGPS.lon),
-      };
+    // Min-move guard — still useful to suppress accidental double-taps while
+    // stationary. Compare against the last *committed* waypoint.
+    const last =
+      [...waypoints]
+        .reverse()
+        .find(
+          (p) =>
+            Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lon)),
+        ) || null;
 
-      if (last) {
-        const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
+    const curFix = {
+      lat: Number(currentGPS.lat),
+      lon: Number(currentGPS.lon),
+    };
 
-        if (Number.isFinite(lastFix.lat) && Number.isFinite(lastFix.lon)) {
-          const moved = haversineMeters(lastFix, curFix);
-          const minMove = dynamicMinMoveMeters(currentGPS);
-
-          console.log("📍 Waypoint Debug:", {
-            speed: currentGPS?.speed,
-            accuracy: currentGPS?.accuracy,
-            movedMeters: Number.isFinite(moved)
-              ? Number(moved.toFixed(2))
-              : null,
-            minMoveMeters: Number.isFinite(minMove)
-              ? Number(minMove.toFixed(2))
-              : null,
-            lat: currentGPS?.lat,
-            lon: currentGPS?.lon,
-            ts: currentGPS?.timestamp,
-          });
-
-          if (
-            Number.isFinite(moved) &&
-            Number.isFinite(minMove) &&
-            moved < minMove
-          ) {
-            console.log("⏳ Ignored due to threshold");
-            return prev;
-          }
-        } else {
-          console.log("⚠️ Invalid last waypoint fix", last);
+    if (last) {
+      const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
+      if (Number.isFinite(lastFix.lat) && Number.isFinite(lastFix.lon)) {
+        const moved = haversineMeters(lastFix, curFix);
+        const minMove = dynamicMinMoveMeters(currentGPS);
+        if (
+          Number.isFinite(moved) &&
+          Number.isFinite(minMove) &&
+          moved < minMove
+        ) {
+          console.log("⏳ Ignored due to threshold");
+          return;
         }
       }
+    }
 
-      const typeToSave = typeOverride ?? waypointType;
-      const iconId =
-        typeToSave === "hazard"
-          ? hazardIconId || "danger_1"
-          : typeToSave === "nav"
-            ? navIconId || "straight"
-            : typeToSave === "control"
-              ? controlIconId || "start"
-              : typeToSave === "terrain"
-                ? terrainIconId || "bump"
-                : null;
+    const typeToSave = typeOverride ?? waypointType;
+    const iconId =
+      typeToSave === "hazard"
+        ? hazardIconId || "danger_1"
+        : typeToSave === "nav"
+          ? navIconId || "straight"
+          : typeToSave === "control"
+            ? controlIconId || "start"
+            : typeToSave === "terrain"
+              ? terrainIconId || "bump"
+              : null;
 
-      const lastWaypointDistance =
-        prev.length > 0
-          ? Number(prev[prev.length - 1]?.distanceFromStartM || 0)
-          : 0;
+    // If a typeOverride was passed, sync the UI selection so the panel
+    // reflects the pending waypoint's type.
+    if (typeOverride && typeOverride !== waypointType) {
+      setWaypointType(typeOverride);
+    }
 
-      const segmentFromLastWaypoint =
-        prev.length > 0
-          ? haversineMeters(
-              {
-                lat: Number(prev[prev.length - 1].lat),
-                lon: Number(prev[prev.length - 1].lon),
-              },
-              curFix,
-            )
-          : startGPS &&
-              Number.isFinite(Number(startGPS.lat)) &&
-              Number.isFinite(Number(startGPS.lon))
-            ? haversineMeters(
-                {
-                  lat: Number(startGPS.lat),
-                  lon: Number(startGPS.lon),
-                },
-                curFix,
-              )
-            : 0;
+    const pending = {
+      id:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      lat: currentGPS.lat,
+      lon: currentGPS.lon,
+      timestamp: new Date().toISOString(),
+      type: typeToSave,
+      iconId,
+      poi: poi.trim(),
+      expiresAt: Date.now() + snapWindowMs,
+    };
 
-      const distanceFromStartM =
-        prev.length > 0
-          ? lastWaypointDistance +
-            (Number.isFinite(segmentFromLastWaypoint)
-              ? segmentFromLastWaypoint
-              : 0)
-          : Number.isFinite(segmentFromLastWaypoint)
-            ? segmentFromLastWaypoint
-            : 0;
-
-      const next = {
-        id:
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `wp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        lat: currentGPS.lat,
-        lon: currentGPS.lon,
-        poi: poi.trim(),
-        timestamp: new Date().toISOString(),
-        kind: "waypoint",
-        type: typeToSave,
-        iconId,
-        distanceFromStartM,
-      };
-
-      return [...prev, next];
-    });
-
-    setPoi("");
+    pendingWaypointRef.current = pending;
+    setPendingWaypoint(pending);
+    startPendingTimer(snapWindowMs);
   };
 
   const routePoints = useMemo(() => {
@@ -1710,7 +1816,7 @@ export default function RouteMapperLayout() {
               </button>
               <input
                 ref={routeNameRef}
-                className="flex-1 min-w-[8rem] max-w-[16rem] px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
+                className="flex-1 min-w-[8rem] max-w-[16rem] landscape:max-w-none px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
                 value={routeName}
                 onChange={(e) => setRouteName(e.target.value)}
                 disabled={stageActive}
@@ -1776,6 +1882,7 @@ export default function RouteMapperLayout() {
               currentGPS={currentGPS}
               startGPS={startGPS}
               waypoints={waypoints}
+              pendingWaypoint={pendingWaypoint}
               trackPoints={trackPoints} // ✅ add
               followMap={followMap}
               mapMode={mapMode}
@@ -1796,6 +1903,7 @@ export default function RouteMapperLayout() {
                 currentGPS={currentGPS}
                 startGPS={startGPS}
                 waypoints={waypoints}
+                pendingWaypoint={pendingWaypoint}
                 trackPoints={trackPoints}
                 followMap={followMap}
                 mapMode={mapMode}
@@ -2053,7 +2161,70 @@ export default function RouteMapperLayout() {
               </div>
             </div>
 
-            <div className="flex gap-2 flex-wrap mb-2">
+            {/* Snap-first: tap lands first, refinement below */}
+            <button
+              className="btn btn-primary w-full"
+              disabled={!stageActive}
+              onClick={() => handleAddWaypoint(null)}
+            >
+              {pendingWaypoint
+                ? "➕ Snap Another Waypoint"
+                : "➕ Add Waypoint (Current GPS)"}
+            </button>
+
+            {pendingWaypoint && (
+              <div
+                className="mt-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-3"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-sm font-semibold text-amber-900">
+                      Pending waypoint
+                    </span>
+                  </div>
+                  <span className="text-xs tabular-nums text-amber-700">
+                    {(pendingRemainingMs / 1000).toFixed(1)}s
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-amber-100 rounded-full overflow-hidden mb-2">
+                  <div
+                    className="h-full bg-amber-500 transition-[width] duration-100 ease-linear"
+                    style={{
+                      width: `${Math.min(100, (pendingRemainingMs / Math.max(1, snapWindowMs)) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-amber-800 mb-2">
+                  GPS snapped at{" "}
+                  <span className="tabular-nums">
+                    {Number(pendingWaypoint.lat).toFixed(5)},{" "}
+                    {Number(pendingWaypoint.lon).toFixed(5)}
+                  </span>
+                  . Refine icon / type / note below — commits automatically.
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={commitPendingWaypoint}
+                    className="flex-1 px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700"
+                  >
+                    ✓ Done
+                  </button>
+                  <button
+                    type="button"
+                    onClick={discardPendingWaypoint}
+                    className="flex-1 px-3 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-semibold hover:bg-gray-300"
+                  >
+                    ✕ Discard
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-3 flex gap-2 flex-wrap mb-2">
               {ICON_ORDER.map((type) => (
                 <IconButton
                   key={type}
@@ -2294,6 +2465,33 @@ export default function RouteMapperLayout() {
                       <span>5s (relaxed)</span>
                     </div>
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        Snap window (edit after tap)
+                      </label>
+                      <span className="text-xs text-gray-500 tabular-nums">
+                        {(snapWindowMs / 1000).toFixed(1)}s
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={2000}
+                      max={10000}
+                      step={500}
+                      value={snapWindowMs}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setSnapWindowMs(val);
+                        localStorage.setItem("rm_snap_window_ms", val);
+                      }}
+                      className="w-full accent-blue-600"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                      <span>2s (fast)</span>
+                      <span>10s (relaxed)</span>
+                    </div>
+                  </div>
                   <div className="text-[11px] text-gray-400 leading-snug">
                     A Bluetooth headset with mic improves accuracy in noisy
                     environments.
@@ -2354,13 +2552,6 @@ export default function RouteMapperLayout() {
               </div>
             )}
 
-            <button
-              className="btn btn-primary mt-3 w-full"
-              disabled={!stageActive}
-              onClick={() => handleAddWaypoint(null)}
-            >
-              ➕ Add Waypoint (Current GPS)
-            </button>
           </div>
         </section>
 

@@ -83,6 +83,7 @@ export default function MapView({
   currentGPS,
   startGPS,
   waypoints,
+  pendingWaypoint = null,
   trackPoints,
   followMap,
   showMap = true,
@@ -415,6 +416,56 @@ export default function MapView({
             </Marker>
           );
         })}
+
+        {/* Pending (snap-first) waypoint — rendered with a pulsing ring */}
+        {pendingWaypoint &&
+          Number.isFinite(Number(pendingWaypoint.lat)) &&
+          Number.isFinite(Number(pendingWaypoint.lon)) &&
+          (() => {
+            const lat = Number(pendingWaypoint.lat);
+            const lon = Number(pendingWaypoint.lon);
+            const type = String(pendingWaypoint.type || "").toLowerCase();
+            const iconId = String(pendingWaypoint.iconId || "").toLowerCase();
+            let svgFallback = ICONS.note?.svg;
+            if (type === "hazard") {
+              svgFallback =
+                ICONS.hazard?.variants?.[iconId || "danger_1"]?.svg ||
+                ICONS.hazard?.svg ||
+                ICONS.note?.svg;
+            } else if (type === "nav") {
+              svgFallback =
+                ICONS.nav?.variants?.[iconId || "straight"]?.svg ||
+                ICONS.nav?.svg ||
+                ICONS.note?.svg;
+            } else if (type === "control") {
+              svgFallback =
+                ICONS.control?.variants?.[iconId || "start"]?.svg ||
+                ICONS.control?.svg ||
+                ICONS.note?.svg;
+            } else if (type === "terrain") {
+              svgFallback =
+                ICONS.terrain?.variants?.[iconId || "bump"]?.svg ||
+                ICONS.terrain?.svg ||
+                ICONS.note?.svg;
+            } else if (ICONS[type]?.svg) {
+              svgFallback = ICONS[type].svg;
+            }
+            const pendingIcon = L.divIcon({
+              className: "rm-leaflet-svg-icon rm-leaflet-pending",
+              html: `<div class="rm-leaflet-svg-wrap rm-pending-wrap">${svgFallback || ""}</div>`,
+              iconSize: [36, 36],
+              iconAnchor: [18, 18],
+              popupAnchor: [0, -18],
+            });
+            return (
+              <Marker
+                key="pending-waypoint"
+                position={[lat, lon]}
+                icon={pendingIcon}
+                interactive={false}
+              />
+            );
+          })()}
       </MapContainer>
     </div>
   );
