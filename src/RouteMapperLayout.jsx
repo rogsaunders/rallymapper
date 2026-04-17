@@ -1698,10 +1698,10 @@ export default function RouteMapperLayout() {
             </div>
 
             {/* Row 2: Route + Stage + Start/End */}
-            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap shrink-0"
                 onClick={handleNewRoute}
                 disabled={stageActive}
                 title="Start a new route within this trip/event"
@@ -1710,27 +1710,27 @@ export default function RouteMapperLayout() {
               </button>
               <input
                 ref={routeNameRef}
-                className="w-full px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
+                className="flex-1 min-w-[8rem] max-w-[16rem] px-3 py-2 rounded-xl border bg-gray-50 min-w-0"
                 value={routeName}
                 onChange={(e) => setRouteName(e.target.value)}
                 disabled={stageActive}
-                placeholder="Route name (e.g. Barossa to Silverton)"
+                placeholder="Route name"
               />
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                className="px-4 py-2 rounded-xl bg-[#588233] text-white font-medium disabled:opacity-50 whitespace-nowrap shrink-0"
                 onClick={handleNewStage}
                 disabled={stageActive}
                 title="Increment stage number within this route"
               >
                 New Stage
               </button>
-              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold whitespace-nowrap">
+              <div className="px-3 py-2 rounded-xl border bg-white text-gray-900 font-semibold whitespace-nowrap shrink-0">
                 Stage {stageNumber}
               </div>
               <button
                 type="button"
-                className="px-4 py-2 rounded-xl text-white font-semibold disabled:opacity-50 whitespace-nowrap"
+                className="px-4 py-2 rounded-xl text-white font-semibold disabled:opacity-50 whitespace-nowrap shrink-0"
                 style={{
                   backgroundColor: stageActive ? "#dc2626" : "#588233",
                 }}
@@ -1747,7 +1747,7 @@ export default function RouteMapperLayout() {
               {hasSavedStageOnScreen && (
                 <button
                   type="button"
-                  className="px-4 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white whitespace-nowrap"
+                  className="px-4 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white whitespace-nowrap shrink-0"
                   onClick={handleStartNewStage}
                   title="Clear the last stage from the map and get ready for the next one"
                 >
