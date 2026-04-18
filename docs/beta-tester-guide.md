@@ -78,9 +78,18 @@ The Hands-Free mode now also snaps GPS at the instant "Mapper" is recognised —
 4. If you say nothing, the waypoint **auto-commits** after the voice snap window using the last-used icon — no action needed.
 5. Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint and return to standby.
 
-Two separate sliders in the ⚙️ gear panel:
-- **Snap window (edit after tap)** — edit time after tapping Add Waypoint (2s–10s)
-- **Voice snap window** — how long after "Mapper" you have to speak a command before it auto-commits (3s–10s)
+Three sliders in the ⚙️ gear panel (all in one place for convenience):
+- **Silence timeout** — pause after speaking before the HF command fires (1.5s–5s)
+- **Voice snap window** — how long after "Mapper" you have to speak before it auto-commits (3s–10s)
+- **Snap window (edit after tap)** — edit time after tapping Add Waypoint before auto-commit (2s–10s) *(controls the manual tap flow, not Hands-Free)*
+
+### Map PDF export
+
+When a stage ends, a **printable PDF of the map** is automatically included in the ZIP export — no extra steps needed. The PDF shows your route, waypoint markers, stage title, date, total distance, and waypoint count, laid out for A4 landscape printing.
+
+You can also export the map at any time during a stage by tapping **Export Map PDF** in the map controls. Useful for sharing a route overview before the roadbook is complete.
+
+> **Note**: The PDF captures the map exactly as it appears on screen. For the cleanest result, make sure your route is visible in the map view before exporting. Tile loading can take a few seconds on slower connections — the app waits up to 2 seconds for tiles to settle before capturing.
 
 ---
 
@@ -136,9 +145,10 @@ Try all four methods:
 
 ### Step 7 — Check the export
 - Open the downloaded ZIP file
-- Inside you should find: GPX files, CSV files, KML, HTML roadbook, and a master JSON
+- Inside you should find: GPX files, CSV files, KML, HTML roadbook, a master JSON, and a **map PDF**
 - Open the **HTML roadbook** in a browser
-- **Expected**: A formatted roadbook with waypoint rows, distances, and turn diagrams
+- Open the **map PDF** — it should show your route, waypoint markers, distance, and waypoint count on an A4 landscape page
+- **Expected**: A formatted roadbook with waypoint rows, distances, and turn diagrams; a printable map PDF matching what you saw on screen
 
 ### Step 8 — Revisit a saved stage
 - Close and reopen the app
@@ -194,7 +204,7 @@ If you have any concerns about your data, please reach out.
 - **Charge your device** before recording — GPS usage drains battery quickly
 - **Use a phone mount** if recording while driving — essential for Hands-Free mode
 - **Hands-Free driving tip**: Speak clearly and leave a brief pause after "Mapper" before your command. The dash separator ("dash" or a natural pause) separates the icon type from your note text.
-- **Tune the snap windows**: The ⚙️ settings cog has two independent sliders. **Snap window (edit after tap)** controls how long you have after tapping Add Waypoint (2s–10s). **Voice snap window** controls how long after "Mapper" before it auto-commits (3s–10s). On open terrain 3–4s for voice is plenty; in tricky navigation or when switching icon categories, 7–8s gives you room to think.
+- **Tune the snap windows**: The ⚙️ settings cog has three sliders. **Voice snap window** controls how long after "Mapper" before HF auto-commits (3s–10s). **Snap window (edit after tap)** controls the manual tap edit window (2s–10s) — note this one affects the tap flow, not Hands-Free. On open terrain 3–4s for voice is plenty; in tricky navigation 7–8s gives you room to think.
 - **Bluetooth headset**: If you're surveying in a noisy vehicle or windy conditions, a Bluetooth headset with mic dramatically improves voice recognition accuracy
 - **Don't worry about breaking things** — that's the whole point of a beta!
 
