@@ -15,6 +15,8 @@
 // ── Category keywords ────────────────────────────────────────────────
 // Maps spoken words to the waypoint `type` value.
 const TYPE_KEYWORDS = {
+  // "cancel" must come first so it short-circuits before any other match.
+  cancel: ["cancel", "discard", "abort"],
   note: ["note"],
   hazard: ["hazard", "danger"],
   nav: ["nav", "navigation", "turn"],
@@ -119,6 +121,13 @@ const DEFAULT_ICON = {
 export function parseVoiceCommand(raw) {
   if (!raw || typeof raw !== "string") {
     return { type: "note", iconId: null, poi: "" };
+  }
+
+  // Fast-path: cancel / discard / abort — return immediately so the caller
+  // can discard a pending snap without adding a waypoint.
+  const trimmed = raw.toLowerCase().trim();
+  if (["cancel", "discard", "abort"].some((w) => trimmed.startsWith(w))) {
+    return { type: "cancel", iconId: null, poi: "" };
   }
 
   // Normalise: lowercase, collapse whitespace, strip leading/trailing junk
