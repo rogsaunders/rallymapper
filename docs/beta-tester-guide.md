@@ -47,6 +47,8 @@ RouteMapper is a Progressive Web App (PWA). For the best experience, install it 
 
 ## What's New — April 2026
 
+### Snap-first waypoint capture (tap)
+
 We've flipped the waypoint capture flow so your GPS coordinate is locked the moment you tap — no more position drift while you choose an icon. At 100 kph, the old 2–5 second delay between tap and commit could mean 50–140 m of error; now the fix is instant.
 
 **The new flow:**
@@ -59,10 +61,26 @@ On the map, the pending waypoint appears as a dashed amber circle. When it commi
 
 A few extras:
 
-- **Adjustable edit window** — the Hands-Free settings cog now has a second slider for the snap window (2s fast → 10s relaxed).
+- **Adjustable edit window** — open the Hands-Free settings cog to find the **Snap window (edit after tap)** slider (2s fast → 10s relaxed).
 - **Voice while pending** — Hands-Free or Dictate commands during the edit window refine the pending waypoint instead of creating a new one.
 - **Second tap while pending** — auto-commits the first waypoint and snaps a new one instantly.
 - **Button moved** — the Add Waypoint button now sits at the top of the Input Controls panel to match the tap-first workflow.
+
+### Hands-free snap-on-wake-word
+
+The Hands-Free mode now also snaps GPS at the instant "Mapper" is recognised — **before you say anything else**. At speed, this means the recorded position is where you were when you called it, not where you ended up while speaking the command.
+
+**The new flow:**
+
+1. Say **"Mapper"** — the panel turns **amber** ("📍 GPS locked") and a beep confirms. GPS is locked right now.
+2. Speak your command: *type + icon + dash + note* (e.g. "hazard danger two — rocks on track").
+3. After the silence timeout, the waypoint commits to the locked GPS position.
+4. If you say nothing, the waypoint **auto-commits** after the voice snap window using the last-used icon — no action needed.
+5. Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint and return to standby.
+
+Two separate sliders in the ⚙️ gear panel:
+- **Snap window (edit after tap)** — edit time after tapping Add Waypoint (2s–10s)
+- **Voice snap window** — how long after "Mapper" you have to speak a command before it auto-commits (3s–10s)
 
 ---
 
@@ -100,14 +118,15 @@ Try all four methods:
 4. **Hands-Free voice mode** *(for solo drivers)*:
    - Tap **Activate** in the Hands-Free panel
    - The panel shows a blue dot and **Say "Mapper"** — the app is listening for the wake word
-   - Say **"Mapper"** — you'll hear a start tone and the panel turns red (**Listening...**)
+   - Say **"Mapper"** — you'll hear a beep and the panel turns **amber** ("📍 GPS locked — say type or wait Ns"). **GPS is locked at this instant.**
    - Speak your command using the format: *type + icon + dash + note*
      - Examples: "hazard danger two — deep ruts ahead", "left — onto gravel road", "terrain washout", "bump", "note — fuel stop in 5 km"
-   - After a short silence (default 2.5s), the waypoint is automatically created and a green confirmation toast appears
-   - If a pending waypoint already exists, the voice command refines it rather than creating a new one — use this to correct or annotate a tap-captured waypoint hands-free
+   - After a short silence (default 2.5s), the waypoint commits to the **locked GPS position** and a confirmation toast appears
+   - If you say nothing within the voice snap window (default 5s), the waypoint **auto-commits** using the last-used icon — no speaking required
+   - Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint and return to standby
    - The app returns to standby, ready for the next "Mapper" command
    - Tap **Stop** to deactivate
-   - Use the settings cog to adjust the **silence timeout** (1.5s–5s) *and* the **snap edit window** (2s–10s)
+   - Use the ⚙️ settings cog to adjust the **silence timeout** (1.5s–5s) and the **Voice snap window** (3s–10s)
 
 - **Expected**: While pending, a dashed amber circle appears on the map at the captured GPS position. Once committed, it switches to the solid icon marker and appears in the Waypoints panel with its type, icon, time, and distance from the previous waypoint.
 
@@ -175,7 +194,7 @@ If you have any concerns about your data, please reach out.
 - **Charge your device** before recording — GPS usage drains battery quickly
 - **Use a phone mount** if recording while driving — essential for Hands-Free mode
 - **Hands-Free driving tip**: Speak clearly and leave a brief pause after "Mapper" before your command. The dash separator ("dash" or a natural pause) separates the icon type from your note text.
-- **Tune the snap edit window**: If 5s feels too fast (or too slow), the Hands-Free settings cog has a slider (2s–10s). On open terrain 3–4s is plenty; in tricky navigation or when switching icon categories, 7–8s gives you room to think.
+- **Tune the snap windows**: The ⚙️ settings cog has two independent sliders. **Snap window (edit after tap)** controls how long you have after tapping Add Waypoint (2s–10s). **Voice snap window** controls how long after "Mapper" before it auto-commits (3s–10s). On open terrain 3–4s for voice is plenty; in tricky navigation or when switching icon categories, 7–8s gives you room to think.
 - **Bluetooth headset**: If you're surveying in a noisy vehicle or windy conditions, a Bluetooth headset with mic dramatically improves voice recognition accuracy
 - **Don't worry about breaking things** — that's the whole point of a beta!
 
