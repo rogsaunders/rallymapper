@@ -14,6 +14,7 @@ import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
 import { createWakeWordListener } from "./voice/wakeWordListener";
+import StageHistoryPanel from "./components/StageHistoryPanel";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
 import startSoundUrl from "./assets/sounds/start.wav";
 import stopSoundUrl from "./assets/sounds/stop.wav";
@@ -389,6 +390,8 @@ export default function RouteMapperLayout() {
   const [startGPS, setStartGPS] = useState(null);
   const [waypoints, setWaypoints] = useState([]);
   const [_stageArchive, setStageArchive] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [reviewStage, setReviewStage] = useState(null); // full stage object when reviewing history
   const [waypointType, setWaypointType] = useState("note");
   const [poi, setPoi] = useState("");
   const [followMap, setFollowMap] = useState(true);
@@ -1272,6 +1275,10 @@ export default function RouteMapperLayout() {
         startedAt: stageStartedAt,
         endedAt,
         local_id: localId,
+        // Summary fields stored in meta so history list can display them
+        // without loading the full payload.
+        waypointCount: waypoints.length,
+        totalDistanceM: trackPoints.at?.(-1)?.distanceFromStartM ?? 0,
       },
       startGPS,
       trackPoints: Array.isArray(trackPoints) ? trackPoints : [],
@@ -1484,6 +1491,45 @@ export default function RouteMapperLayout() {
     trackLastRef.current = null;
     setShowRoadbookPreview(false);
   };
+
+  // ── Stage History ────────────────────────────────────────────────────────────
+
+  // Open a historical stage in read-only review mode.
+  const handleOpenHistoryStage = (stage) => {
+    setReviewStage(stage);
+    setHistoryOpen(false);
+  };
+
+  // Exit review mode — returns to the normal (post-save or idle) screen.
+  const handleCloseReview = () => {
+    setReviewStage(null);
+  };
+
+  // Re-export the currently reviewed stage as a ZIP.
+  const handleReExportStage = async () => {
+    if (!reviewStage) return;
+    try {
+      const blob = await buildRoutePackage(reviewStage, {
+        includeHema: true,
+        includeGarmin: true,
+        includeRallyNav: true,
+        includeGoogleEarth: true,
+        includeGaia: true,
+        includePdf: false,
+      });
+      const m = reviewStage.meta || {};
+      const base = `${safeSlug(m.tripName)}_day${m.dayNumber}_route${m.routeNumber}_stage${m.stageNumber}`;
+      downloadBlob(`${base}.zip`, blob);
+    } catch (err) {
+      console.error("Re-export failed", err);
+      alert("Re-export failed — see console for details.");
+    }
+  };
+
+  // Data to display on the map: historical stage overrides live session.
+  const displayWaypoints = reviewStage ? (reviewStage.waypoints || []) : waypoints;
+  const displayTrackPoints = reviewStage ? (reviewStage.trackPoints || []) : trackPoints;
+  const displayStartGPS = reviewStage ? reviewStage.startGPS : startGPS;
 
   const handleSetStart = () => {
     if (
@@ -2021,7 +2067,70 @@ export default function RouteMapperLayout() {
                   Start New Stage
                 </button>
               )}
+              {/* History button — always visible when not recording */}
+              {!stageActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoryOpen((v) => !v);
+                    setReviewStage(null);
+                  }}
+                  className="ml-auto px-3 py-2 rounded-xl border border-gray-300 text-gray-500 bg-white hover:bg-gray-50 shrink-0 flex items-center gap-1.5 text-sm"
+                  title="Browse and re-open saved stages"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                  </svg>
+                  History
+                </button>
+              )}
             </div>
+
+            {/* ── Stage History panel ───────────────────────────────── */}
+            {historyOpen && !stageActive && (
+              <div className="mt-3">
+                <StageHistoryPanel
+                  userId={user?.id ?? null}
+                  owner={localOwner}
+                  onOpenStage={handleOpenHistoryStage}
+                  onClose={() => setHistoryOpen(false)}
+                />
+              </div>
+            )}
+
+            {/* ── Review mode banner ────────────────────────────────── */}
+            {reviewStage && (
+              <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+                    Reviewing saved stage
+                  </p>
+                  <p className="text-sm text-amber-900 font-medium truncate mt-0.5">
+                    {reviewStage.meta?.stageName || reviewStage.meta?.tripName || "Unnamed stage"}
+                    {reviewStage.meta?.endedAt && (
+                      <span className="font-normal text-amber-700 ml-2">
+                        {new Date(reviewStage.meta.endedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleReExportStage}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-400 text-amber-800 bg-white hover:bg-amber-100 transition-colors"
+                >
+                  ↓ Re-export ZIP
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseReview}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 text-gray-600 bg-white hover:bg-gray-100 transition-colors"
+                >
+                  Close Review
+                </button>
+              </div>
+            )}
 
             {/* Roadbook toggle */}
           </div>
@@ -2041,10 +2150,10 @@ export default function RouteMapperLayout() {
             </div>
             <MapView
               currentGPS={currentGPS}
-              startGPS={startGPS}
-              waypoints={waypoints}
+              startGPS={displayStartGPS}
+              waypoints={displayWaypoints}
               pendingWaypoint={pendingWaypoint}
-              trackPoints={trackPoints} // ✅ add
+              trackPoints={displayTrackPoints}
               followMap={followMap}
               mapMode={mapMode}
               mapSource={mapSource}
@@ -2061,11 +2170,11 @@ export default function RouteMapperLayout() {
               }
             >
               <MapView
-                currentGPS={currentGPS}
-                startGPS={startGPS}
-                waypoints={waypoints}
-                pendingWaypoint={pendingWaypoint}
-                trackPoints={trackPoints}
+                currentGPS={reviewStage ? null : currentGPS}
+                startGPS={displayStartGPS}
+                waypoints={displayWaypoints}
+                pendingWaypoint={reviewStage ? null : pendingWaypoint}
+                trackPoints={displayTrackPoints}
                 followMap={followMap}
                 mapMode={mapMode}
                 mapSource={mapSource}
