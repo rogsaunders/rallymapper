@@ -83,6 +83,19 @@ Three sliders in the ⚙️ gear panel (all in one place for convenience):
 - **Voice snap window** — how long after "Mapper" you have to speak before it auto-commits (3s–10s)
 - **Snap window (edit after tap)** — edit time after tapping Add Waypoint before auto-commit (2s–10s) *(controls the manual tap flow, not Hands-Free)*
 
+### Stage History
+
+Every completed stage is saved and accessible at any time via the **History** button in the stage control row — even after you've started a new stage or closed and reopened the app.
+
+Tap **History** → a panel lists your last 20 stages, newest first, with date, stage name, distance, and waypoint count. Tap **Open** on any row to load it in review mode:
+
+- The map switches to show that stage's route and waypoints
+- An amber banner shows the stage name and date
+- Tap **↓ Re-export ZIP** to download the full export package again
+- Tap **Close Review** to return to the normal screen
+
+The History button is hidden while a stage is actively recording — it reappears as soon as you end the stage.
+
 ### Map PDF export
 
 When a stage ends, a **printable PDF of the map** is automatically included in the ZIP export — no extra steps needed. The PDF shows your route, waypoint markers, stage title, date, total distance, and waypoint count, laid out for A4 landscape printing.
@@ -150,10 +163,15 @@ Try all four methods:
 - Open the **map PDF** — it should show your route, waypoint markers, distance, and waypoint count on an A4 landscape page
 - **Expected**: A formatted roadbook with waypoint rows, distances, and turn diagrams; a printable map PDF matching what you saw on screen
 
-### Step 8 — Revisit a saved stage
-- Close and reopen the app
-- Your saved stage should still be available
-- **Expected**: Your route data persists between sessions
+### Step 8 — Stage History
+- Tap the green **History** button in the stage control row
+- **Expected**: A panel lists your completed stages with date, name, distance, and waypoint count
+- Tap **Open** on the stage you just recorded
+- **Expected**: An amber review banner appears; the map shows the historical route and waypoints (not live GPS)
+- Tap **↓ Re-export ZIP** — a new ZIP should download
+- Tap **Close Review** — the banner disappears and the map returns to normal
+- Close and reopen the app, then tap History again
+- **Expected**: The stage is still listed — history persists across sessions
 
 ---
 
@@ -206,6 +224,7 @@ If you have any concerns about your data, please reach out.
 - **Hands-Free driving tip**: Speak clearly and leave a brief pause after "Mapper" before your command. The dash separator ("dash" or a natural pause) separates the icon type from your note text.
 - **Tune the snap windows**: The ⚙️ settings cog has three sliders. **Voice snap window** controls how long after "Mapper" before HF auto-commits (3s–10s). **Snap window (edit after tap)** controls the manual tap edit window (2s–10s) — note this one affects the tap flow, not Hands-Free. On open terrain 3–4s for voice is plenty; in tricky navigation 7–8s gives you room to think.
 - **Bluetooth headset**: If you're surveying in a noisy vehicle or windy conditions, a Bluetooth headset with mic dramatically improves voice recognition accuracy
+- **Stage History is read-only** — opening a past stage won't affect your current session or overwrite any data. Use it freely to review routes between stages.
 - **Don't worry about breaking things** — that's the whole point of a beta!
 
 ---
