@@ -1,6 +1,6 @@
 # Route Mapper - Complete Rally Stage Workflow
 
-**Version 6 | April 2025**
+**Version 7 | April 2026**
 
 Route Mapper is designed for anyone logging routes during competitive rallies, fun runs, fundraising events, outback tours, or family adventures. Mount your iPad, press Start, and the app captures every turn, hazard, and landmark — then produces a professional roadbook at the end.
 
@@ -59,17 +59,21 @@ That's **41 icons** across 5 categories — covering everything from standard na
 
 ---
 
-### Method 1: Icon Selector + Notes (Recommended for Speed)
+### Method 1: Snap-First Tap (Recommended for Speed)
 
-1. Select the waypoint **type** using the category buttons (Note / Hazard / Nav / Control / Terrain)
-2. Select the specific **icon variant** from the buttons that appear for that type
-3. Optionally enter a note in the **POI text field** (e.g., "sharp", "50m after red house")
-   - Type the note directly, OR
-   - Press the **Dictate** button to speak it (see Method 3 below)
-4. Press **Add Waypoint (Current GPS)**
-5. The waypoint is created with your current GPS position, the selected icon, and any notes
+Route Mapper uses a **snap-first** flow — GPS is locked the instant you tap, eliminating position drift while you choose an icon. At 100 kph, a 2–5 second delay between tap and commit can mean 50–140 m of error; now the fix is instant.
 
-Your icon selection is remembered between waypoints — if you select "Nav > Left", the next waypoint defaults to that type and icon until you change it. This speeds up repetitive entries like a series of turns.
+1. Press **Add Waypoint (Current GPS)** — GPS is captured *instantly* and a pending amber card appears with a countdown
+2. Within the edit window (default **5 seconds**), select the waypoint **type** and **icon variant** and/or enter a POI note
+3. The waypoint auto-commits when the countdown ends — or tap **✓ Done** to commit early, or **Discard** to cancel
+
+The pending waypoint appears as a dashed amber circle on the map. When it commits it switches to the solid icon marker.
+
+**Tips:**
+- Your last-used type and icon are pre-selected when the card appears — for a stream of same-type waypoints just tap and let it commit
+- A second tap while the card is pending auto-commits the first waypoint and snaps a new one instantly
+- Adjust the edit window (2s–10s) via the **Snap window (edit after tap)** slider in the Hands-Free ⚙️ settings
+- Dictate a note while the card is pending — the voice text fills the POI field before auto-commit
 
 ### Method 2: Hands-Free Voice Commands
 
@@ -174,7 +178,8 @@ Each waypoint displays:
    - Builds a comprehensive **ZIP export package** (see Export Formats below)
    - Downloads the ZIP to your device
    - Syncs to the cloud if signed in and online (queues for later if offline)
-3. The stage is archived, waypoints and track are cleared, and the stage number increments — ready for the next stage
+3. The stage is saved to **Stage History** and synced to the cloud (if online). Waypoints and track remain on screen until you tap **Start New Stage**
+4. Tap **Start New Stage** to clear the map and increment the stage counter — ready for the next stage
 
 There is no confirmation dialog — ending a stage immediately processes and exports.
 
@@ -191,6 +196,7 @@ When a stage ends, Route Mapper produces a ZIP file containing a comprehensive s
 | **Track GPX** | Raw GPS track points from the entire stage |
 | **Waypoints GPX** | All manually added waypoints plus the start point |
 | **Combined GPX** | Track and waypoints together in a single file |
+| **Map PDF** | Printable A4 landscape map showing the route, waypoint markers, distance, and waypoint count |
 
 ### Roadbook Files
 | File | Description |
@@ -217,6 +223,32 @@ GPX exports include OpenRally extensions:
 - Bearing/heading (0–360 degrees)
 - Tulip diagrams (Base64-encoded PNG)
 - Metric units throughout
+
+---
+
+## Stage History
+
+Every completed stage is automatically saved and accessible at any time via the **History** button in the stage control row.
+
+### Accessing History
+
+1. Tap the green **History** button (visible whenever a stage is not actively recording)
+2. A panel lists your last 20 stages, newest first — showing date, stage name, distance, and waypoint count
+3. Tap **Open** on any row to load that stage in review mode
+
+### Review Mode
+
+When a historical stage is open:
+- The map switches to display that stage's route and waypoints (live GPS is not shown)
+- An amber banner shows the stage name and date
+- Tap **↓ Re-export ZIP** to download the full export package for that stage again
+- Tap **Close Review** to return to the normal screen
+
+Review mode is **read-only** — opening a past stage does not affect the current session or any saved data.
+
+### Map PDF (mid-stage)
+
+You can also export a printable map at any point during an active stage — tap **Export Map PDF** in the map controls. Useful for sharing a route overview before the stage ends.
 
 ---
 
@@ -287,8 +319,9 @@ Day, Route, and Stage controls are disabled while a stage is active. Between sta
 
 ## Quick Corrections
 
-- **Wrong icon selected:** Change the type/icon buttons before pressing Add Waypoint
-- **Wrong waypoint added:** Currently requires noting the error and correcting in post-stage review of the exported data
+- **Wrong icon selected:** Change the type/icon buttons while the pending amber card is still counting down — the selection updates the pending waypoint before it commits
+- **Mis-tap / wrong position:** Tap **Discard** on the pending card before the countdown expires to cancel the waypoint entirely
+- **Wrong waypoint already committed:** Note the error during the stage — correct it during post-stage review of the exported data
 
 ---
 
