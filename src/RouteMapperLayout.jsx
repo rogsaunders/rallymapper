@@ -2075,7 +2075,7 @@ export default function RouteMapperLayout() {
                     setHistoryOpen((v) => !v);
                     setReviewStage(null);
                   }}
-                  className="ml-auto px-3 py-2 rounded-xl border border-gray-300 text-gray-500 bg-white hover:bg-gray-50 shrink-0 flex items-center gap-1.5 text-sm"
+                  className="ml-auto px-3 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white hover:bg-[#588233] hover:text-white shrink-0 flex items-center gap-1.5 text-sm transition-colors"
                   title="Browse and re-open saved stages"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
