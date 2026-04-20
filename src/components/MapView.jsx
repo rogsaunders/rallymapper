@@ -74,9 +74,27 @@ function Recenter({ center, zoom, enabled }) {
   return null;
 }
 
-function fmtKm(meters) {
-  const km = meters / 1000;
-  return km >= 10 ? `${km.toFixed(1)} km` : `${km.toFixed(2)} km`;
+/**
+ * Creates a divIcon for a waypoint marker with an optional numbered badge.
+ * The badge appears at the bottom-right corner of the icon so users can
+ * cross-reference with the roadbook's WP 1, WP 2, ... sequence.
+ */
+function makeWaypointDivIcon(svg, number, size = 28) {
+  const safeSvg =
+    typeof svg === "string" && svg.trim()
+      ? svg
+      : `<svg viewBox="0 0 24 24"><text x="10" y="18">•</text></svg>`;
+  const badgeHtml =
+    number != null
+      ? `<span class="wp-number-badge">${number}</span>`
+      : "";
+  return L.divIcon({
+    className: "rm-leaflet-svg-icon",
+    html: `<div class="rm-leaflet-svg-wrap">${safeSvg}${badgeHtml}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
 }
 
 export default function MapView({
@@ -214,40 +232,17 @@ export default function MapView({
     return pts;
   }, [startGPS, trackPoints, waypoints]);
 
-  const segmentLabels = useMemo(() => {
-    // Use only START + WAYPOINTS for labels (not track points)
-    const pts = [];
-
-    const add = (lat, lon) => {
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      pts.push([lat, lon]);
-    };
-
-    if (startGPS) add(Number(startGPS.lat), Number(startGPS.lon));
-
-    (waypoints || [])
-      .filter((wp) => wp && wp.kind !== "start" && wp.poi !== "START")
-      .forEach((wp) => add(Number(wp.lat), Number(wp.lon)));
-
-    if (pts.length < 2) return [];
-
-    const labels = [];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i];
-      const b = pts[i + 1];
-      const meters = L.latLng(a[0], a[1]).distanceTo(L.latLng(b[0], b[1]));
-      if (meters < 25) continue;
-
-      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      labels.push({
-        key: `wpseg-${i}`,
-        position: mid,
-        text: fmtKm(meters),
-      });
+  // Map each non-start waypoint object → its 1-based display number (WP 1, WP 2, …)
+  const waypointNumberMap = useMemo(() => {
+    const m = new Map();
+    let n = 0;
+    for (const wp of waypoints || []) {
+      if (wp.kind !== "start" && wp.poi !== "START") {
+        m.set(wp, ++n);
+      }
     }
-
-    return labels;
-  }, [startGPS, waypoints]);
+    return m;
+  }, [waypoints]);
 
   return (
     <div
@@ -285,20 +280,6 @@ export default function MapView({
             pathOptions={{ color: "red", weight: 5, opacity: 0.9 }}
           />
         )}
-
-        {segmentLabels.map((s) => (
-          <Marker
-            key={s.key}
-            position={s.position}
-            interactive={false}
-            icon={L.divIcon({
-              className: "segment-label",
-              html: `<div>${s.text}</div>`,
-              iconSize: [80, 24], // optional
-              iconAnchor: [40, 12], // optional (center the label)
-            })}
-          />
-        ))}
 
         {/* Live GPS */}
         {currentGPS && (
@@ -379,14 +360,19 @@ export default function MapView({
 
           // console.log("NAV svgFallback starts:", svgFallback?.slice?.(0, 120));
 
-          const cacheKey = isStart ? "start" : `${type}:${iconId || "default"}`;
-          const icon = getLeafletIcon(cacheKey, svgFallback);
+          const wpNumber = isStart ? null : waypointNumberMap.get(wp);
+          // Start uses the cached blue-circle icon; all others get an inline
+          // icon with a numbered badge (bypasses the icon cache so each
+          // waypoint can have its own unique number).
+          const icon = isStart
+            ? getLeafletIcon("start", svgFallback)
+            : makeWaypointDivIcon(svgFallback, wpNumber);
 
           if (!icon) {
             console.warn("Missing icon for waypoint", {
               type,
               iconId,
-              cacheKey,
+              wpNumber,
               svgFallbackLen: svgFallback?.length,
               svgFallbackSample: svgFallback?.slice?.(0, 50),
             });

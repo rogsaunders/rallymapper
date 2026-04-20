@@ -119,6 +119,22 @@ export async function buildMapPdfBlob(map, meta = {}) {
   // tiles after the fitBounds re-zoom, reducing blank tile grid lines.
   await new Promise((r) => setTimeout(r, 2000));
 
+  // Force Leaflet's canvas renderer (used for the route Polyline) to repaint.
+  // After fitBounds, the canvas schedules a redraw on the next animation frame;
+  // if we call takeScreen() before that frame fires the polyline is missing.
+  // Calling _update() + waiting two rAFs guarantees the canvas is flushed
+  // before dom-to-image calls canvas.toDataURL().
+  map.eachLayer((layer) => {
+    if (layer._renderer && typeof layer._renderer._update === "function") {
+      try {
+        layer._renderer._update();
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
   const screenshoter = new SimpleMapScreenshoter({ hidden: true }).addTo(map);
 
   let pngDataUrl;
