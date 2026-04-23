@@ -2271,7 +2271,9 @@ export default function RouteMapperLayout() {
                       : mapSource === "opentopo"
                         ? "© OpenTopoMap (CC-BY-SA)"
                         : "© OpenStreetMap contributors",
-                  fitBoundsTo: pts.length >= 2 ? pts : null,
+                  // Mid-stage manual export: no fitBoundsTo so the PDF captures
+                  // exactly what the user has zoomed/panned to on screen.
+                  fitBoundsTo: null,
                   filename: baseTitle || "routemapper-map",
                 });
               } catch (err) {

@@ -100,40 +100,34 @@ export async function buildMapPdfBlob(map, meta = {}) {
   container.style.zIndex = "10000";
   container.style.background = "#fff";
 
+  // Capture the user's current view before the resize distorts it.
+  // After invalidateSize the same centre/zoom is re-applied so the map
+  // simply shows a wider area rather than jumping to a different zoom.
+  const savedCenter = map.getCenter();
+  const savedZoom   = map.getZoom();
+
   // Tell Leaflet the container size changed
   map.invalidateSize({ animate: false, pan: false });
 
-  // If the caller supplies route points, fit the map to them at the new size.
-  // Otherwise keep the current centre/zoom — the resize alone will give a
-  // properly-shaped screenshot.
   if (Array.isArray(fitBoundsTo) && fitBoundsTo.length >= 2) {
+    // Caller supplied route points → fit the full route into the larger canvas.
+    // Used by the automatic stage-end export so the PDF always shows everything.
     try {
       map.fitBounds(fitBoundsTo, { padding: [40, 40], animate: false });
     } catch (e) {
-      console.warn("exportMapAsPdf: fitBounds failed, capturing current view", e);
+      console.warn("exportMapAsPdf: fitBounds failed, restoring saved view", e);
+      map.setView(savedCenter, savedZoom, { animate: false });
     }
+  } else {
+    // No bounds supplied → honour the view the user had before export.
+    // Used by the mid-stage "Export Map PDF" button so manual zoom is preserved.
+    map.setView(savedCenter, savedZoom, { animate: false });
   }
 
   // Let the tiles settle before capture.
   // 2 s gives mobile connections enough time to load the new viewport's
-  // tiles after the fitBounds re-zoom, reducing blank tile grid lines.
+  // tiles after any re-zoom, reducing blank tile grid-lines in the PDF.
   await new Promise((r) => setTimeout(r, 2000));
-
-  // Force Leaflet's canvas renderer (used for the route Polyline) to repaint.
-  // After fitBounds, the canvas schedules a redraw on the next animation frame;
-  // if we call takeScreen() before that frame fires the polyline is missing.
-  // Calling _update() + waiting two rAFs guarantees the canvas is flushed
-  // before dom-to-image calls canvas.toDataURL().
-  map.eachLayer((layer) => {
-    if (layer._renderer && typeof layer._renderer._update === "function") {
-      try {
-        layer._renderer._update();
-      } catch {
-        /* ignore */
-      }
-    }
-  });
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   const screenshoter = new SimpleMapScreenshoter({ hidden: true }).addTo(map);
 

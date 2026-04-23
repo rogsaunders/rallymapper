@@ -183,6 +183,12 @@ bg_blue.wp-svg-wrap {
   border: none;
 }
 
+/* Compact badge marker used for all non-start waypoints */
+.rm-waypoint-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
 .rm-leaflet-svg-wrap {
   position: relative; /* required for .wp-number-badge absolute positioning */
   width: 28px;

@@ -74,26 +74,83 @@ function Recenter({ center, zoom, enabled }) {
   return null;
 }
 
+// ── Waypoint map marker helpers ───────────────────────────────────────────────
+//
+// Map markers use a compact two-row HTML badge instead of the full SVG icons.
+// The top row shows an abbreviated type/icon label (L, R, H1, N, …) on a
+// coloured background; the bottom row shows the sequential WP number.
+// This approach:
+//   • avoids the "NOTE" text rendered by note.svg
+//   • works reliably in PDF captures (pure HTML/CSS, no canvas timing issues)
+//   • lets navigators cross-reference with the roadbook instantly
+
+const ICON_ABBR = {
+  // Nav
+  left: "L", right: "R", keep_l: "KL", keep_r: "KR",
+  straight: "S", gate: "GT", cattle_gate: "CG",
+  railroad: "RR", give_way: "GW", caution: "CA",
+  // Hazard
+  danger_1: "H1", danger_2: "H2", danger_3: "H3",
+  // Terrain
+  bump: "B", bumps: "BB", dip: "D", twisty: "TW",
+  ruts: "RT", washout: "WO", up_hill: "UP", down_hill: "DN",
+  // Control
+  start: "ST", finish: "FN", stop: "SP", checkpoint: "CP",
+  time: "TC", fuel: "F", service: "SV",
+};
+
+const TYPE_COLOR = {
+  nav:     "#1d4ed8", // blue
+  hazard:  "#dc2626", // red
+  control: "#7c3aed", // purple
+  terrain: "#b45309", // amber/brown
+  note:    "#374151", // grey
+};
+
+function getIconAbbr(type, iconId) {
+  const id = (iconId || "").toLowerCase();
+  if (id && ICON_ABBR[id]) return ICON_ABBR[id];
+  // Fall back to first letter of type
+  const t = (type || "note").toLowerCase();
+  return { nav: "N", hazard: "H", control: "C", terrain: "T", note: "N" }[t] ?? "N";
+}
+
+function getTypeColor(type) {
+  return TYPE_COLOR[(type || "note").toLowerCase()] ?? TYPE_COLOR.note;
+}
+
 /**
- * Creates a divIcon for a waypoint marker with an optional numbered badge.
- * The badge appears at the bottom-right corner of the icon so users can
- * cross-reference with the roadbook's WP 1, WP 2, ... sequence.
+ * Compact two-row map marker: coloured abbreviation label + sequential number.
+ * No SVG involved — pure HTML/CSS, safe for dom-to-image PDF capture.
  */
-function makeWaypointDivIcon(svg, number, size = 28) {
-  const safeSvg =
-    typeof svg === "string" && svg.trim()
-      ? svg
-      : `<svg viewBox="0 0 24 24"><text x="10" y="18">•</text></svg>`;
-  const badgeHtml =
-    number != null
-      ? `<span class="wp-number-badge">${number}</span>`
-      : "";
+function makeWaypointDivIcon(type, iconId, number) {
+  const abbr  = getIconAbbr(type, iconId);
+  const bg    = getTypeColor(type);
+  const numHtml = number != null
+    ? `<div style="background:#fff;border:1.5px solid #374151;border-radius:3px;
+                   font-size:9px;font-weight:700;padding:1px 4px;color:#111;
+                   font-family:sans-serif;line-height:1.2;text-align:center;
+                   box-shadow:0 1px 2px rgba(0,0,0,0.18);">${number}</div>`
+    : "";
+
+  const html = `<div style="display:flex;flex-direction:column;align-items:center;
+                             gap:2px;pointer-events:none;">
+    <div style="background:${bg};color:#fff;border-radius:4px;padding:2px 5px;
+                font-size:10px;font-weight:800;font-family:sans-serif;line-height:1.3;
+                white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.35);
+                border:1.5px solid rgba(255,255,255,0.35);">${abbr}</div>
+    ${numHtml}
+  </div>`;
+
+  const w = Math.max(24, abbr.length * 7 + 12);
+  const h = number != null ? 34 : 20;
+
   return L.divIcon({
-    className: "rm-leaflet-svg-icon",
-    html: `<div class="rm-leaflet-svg-wrap">${safeSvg}${badgeHtml}</div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    popupAnchor: [0, -size / 2],
+    className: "rm-waypoint-icon",
+    html,
+    iconSize:    [w, h],
+    iconAnchor:  [w / 2, h / 2],
+    popupAnchor: [0, -(h / 2)],
   });
 }
 
@@ -258,7 +315,6 @@ export default function MapView({
         center={[defaultCenter.lat, defaultCenter.lon]}
         zoom={14}
         style={{ height: "100%", width: "100%" }}
-        preferCanvas={true}
       >
         <FixResize showMap={showMap} />
         <FixResize resizeKey={resizeKey} />
@@ -305,78 +361,21 @@ export default function MapView({
           </Marker>
         )}
 
-        {/* Waypoints */}
+        {/* Waypoints — compact badge markers (abbreviated type + WP number) */}
         {(waypoints || []).map((wp, idx) => {
           const lat = Number(wp?.lat);
           const lon = Number(wp?.lon);
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
-          const type = String(wp.type || "").toLowerCase();
-          const iconId = String(wp.iconId || "").toLowerCase();
-          const rawIconId = wp.iconId; // ✅ add this (or just use wp.iconId directly)
+          const type    = String(wp.type   || "note").toLowerCase();
+          const iconId  = String(wp.iconId || "").toLowerCase();
           const isStart = wp.kind === "start" || wp.poi === "START";
-
-          let svgFallback = ICONS.note?.svg;
-
-          if (isStart) {
-            svgFallback = START_SVG;
-          } else if (type === "hazard") {
-            const hazardKey = iconId || "danger_1";
-            svgFallback =
-              ICONS.hazard?.variants?.[hazardKey]?.svg ||
-              ICONS.hazard?.svg ||
-              ICONS.note?.svg;
-          } else if (type === "nav") {
-            const navKey = iconId || "straight";
-            const DEBUG = false;
-            if (DEBUG && type === "nav")
-              console.log("NAV waypoint debug:", {
-                type,
-                iconId,
-                hasVariant: !!ICONS.nav?.variants?.[iconId],
-              });
-            svgFallback =
-              ICONS.nav?.variants?.[navKey]?.svg ||
-              ICONS.nav?.svg ||
-              ICONS.note?.svg;
-          } else if (type === "control") {
-            const controlKey = iconId || "start";
-            svgFallback =
-              ICONS.control?.variants?.[controlKey]?.svg ||
-              ICONS.control?.svg ||
-              ICONS.note?.svg;
-          } else if (type === "terrain") {
-            const terrainKey = iconId || "bump";
-            svgFallback =
-              ICONS.terrain?.variants?.[terrainKey]?.svg ||
-              ICONS.terrain?.svg ||
-              ICONS.note?.svg;
-          } else if (ICONS[type]?.svg) {
-            svgFallback = ICONS[type].svg;
-          }
-          if (type === "nav") {
-            console.log("NAV waypoint iconId =", wp.iconId);
-          }
-
-          // console.log("NAV svgFallback starts:", svgFallback?.slice?.(0, 120));
-
           const wpNumber = isStart ? null : waypointNumberMap.get(wp);
-          // Start uses the cached blue-circle icon; all others get an inline
-          // icon with a numbered badge (bypasses the icon cache so each
-          // waypoint can have its own unique number).
-          const icon = isStart
-            ? getLeafletIcon("start", svgFallback)
-            : makeWaypointDivIcon(svgFallback, wpNumber);
 
-          if (!icon) {
-            console.warn("Missing icon for waypoint", {
-              type,
-              iconId,
-              wpNumber,
-              svgFallbackLen: svgFallback?.length,
-              svgFallbackSample: svgFallback?.slice?.(0, 50),
-            });
-          }
+          // Start uses the blue-circle SVG icon; all others use the compact badge.
+          const icon = isStart
+            ? getLeafletIcon("start")
+            : makeWaypointDivIcon(type, iconId, wpNumber);
 
           return (
             <Marker
@@ -385,17 +384,13 @@ export default function MapView({
               icon={icon}
             >
               <Popup>
-                {isStart ? "START" : wp.poi || `Waypoint ${idx + 1}`}
+                {isStart ? "START" : wp.poi || `WP ${wpNumber}`}
                 <br />
                 <small>{wp.timestamp}</small>
-                {wp.type && (
+                {!isStart && (
                   <div style={{ fontSize: 12, opacity: 0.8 }}>
-                    Type: {String(wp.type).toUpperCase()}
-                  </div>
-                )}
-                {(type === "hazard" || type === "nav") && rawIconId && (
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>
-                    IconId: {String(rawIconId)}
+                    {String(type).toUpperCase()}
+                    {wp.iconId ? ` · ${wp.iconId}` : ""}
                   </div>
                 )}
               </Popup>
