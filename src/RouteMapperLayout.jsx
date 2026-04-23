@@ -1372,6 +1372,7 @@ export default function RouteMapperLayout() {
                     ? "© OpenTopoMap (CC-BY-SA)"
                     : "© OpenStreetMap contributors",
               fitBoundsTo: pts.length >= 2 ? pts : null,
+              routePositions: pts.length >= 2 ? pts : null,
               filename: baseTitle || "routemapper-map",
             });
             mapPdfBlob = result?.blob ?? null;
@@ -2274,6 +2275,9 @@ export default function RouteMapperLayout() {
                   // Mid-stage manual export: no fitBoundsTo so the PDF captures
                   // exactly what the user has zoomed/panned to on screen.
                   fitBoundsTo: null,
+                  // routePositions is supplied separately so the canvas overlay
+                  // can draw the route even though fitBounds is skipped.
+                  routePositions: pts.length >= 2 ? pts : null,
                   filename: baseTitle || "routemapper-map",
                 });
               } catch (err) {
