@@ -195,7 +195,22 @@ export async function buildMapPdfBlob(map, meta = {}) {
   // tiles after any re-zoom, reducing blank tile grid-lines in the PDF.
   await new Promise((r) => setTimeout(r, 2000));
 
-  const screenshoter = new SimpleMapScreenshoter({ hidden: true }).addTo(map);
+  // Hide the Leaflet SVG overlay pane during capture.
+  // dom-to-image can pick up the pane but applies Leaflet's large
+  // translate3d() world-coordinate offsets incorrectly, causing the route
+  // polyline to appear at a wrong, view-dependent position (the "phantom
+  // line that moves on each export" bug).  Setting opacity to 0 before
+  // the screenshot ensures dom-to-image renders nothing from that pane;
+  // drawRouteOverlay then re-draws the route correctly via canvas composite.
+  // We also keep '.leaflet-control-container' hidden (the screenshoter's
+  // default) so the zoom buttons don't appear in the PDF.
+  const screenshoter = new SimpleMapScreenshoter({
+    hidden: true,
+    hideElementsWithSelectors: [
+      ".leaflet-control-container",
+      ".leaflet-overlay-pane",
+    ],
+  }).addTo(map);
 
   let pngDataUrl;
   try {
