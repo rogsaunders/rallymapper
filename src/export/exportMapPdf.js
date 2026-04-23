@@ -199,7 +199,30 @@ export async function buildMapPdfBlob(map, meta = {}) {
 
   let pngDataUrl;
   try {
-    pngDataUrl = await screenshoter.takeScreen("image");
+    try {
+      pngDataUrl = await screenshoter.takeScreen("image");
+    } catch (captureErr) {
+      // dom-to-image returns "data:," when the canvas is tainted by cross-origin
+      // tile requests.  This is common on iOS/Safari: tiles already in the browser
+      // cache may have been stored without the CORS response headers, so when
+      // dom-to-image fetches them via XHR the browser rejects the cached entry as
+      // a CORS violation and canvas.toDataURL() returns the empty "data:," URL,
+      // which SimpleMapScreenshoter correctly detects and rejects as
+      // "Base64 image generation error".
+      //
+      // Fix: retry with cacheBust=true so dom-to-image appends a timestamp to
+      // every tile URL, bypassing the cache and forcing fresh CORS-valid responses.
+      if (captureErr?.message?.includes("Base64 image generation error")) {
+        console.warn(
+          "exportMapAsPdf: first capture tainted by CORS — retrying with cache-bust",
+        );
+        pngDataUrl = await screenshoter.takeScreen("image", {
+          domtoimageOptions: { cacheBust: true },
+        });
+      } else {
+        throw captureErr;
+      }
+    }
 
     // Composite the route polyline while the container is STILL at 1600×1000.
     // map.latLngToContainerPoint() gives pixel coordinates matching the capture

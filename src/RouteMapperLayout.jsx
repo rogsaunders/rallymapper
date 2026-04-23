@@ -1018,7 +1018,23 @@ export default function RouteMapperLayout() {
       },
 
       onComplete: () => {
-        // Command cycle done — return to standby (re-arm wake word)
+        // Command cycle done — return to standby (re-arm wake word).
+        //
+        // IMPORTANT: clear the snap countdown here, for the same reason
+        // onError does. If iOS speech recognition ends cleanly but without
+        // producing any speech (a common failure mode on WKWebView), onCommand
+        // is never called, so the countdown was never cleared there.  Without
+        // this call the interval fires with stale `snappedDefaults` and commits
+        // a waypoint using whatever type was current at wake-word time (often
+        // "hazard" from a previous manual add), causing the "type sticking" bug.
+        //
+        // If onCommand DID fire first (speech was recognised), the countdown
+        // was already cleared there — clearInterval on a null/invalid id is a
+        // safe no-op, so calling it again here is harmless.
+        clearInterval(snapTimerRef.current);
+        snapTimerRef.current = null;
+        setSnapCountdown(0);
+
         handsFreeRef.current = null;
         if (handsFreeActiveRef.current) {
           armWakeWord();
