@@ -1133,6 +1133,22 @@ export default function RouteMapperLayout() {
         if (!stageActiveRef.current) return;
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
+        // Discard fixes with very poor accuracy — these are usually network-
+        // location guesses (Wi-Fi / cell tower) that iOS returns before GPS
+        // satellites are fully acquired.  Such fixes can be hundreds of metres
+        // to kilometres off the true position and create phantom lines on the
+        // map and in the PDF that don't follow any road.
+        // 80 m covers good GPS (5–15 m), GPS in light forest (30–50 m), and
+        // even marginal satellite fixes (50–80 m) while rejecting network-only
+        // location estimates (typically >100 m, often >>200 m).
+        const TRACK_MAX_ACCURACY_M = 80;
+        if (
+          Number.isFinite(accuracy) &&
+          accuracy > TRACK_MAX_ACCURACY_M
+        ) {
+          return;
+        }
+
         const now = Date.now();
         if (now - lastTrackTimeRef.current < TRACK_INTERVAL_MS) return; // time gate
 
