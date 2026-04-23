@@ -205,8 +205,10 @@ export async function buildMapPdfBlob(map, meta = {}) {
     // map.latLngToContainerPoint() gives pixel coordinates matching the capture
     // exactly at this moment. Must happen before the finally block restores the
     // container — after that, coordinates would be for the wrong dimensions.
-    const routePts = routePositions ?? (Array.isArray(fitBoundsTo) ? fitBoundsTo : null);
-    pngDataUrl = await drawRouteOverlay(pngDataUrl, map, routePts);
+    // routePositions must contain track points only — NOT waypoints.
+    // fitBoundsTo contains everything and must NOT be used as a fallback here,
+    // or the overlay will draw spurious straight lines to each waypoint.
+    pngDataUrl = await drawRouteOverlay(pngDataUrl, map, routePositions);
 
   } finally {
     // Always restore the container + detach the screenshoter, even on failure

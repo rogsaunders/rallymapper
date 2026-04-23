@@ -1342,6 +1342,8 @@ export default function RouteMapperLayout() {
               (w) => w.kind !== "start" && w.poi !== "START",
             ).length;
 
+            // fitBoundsTo: all points (start + track + waypoints) so the map
+            // fits everything visible before capture.
             const pts = [];
             if (startGPS?.lat && startGPS?.lon) {
               pts.push([Number(startGPS.lat), Number(startGPS.lon)]);
@@ -1354,6 +1356,19 @@ export default function RouteMapperLayout() {
             stageWaypoints.forEach((p) => {
               if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
                 pts.push([Number(p.lat), Number(p.lon)]);
+              }
+            });
+
+            // routePositions: track points only (+ start).
+            // Waypoints are already shown as markers; including them in the
+            // polyline array causes spurious straight lines between them.
+            const routePts = [];
+            if (startGPS?.lat && startGPS?.lon) {
+              routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+            }
+            (stageWithRoadbook.trackPoints || []).forEach((p) => {
+              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                routePts.push([Number(p.lat), Number(p.lon)]);
               }
             });
 
@@ -1372,7 +1387,7 @@ export default function RouteMapperLayout() {
                     ? "© OpenTopoMap (CC-BY-SA)"
                     : "© OpenStreetMap contributors",
               fitBoundsTo: pts.length >= 2 ? pts : null,
-              routePositions: pts.length >= 2 ? pts : null,
+              routePositions: routePts.length >= 2 ? routePts : null,
               filename: baseTitle || "routemapper-map",
             });
             mapPdfBlob = result?.blob ?? null;
@@ -2239,8 +2254,7 @@ export default function RouteMapperLayout() {
                 const lastTrackPt = trackPoints?.[trackPoints.length - 1];
                 const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
 
-                // Build bounds from start + waypoints + track so fitBounds
-                // captures the whole route on the PDF regardless of current pan/zoom.
+                // fitBoundsTo: all points so the map fits everything visible.
                 const pts = [];
                 if (startGPS?.lat && startGPS?.lon) {
                   pts.push([Number(startGPS.lat), Number(startGPS.lon)]);
@@ -2253,6 +2267,19 @@ export default function RouteMapperLayout() {
                 (waypoints || []).forEach((p) => {
                   if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
                     pts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+
+                // routePositions: track points only (+ start) for the polyline overlay.
+                // Waypoints are already shown as markers; appending them would draw
+                // spurious straight lines from the end of the track to each waypoint.
+                const routePts = [];
+                if (startGPS?.lat && startGPS?.lon) {
+                  routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+                }
+                (trackPoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    routePts.push([Number(p.lat), Number(p.lon)]);
                   }
                 });
 
@@ -2275,9 +2302,9 @@ export default function RouteMapperLayout() {
                   // Mid-stage manual export: no fitBoundsTo so the PDF captures
                   // exactly what the user has zoomed/panned to on screen.
                   fitBoundsTo: null,
-                  // routePositions is supplied separately so the canvas overlay
-                  // can draw the route even though fitBounds is skipped.
-                  routePositions: pts.length >= 2 ? pts : null,
+                  // routePositions: track points only so the overlay draws just
+                  // the GPS track, not straight lines between waypoints.
+                  routePositions: routePts.length >= 2 ? routePts : null,
                   filename: baseTitle || "routemapper-map",
                 });
               } catch (err) {
