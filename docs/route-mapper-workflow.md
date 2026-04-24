@@ -408,4 +408,4 @@ Which input method should I use?
 
 ---
 
-*Route Mapper is optimised for real-world rally conditions where the navigator needs to capture precise route information quickly and accurately. The icon selector provides the fastest method for standard instructions, hands-free voice handles high-pace situations, and the comprehensive export package ensures your data works with whatever device or software you use next.*
+*Route Mapper is optimised for real-world rally survey conditions where the navigator needs to capture precise route information quickly and accurately. The icon selector provides the fastest method for standard instructions, hands-free voice handles high-pace situations, and the comprehensive export package ensures your data works with whatever device or software you use next.*
