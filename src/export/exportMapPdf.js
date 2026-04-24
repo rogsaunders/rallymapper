@@ -80,15 +80,28 @@ async function drawRouteOverlay(pngDataUrl, map, routePositions) {
       // Layer 1: the captured map (tiles + markers)
       ctx.drawImage(img, 0, 0);
 
-      // Layer 2: the route polyline projected via Leaflet
-      ctx.save();
-      ctx.strokeStyle = "#ef4444"; // red-500, matches live map colour
-      ctx.lineWidth   = 4;
-      ctx.lineJoin    = "round";
-      ctx.lineCap     = "round";
-      ctx.globalAlpha = 0.9;
-      ctx.beginPath();
+      // Layer 2: the route polyline projected via Leaflet.
+      //
+      // Scale factor: dom-to-image captures at CSS-pixel resolution (scale=1),
+      // but on high-DPR devices the canvas could be larger than the CSS pixel
+      // grid.  Dividing canvas dimensions by the container's CSS dimensions
+      // gives the scale that maps latLngToContainerPoint() output (CSS pixels)
+      // onto physical canvas pixels, future-proofing against any DPR change.
+      const containerEl = map.getContainer();
+      const cssW = containerEl.offsetWidth  || img.naturalWidth;
+      const cssH = containerEl.offsetHeight || img.naturalHeight;
+      const scaleX = canvas.width  / cssW;
+      const scaleY = canvas.height / cssH;
 
+      ctx.save();
+      ctx.scale(scaleX, scaleY);
+      ctx.lineJoin = "round";
+      ctx.lineCap  = "round";
+
+      // Build the path once — we'll stroke it twice for a "casing" effect.
+      // The outer white stroke acts as a halo that frames the route and keeps
+      // waypoint badge labels readable where the line passes through them.
+      ctx.beginPath();
       let started = false;
       for (const point of routePositions) {
         const lat = Array.isArray(point) ? point[0] : point.lat;
@@ -104,7 +117,24 @@ async function drawRouteOverlay(pngDataUrl, map, routePositions) {
         }
       }
 
+      if (!started) {
+        ctx.restore();
+        resolve(canvas.toDataURL("image/png"));
+        return;
+      }
+
+      // Outer casing — white, slightly wider, drawn first (behind)
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth   = 8;
+      ctx.globalAlpha = 1.0;
       ctx.stroke();
+
+      // Inner route line — red-500, drawn on top
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth   = 4;
+      ctx.globalAlpha = 0.9;
+      ctx.stroke();
+
       ctx.restore();
 
       resolve(canvas.toDataURL("image/png"));
@@ -195,21 +225,27 @@ export async function buildMapPdfBlob(map, meta = {}) {
   // tiles after any re-zoom, reducing blank tile grid-lines in the PDF.
   await new Promise((r) => setTimeout(r, 2000));
 
-  // Hide the Leaflet SVG overlay pane during capture.
-  // dom-to-image can pick up the pane but applies Leaflet's large
-  // translate3d() world-coordinate offsets incorrectly, causing the route
-  // polyline to appear at a wrong, view-dependent position (the "phantom
-  // line that moves on each export" bug).  Setting opacity to 0 before
-  // the screenshot ensures dom-to-image renders nothing from that pane;
-  // drawRouteOverlay then re-draws the route correctly via canvas composite.
-  // We also keep '.leaflet-control-container' hidden (the screenshoter's
-  // default) so the zoom buttons don't appear in the PDF.
+  // Hide the Leaflet SVG overlay pane before capture.
+  //
+  // dom-to-image applies Leaflet's large translate3d() world-coordinate
+  // offsets from the overlay pane's SVG incorrectly, so the route polyline
+  // appears at a wrong, view-dependent position (the "phantom line" bug).
+  //
+  // Using `display: none` (not just opacity:0) is essential: dom-to-image
+  // can still rasterise SVG elements that have opacity:0 inherited from a
+  // parent div in some browser/engine combinations, producing the phantom.
+  // `display: none` removes the element from the render tree entirely.
+  //
+  // drawRouteOverlay() re-draws the route correctly via canvas composite
+  // while the container is still at 1600×1000 (before finally restores it).
+  const overlayPane = map.getPane("overlayPane");
+  const savedOverlayDisplay = overlayPane ? overlayPane.style.display : null;
+  if (overlayPane) overlayPane.style.display = "none";
+
+  // Zoom controls are handled by SimpleMapScreenshoter's own hide list.
   const screenshoter = new SimpleMapScreenshoter({
     hidden: true,
-    hideElementsWithSelectors: [
-      ".leaflet-control-container",
-      ".leaflet-overlay-pane",
-    ],
+    hideElementsWithSelectors: [".leaflet-control-container"],
   }).addTo(map);
 
   let pngDataUrl;
@@ -249,7 +285,10 @@ export async function buildMapPdfBlob(map, meta = {}) {
     pngDataUrl = await drawRouteOverlay(pngDataUrl, map, routePositions);
 
   } finally {
-    // Always restore the container + detach the screenshoter, even on failure
+    // Always restore the overlay pane, container and screenshoter — even on failure.
+    if (overlayPane && savedOverlayDisplay !== null) {
+      overlayPane.style.display = savedOverlayDisplay;
+    }
     try {
       screenshoter.remove();
     } catch {

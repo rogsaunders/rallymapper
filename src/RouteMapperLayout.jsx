@@ -926,10 +926,13 @@ export default function RouteMapperLayout() {
             handsFreeRef.current?.stop();
             handsFreeRef.current = null;
 
-            // Commit with the defaults captured at snap time
+            // Commit as a plain note when the countdown expires with no voice input.
+            // Using the snapped defaults here would propagate the previous waypoint's
+            // type/icon (e.g. KL from WP3 becomes the auto-commit for WP4, WP5, …).
+            // A generic note is the safest fallback — the driver can always re-snap.
             const cmd = {
-              type: snappedDefaults.type || "note",
-              iconId: snappedDefaults.iconId || null,
+              type: "note",
+              iconId: null,
               poi: "",
             };
             playStopSound();
