@@ -924,10 +924,12 @@ export default function RouteMapperLayout() {
             handsFreeRef.current?.stop();
             handsFreeRef.current = null;
 
-            // Commit with the defaults captured at snap time
+            // Commit as a plain note when the countdown expires with no voice input.
+            // Using snappedDefaults here propagates the previous waypoint's type
+            // (e.g. KL → KL → KL…). A generic note is the safest fallback.
             const cmd = {
-              type: snappedDefaults.type || "note",
-              iconId: snappedDefaults.iconId || null,
+              type: "note",
+              iconId: null,
               poi: "",
             };
             playStopSound();
