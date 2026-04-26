@@ -6,16 +6,29 @@ import React, {
   useState,
 } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { fetchProfile } from "../lib/profile";
 
 const AuthCtx = createContext(null);
 const GUEST_KEY = "rm_guest_mode";
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [guestMode, setGuestMode] = useState(
     () => localStorage.getItem(GUEST_KEY) === "1",
   );
+
+  // Fetch profile whenever the authenticated user changes.
+  // Runs after session is set so the Supabase client has valid credentials.
+  useEffect(() => {
+    const userId = session?.user?.id ?? null;
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+    fetchProfile(userId).then(setProfile);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -48,6 +61,8 @@ export function AuthProvider({ children }) {
     return {
       session,
       user: session?.user ?? null,
+      profile,                          // full profile row incl. plan
+      plan: profile?.plan ?? "free",    // convenience shorthand
       loading,
       guestMode,
       enableGuest: () => {
@@ -61,8 +76,12 @@ export function AuthProvider({ children }) {
       signOut: async () => {
         await supabase.auth.signOut();
       },
+      // Call this after updateProfile() to keep the context in sync
+      // without a full sign-out/sign-in cycle.
+      refreshProfile: () =>
+        fetchProfile(session?.user?.id).then(setProfile),
     };
-  }, [session, loading, guestMode]);
+  }, [session, profile, loading, guestMode]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
