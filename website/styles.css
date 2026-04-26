@@ -45,7 +45,7 @@
 :root {
   --slate: #1f2937;
   --slate-2: #111827;
-  --green: #16a34a;
+  --green: #588234;
   --amber: #f59e0b;
   --text: #e5e7eb;
   --muted: #9ca3af;
@@ -381,7 +381,7 @@ h1 {
   border-color: #3a4b6b;
 }
 .v-btn:focus {
-  outline: 2px solid #16a34a;
+  outline: 2px solid #588234;
   outline-offset: 2px;
 }
 
@@ -399,7 +399,7 @@ h1 {
   top: 0;
   bottom: 0;
   width: 0%;
-  background: linear-gradient(90deg, #16a34a, #f59e0b);
+  background: linear-gradient(90deg, #588234, #f59e0b);
   border-radius: 999px;
 }
 
@@ -718,7 +718,7 @@ body.nav-open .nav-toggle .hamburger::after {
 }
 
 .btn-green:hover {
-  background: #15803d; /* slightly darker green */
+  background: #4e762d; /* slightly darker green */
   transform: translateY(-1px); /* subtle lift effect */
   box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
 }
@@ -742,7 +742,7 @@ body.nav-open .nav-toggle .hamburger::after {
 }
 
 .form-message.success {
-  color: #16a34a; /* green */
+  color: #588234; /* green */
   font-weight: 600;
 }
 
