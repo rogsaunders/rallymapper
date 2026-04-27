@@ -80,9 +80,9 @@ exports.handler = async (event) => {
         stripe_subscription_id: session.subscription,
         plan:                   planType,
         status:                 subscription.status,
-        current_period_end:     new Date(
-          subscription.current_period_end * 1000,
-        ).toISOString(),
+        current_period_end:     subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null,
       });
       if (error) console.error("subscriptions insert failed:", error.message);
 
@@ -102,9 +102,9 @@ exports.handler = async (event) => {
       .from("subscriptions")
       .update({
         status:             subscription.status,
-        current_period_end: new Date(
-          subscription.current_period_end * 1000,
-        ).toISOString(),
+        current_period_end: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null,
         updated_at: new Date().toISOString(),
       })
       .eq("stripe_subscription_id", subscription.id)
