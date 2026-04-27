@@ -9,7 +9,7 @@ import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
 import { getLimits, countLocalStages, countRemoteStages, UPGRADE_REASONS } from "./lib/planLimits";
 import { STRIPE_PRICES } from "./lib/stripePrices";
-import { redirectToCheckout } from "./lib/checkout";
+import { redirectToCheckout, redirectToPortal } from "./lib/checkout";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { buildRoutePackage } from "./export";
@@ -2051,7 +2051,7 @@ export default function RouteMapperLayout() {
             </div>
           </div>
 
-          {/* Right: cloud badge + signed-in */}
+          {/* Right: cloud badge + plan badge + account */}
           <div className="flex items-center gap-3">
             <div
               className={`text-sm px-3 py-1 rounded-full font-medium
@@ -2060,6 +2060,24 @@ export default function RouteMapperLayout() {
               <span className="mr-1">{cloud.dot}</span>
               <span className="font-medium">{cloud.label}</span>
             </div>
+
+            {/* Plan badge */}
+            {(() => {
+              const planLabels = {
+                free:         { label: "Free",       cls: "bg-gray-100 text-gray-600" },
+                event_pass:   { label: "Event Pass", cls: "bg-amber-100 text-amber-700" },
+                solo_monthly: { label: "Solo",       cls: "bg-blue-100 text-blue-700" },
+                solo_yearly:  { label: "Solo",       cls: "bg-blue-100 text-blue-700" },
+                pro_monthly:  { label: "Pro",        cls: "bg-purple-100 text-purple-700" },
+                pro_yearly:   { label: "Pro",        cls: "bg-purple-100 text-purple-700" },
+              };
+              const p = planLabels[plan] ?? planLabels.free;
+              return (
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${p.cls}`}>
+                  {p.label}
+                </span>
+              );
+            })()}
 
             <div className="text-sm text-gray-700">
               {user?.email ? (
@@ -2070,6 +2088,18 @@ export default function RouteMapperLayout() {
                 <span className="text-gray-500">Guest mode</span>
               )}
             </div>
+
+            {/* Manage Billing — shown to paid users with a Stripe customer */}
+            {user?.id && plan !== "free" && (
+              <button
+                className="text-sm underline text-gray-500 hover:text-gray-800"
+                onClick={() =>
+                  redirectToPortal(session).catch((e) => alert(e.message))
+                }
+              >
+                Manage billing
+              </button>
+            )}
 
             {user?.id && (
               <button
@@ -2289,7 +2319,7 @@ export default function RouteMapperLayout() {
             />
           </div>
         ) : (
-          <section className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+          <section className="bg-white rounded-2xl shadow-sm border overflow-hidden isolate">
             <div
               className={
                 "transition-all duration-300 overflow-hidden " +

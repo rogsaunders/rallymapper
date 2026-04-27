@@ -33,3 +33,27 @@ export async function redirectToCheckout(priceId, planType, session) {
   const { url } = await res.json();
   window.location.href = url;
 }
+
+/**
+ * Redirect the current user to the Stripe Customer Portal so they can
+ * manage their subscription (cancel, update card, view invoices).
+ *
+ * @param {object} session — Supabase session object (for the JWT)
+ */
+export async function redirectToPortal(session) {
+  const token = session?.access_token;
+  if (!token) throw new Error("You must be signed in to manage billing.");
+
+  const res = await fetch("/.netlify/functions/create-portal-session", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Could not open billing portal — please try again.");
+  }
+
+  const { url } = await res.json();
+  window.location.href = url;
+}
