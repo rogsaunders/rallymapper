@@ -74,9 +74,6 @@ exports.handler = async (event) => {
         session.subscription,
       );
 
-      console.log("stripe-webhook: subscription.status =", subscription.status);
-      console.log("stripe-webhook: current_period_end raw =", subscription.current_period_end, typeof subscription.current_period_end);
-
       const periodEndMs = Number(subscription.current_period_end) * 1000;
       const periodEndIso = isNaN(periodEndMs) ? null : new Date(periodEndMs).toISOString();
 
