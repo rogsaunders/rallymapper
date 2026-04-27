@@ -31,7 +31,13 @@ exports.handler = async (event) => {
 
   // ── Authenticate ───────────────────────────────────────────────────────────
   const token = (event.headers.authorization || "").replace("Bearer ", "");
+  console.log("create-checkout: token present?", !!token);
+  console.log("create-checkout: SUPABASE_URL set?", !!process.env.VITE_SUPABASE_URL);
+  console.log("create-checkout: SERVICE_ROLE_KEY set?", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+  console.log("create-checkout: STRIPE_KEY set?", !!process.env.STRIPE_SECRET_KEY);
+
   if (!token) {
+    console.log("create-checkout: no token — returning 401");
     return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) };
   }
 
@@ -39,6 +45,9 @@ exports.handler = async (event) => {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser(token);
+
+  console.log("create-checkout: getUser error?", authError?.message ?? "none");
+  console.log("create-checkout: user id?", user?.id ?? "null");
 
   if (authError || !user) {
     return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) };
