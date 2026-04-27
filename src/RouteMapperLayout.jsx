@@ -7,6 +7,7 @@ import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
 import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
+import { getLimits, countLocalStages, countRemoteStages, UPGRADE_REASONS } from "./lib/planLimits";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { buildRoutePackage } from "./export";
@@ -348,8 +349,9 @@ function getCloudStatus({ online, userId, pendingCount }) {
 }
 
 export default function RouteMapperLayout() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, plan, guestMode } = useAuth();
   const localOwner = user?.id ?? getGuestOwnerId();
+  const planLimits = getLimits(plan);
   const [pendingCount, setPendingCount] = useState(
     () => readPendingQueue().length,
   );
@@ -442,6 +444,7 @@ export default function RouteMapperLayout() {
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
   const [leafletMap, setLeafletMap] = useState(null);
+  const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
 
   // Trip meta
   const [tripName, setTripName] = useState("");
@@ -699,6 +702,18 @@ export default function RouteMapperLayout() {
     if (!gps) {
       console.warn("Hands-free: GPS not ready, command dropped:", cmd);
       return;
+    }
+
+    // ── Free / guest tier: max waypoints per stage ────────────────────────────
+    if (planLimits.waypoints !== Infinity) {
+      const nonStartCount = waypoints.filter(
+        (w) => w.kind !== "start" && w.poi !== "START",
+      ).length;
+      if (nonStartCount >= planLimits.waypoints) {
+        // Can't show a blocking modal while driving — log silently and return.
+        console.warn("planLimits: waypoint limit reached, voice command dropped");
+        return;
+      }
     }
 
     // Sync UI type / icon selections to match the voice command in both paths.
@@ -1202,7 +1217,19 @@ export default function RouteMapperLayout() {
     setTimeout(() => routeNameRef.current?.focus(), 0);
   };
 
-  const handleStartStage = () => {
+  const handleStartStage = async () => {
+    // ── Free / guest tier: max 1 saved stage ─────────────────────────────────
+    if (planLimits.stages !== Infinity) {
+      const localCount = countLocalStages(localOwner);
+      // Also check Supabase for authenticated free users (async, best-effort)
+      const remoteCount = user?.id ? await countRemoteStages(user.id) : 0;
+      const totalSaved = Math.max(localCount, remoteCount);
+      if (totalSaved >= planLimits.stages) {
+        setUpgradePrompt(UPGRADE_REASONS.stage_limit);
+        return;
+      }
+    }
+
     // If the previous (just-ended) stage is still on-screen — i.e. the user
     // skipped "Start New Stage" and went straight to "Start Stage" — bump
     // the stage counter so we don't overwrite the last stage's numbering.
@@ -1324,12 +1351,14 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
+        // Free / guest: core GPX files only. Paid plans get the full package.
+        const fullExport = planLimits.fullExport;
         const blob = await buildRoutePackage(stageWithRoadbook, {
-          includeHema: true,
-          includeGarmin: true,
-          includeRallyNav: true,
-          includeGoogleEarth: true,
-          includeGaia: true,
+          includeHema:        fullExport,
+          includeGarmin:      fullExport,
+          includeRallyNav:    fullExport,
+          includeGoogleEarth: fullExport,
+          includeGaia:        fullExport,
           includePdf: false,
         });
 
@@ -1611,6 +1640,17 @@ export default function RouteMapperLayout() {
     if (!currentGPS)
       return alert("GPS not ready yet — wait a moment and try again.");
 
+    // ── Free / guest tier: max waypoints per stage ────────────────────────────
+    if (planLimits.waypoints !== Infinity) {
+      const nonStartCount = waypoints.filter(
+        (w) => w.kind !== "start" && w.poi !== "START",
+      ).length;
+      if (nonStartCount >= planLimits.waypoints) {
+        setUpgradePrompt(UPGRADE_REASONS.waypoint_limit);
+        return;
+      }
+    }
+
     // Snap-first: a tap that arrives while another pending is still open
     // commits the previous pending immediately, then snaps a new one.
     if (pendingWaypointRef.current) {
@@ -1840,6 +1880,36 @@ export default function RouteMapperLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
+
+      {/* ── Upgrade prompt modal ───────────────────────────────────────────── */}
+      {upgradePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 flex flex-col gap-4">
+            <h2 className="text-lg font-bold text-gray-900">Upgrade Required</h2>
+            <p className="text-sm text-gray-600 whitespace-pre-line">{upgradePrompt}</p>
+            <div className="flex flex-col gap-2">
+              {/* Upgrade CTA — will link to Stripe checkout once billing is live */}
+              <button
+                className="btn btn-rally btn-green"
+                onClick={() => {
+                  setUpgradePrompt(null);
+                  alert("Online payments coming soon. Contact us at routemapper.net/contact to upgrade.");
+                }}
+              >
+                Upgrade Plan
+              </button>
+              <button
+                className="btn btn-rally"
+                style={{ background: "#6b7280", color: "#fff" }}
+                onClick={() => setUpgradePrompt(null)}
+              >
+                Not Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
