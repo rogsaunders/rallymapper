@@ -8,6 +8,8 @@ import IconButton from "./components/IconButton";
 import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
 import { getLimits, countLocalStages, countRemoteStages, UPGRADE_REASONS } from "./lib/planLimits";
+import { STRIPE_PRICES } from "./lib/stripePrices";
+import { redirectToCheckout } from "./lib/checkout";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { buildRoutePackage } from "./export";
@@ -349,7 +351,7 @@ function getCloudStatus({ online, userId, pendingCount }) {
 }
 
 export default function RouteMapperLayout() {
-  const { user, signOut, plan, guestMode } = useAuth();
+  const { user, session, signOut, plan, guestMode } = useAuth();
   const localOwner = user?.id ?? getGuestOwnerId();
   const planLimits = getLimits(plan);
   const [pendingCount, setPendingCount] = useState(
@@ -1887,25 +1889,104 @@ export default function RouteMapperLayout() {
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 flex flex-col gap-4">
             <h2 className="text-lg font-bold text-gray-900">Upgrade Required</h2>
             <p className="text-sm text-gray-600 whitespace-pre-line">{upgradePrompt}</p>
-            <div className="flex flex-col gap-2">
-              {/* Upgrade CTA — will link to Stripe checkout once billing is live */}
-              <button
-                className="btn btn-rally btn-green"
-                onClick={() => {
-                  setUpgradePrompt(null);
-                  alert("Online payments coming soon. Contact us at routemapper.net/contact to upgrade.");
-                }}
-              >
-                Upgrade Plan
-              </button>
-              <button
-                className="btn btn-rally"
-                style={{ background: "#6b7280", color: "#fff" }}
-                onClick={() => setUpgradePrompt(null)}
-              >
-                Not Now
-              </button>
-            </div>
+
+            {/* Guest users must sign up before paying */}
+            {guestMode ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-gray-500">
+                  Create a free account to upgrade to a paid plan.
+                </p>
+                <button
+                  className="btn btn-rally btn-green"
+                  onClick={() => { setUpgradePrompt(null); }}
+                >
+                  Sign Up
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {/* Event Pass */}
+                <button
+                  className="w-full text-left border rounded-xl p-3 hover:bg-gray-50 transition"
+                  onClick={() => {
+                    setUpgradePrompt(null);
+                    redirectToCheckout(STRIPE_PRICES.event_pass, "event_pass", session).catch(
+                      (e) => alert(e.message),
+                    );
+                  }}
+                >
+                  <div className="font-semibold text-sm">Event Pass — A$39</div>
+                  <div className="text-xs text-gray-500">1 trip · unlimited stages · 60 days · one-time</div>
+                </button>
+
+                {/* Solo */}
+                <div className="border rounded-xl p-3 flex flex-col gap-1">
+                  <div className="font-semibold text-sm">Solo</div>
+                  <div className="flex gap-2">
+                    <button
+                      className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
+                      onClick={() => {
+                        setUpgradePrompt(null);
+                        redirectToCheckout(STRIPE_PRICES.solo_monthly, "solo_monthly", session).catch(
+                          (e) => alert(e.message),
+                        );
+                      }}
+                    >
+                      A$9.99 / month
+                    </button>
+                    <button
+                      className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
+                      onClick={() => {
+                        setUpgradePrompt(null);
+                        redirectToCheckout(STRIPE_PRICES.solo_yearly, "solo_yearly", session).catch(
+                          (e) => alert(e.message),
+                        );
+                      }}
+                    >
+                      A$89 / year
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500">Unlimited · non-commercial · single user</div>
+                </div>
+
+                {/* Pro */}
+                <div className="border rounded-xl p-3 flex flex-col gap-1">
+                  <div className="font-semibold text-sm">Pro</div>
+                  <div className="flex gap-2">
+                    <button
+                      className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
+                      onClick={() => {
+                        setUpgradePrompt(null);
+                        redirectToCheckout(STRIPE_PRICES.pro_monthly, "pro_monthly", session).catch(
+                          (e) => alert(e.message),
+                        );
+                      }}
+                    >
+                      A$29.99 / month
+                    </button>
+                    <button
+                      className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
+                      onClick={() => {
+                        setUpgradePrompt(null);
+                        redirectToCheckout(STRIPE_PRICES.pro_yearly, "pro_yearly", session).catch(
+                          (e) => alert(e.message),
+                        );
+                      }}
+                    >
+                      A$249 / year
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500">Unlimited · commercial use · up to 10 users</div>
+                </div>
+              </div>
+            )}
+
+            <button
+              className="text-sm text-gray-400 hover:text-gray-600 text-center"
+              onClick={() => setUpgradePrompt(null)}
+            >
+              Not now
+            </button>
           </div>
         </div>
       )}
