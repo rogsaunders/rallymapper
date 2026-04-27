@@ -74,15 +74,19 @@ exports.handler = async (event) => {
         session.subscription,
       );
 
+      console.log("stripe-webhook: subscription.status =", subscription.status);
+      console.log("stripe-webhook: current_period_end raw =", subscription.current_period_end, typeof subscription.current_period_end);
+
+      const periodEndMs = Number(subscription.current_period_end) * 1000;
+      const periodEndIso = isNaN(periodEndMs) ? null : new Date(periodEndMs).toISOString();
+
       const { error } = await supabase.from("subscriptions").insert({
         user_id:                userId,
         stripe_customer_id:     session.customer,
         stripe_subscription_id: session.subscription,
         plan:                   planType,
         status:                 subscription.status,
-        current_period_end:     subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : null,
+        current_period_end:     periodEndIso,
       });
       if (error) console.error("subscriptions insert failed:", error.message);
 
@@ -98,13 +102,14 @@ exports.handler = async (event) => {
   if (type === "customer.subscription.updated") {
     const subscription = object;
 
+    const updatedPeriodMs = Number(subscription.current_period_end) * 1000;
+    const updatedPeriodIso = isNaN(updatedPeriodMs) ? null : new Date(updatedPeriodMs).toISOString();
+
     const { data: sub, error } = await supabase
       .from("subscriptions")
       .update({
         status:             subscription.status,
-        current_period_end: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : null,
+        current_period_end: updatedPeriodIso,
         updated_at: new Date().toISOString(),
       })
       .eq("stripe_subscription_id", subscription.id)
