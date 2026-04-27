@@ -351,7 +351,7 @@ function getCloudStatus({ online, userId, pendingCount }) {
 }
 
 export default function RouteMapperLayout() {
-  const { user, session, signOut, plan, guestMode } = useAuth();
+  const { user, session, signOut, plan, guestMode, refreshProfile } = useAuth();
   const localOwner = user?.id ?? getGuestOwnerId();
   const planLimits = getLimits(plan);
   const [pendingCount, setPendingCount] = useState(
@@ -371,6 +371,32 @@ export default function RouteMapperLayout() {
       window.removeEventListener("offline", onDown);
     };
   }, []);
+
+  // ── Handle Stripe Checkout return ──────────────────────────────────────────
+  // Stripe redirects back to /?billing=success|cancelled after checkout.
+  // Refresh the profile so the new plan takes effect immediately, then
+  // clean the param from the URL so a reload doesn't re-trigger this.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get("billing");
+    if (!billing) return;
+
+    // Remove the param from the URL without a page reload
+    params.delete("billing");
+    params.delete("plan");
+    const clean = window.location.pathname + (params.toString() ? `?${params}` : "");
+    window.history.replaceState({}, "", clean);
+
+    if (billing === "success") {
+      setBillingToast("success");
+      // Refresh the profile so planLimits updates immediately
+      refreshProfile?.();
+      setTimeout(() => setBillingToast(null), 6000);
+    } else if (billing === "cancelled") {
+      setBillingToast("cancelled");
+      setTimeout(() => setBillingToast(null), 4000);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const refresh = () => setPendingCount(readPendingQueue().length);
@@ -447,6 +473,7 @@ export default function RouteMapperLayout() {
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
   const [leafletMap, setLeafletMap] = useState(null);
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
+  const [billingToast, setBillingToast] = useState(null);   // null | 'success' | 'cancelled'
 
   // Trip meta
   const [tripName, setTripName] = useState("");
@@ -1988,6 +2015,17 @@ export default function RouteMapperLayout() {
               Not now
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Billing result toast ───────────────────────────────────────────── */}
+      {billingToast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all ${
+          billingToast === "success" ? "bg-green-600" : "bg-gray-500"
+        }`}>
+          {billingToast === "success"
+            ? "✓ Payment successful — your plan has been upgraded!"
+            : "Checkout cancelled — no payment was taken."}
         </div>
       )}
 
