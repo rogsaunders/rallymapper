@@ -36,10 +36,15 @@ export const PLAN_LIMITS = {
 
 /**
  * Return the limits object for a given plan string.
+ * Normalises 'solo_monthly' / 'solo_yearly' → 'solo' and
+ * 'pro_monthly' / 'pro_yearly' → 'pro' before lookup.
  * Defaults to 'free' for any unrecognised value (safe fallback).
  */
 export function getLimits(plan) {
-  return PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
+  const normalised = (plan ?? "")
+    .replace(/_monthly$/, "")
+    .replace(/_yearly$/, "");
+  return PLAN_LIMITS[normalised] ?? PLAN_LIMITS.free;
 }
 
 // ── Stage count helpers ───────────────────────────────────────────────────────
