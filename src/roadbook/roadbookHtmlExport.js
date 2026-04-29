@@ -14,7 +14,8 @@ const ICON_BY_ID = Object.fromEntries(ICON_DEFS.map(d => [d.id, d]));
 const ICON_CATEGORIES = [...new Set(ICON_DEFS.map(d => d.category))];
 
 // Nav icons appear as a corner badge; all others overlay the tulip.
-const NAV_ICON_IDS = new Set(["left","right","keep_l","keep_r","straight","caution","gate","cattle_gate"]);
+// "note" is included so it renders as a badge rather than dimming the tulip arrow.
+const NAV_ICON_IDS = new Set(["left","right","keep_l","keep_r","straight","caution","gate","cattle_gate","note"]);
 
 // ─── Public export ────────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ export async function exportRoadbookHtml(stage) {
   .rb-row { break-inside: avoid; }
   .filter-note { display: none; }
   .no-print { display: none; }
+  .note-sub { display: none; }
 
   /* A4 usable width ≈ 190mm. Fixed pixel columns overflow it, collapsing
      the auto note column to zero. Switch to percentage widths for print. */
@@ -459,12 +461,17 @@ function buildRow(row, index, next, flagged) {
 
   const noteText    = row.notes || humanize(row.eventType);
   const reviewBadge = flagged ? `<span class="review-badge">REVIEW</span> ` : "";
-  const debugStr = [
-    row.icon
-      ? `<span class="badge">${escapeHtml(row.icon)}</span>`
-      : `<span class="muted">${escapeHtml(row.eventType || "")}</span>`,
-    `<span class="debug">Conf ${formatConf(row.confidence)}${row.angle != null ? ` · ${Math.round(row.angle)}°` : ""}</span>`,
-  ].join(" ");
+
+  // Debug metadata — screen-only (hidden in print via .note-sub CSS rule).
+  // Shows source type and confidence so the roadbook can be reviewed on-screen
+  // before printing without polluting the printed output.
+  const sourceLabel = row.icon
+    ? `<span class="badge">${escapeHtml(row.icon)}</span>`
+    : `<span class="muted">${escapeHtml(humanize(row.eventType))}</span>`;
+  const confLabel = row.source === "derived"
+    ? `<span class="debug">conf ${formatConf(row.confidence)}</span>`
+    : "";
+  const debugStr = [sourceLabel, confLabel].filter(Boolean).join(" ");
 
   return `
 <tr class="rb-row${flagClass}">
@@ -476,7 +483,7 @@ function buildRow(row, index, next, flagged) {
   <td class="col-note">
     <div class="note-box">
       <div class="note-main note-editable" contenteditable="true">${reviewBadge}${escapeHtml(noteText)}</div>
-      <div class="note-sub">${debugStr}</div>
+      <div class="note-sub no-print">${debugStr}</div>
     </div>
   </td>
   <td class="col-gps"><div class="gps-box"><div class="gps-inner">${gps}</div></div></td>
