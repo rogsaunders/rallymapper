@@ -300,3 +300,19 @@ bg_blue.wp-svg-wrap {
   80%  { opacity: 1; transform: translateY(0) scale(1); }
   100% { opacity: 0; transform: translateY(-8px) scale(0.98); }
 }
+
+/* react-phone-number-input — match the look of other form inputs.
+   The library renders <div class="PhoneInput"><div.PhoneInputCountry/><input.PhoneInputInput/></div>;
+   we strip the inner input's default border and let the wrapper's classes
+   (bg/padding/border) provide the framing. */
+.rm-phone-input.PhoneInput { display: flex; align-items: center; gap: 0.5rem; }
+.rm-phone-input .PhoneInputInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+}
+.rm-phone-input .PhoneInputCountrySelect { font: inherit; }

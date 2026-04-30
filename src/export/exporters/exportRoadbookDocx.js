@@ -53,7 +53,7 @@ const APPENDIX_COLS = 4;
 
 // ─── Public export ────────────────────────────────────────────────────────────
 
-export async function exportRoadbookDocx(stage) {
+export async function exportRoadbookDocx(stage, opts = {}) {
   const roadbook = stage?.roadbook;
   const allRows  = roadbook?.views?.driver || roadbook?.rows || [];
   const rows     = ensureStartRow(allRows);
@@ -71,7 +71,7 @@ export async function exportRoadbookDocx(stage) {
     // Use fallback
   }
 
-  const headerTables  = buildDocxHeader(rows, meta, logoPngData);
+  const headerTables  = buildDocxHeader(rows, meta, logoPngData, opts.author);
   const warningTable  = buildDocxWarning();
   const roadbookTable = buildRoadbookTable(rows, flaggedRows, meta, title);
   const appendixTable = buildIconAppendix();
@@ -121,7 +121,7 @@ export async function exportRoadbookDocx(stage) {
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
-function buildDocxHeader(rows, meta, logoPngData) {
+function buildDocxHeader(rows, meta, logoPngData, author) {
   const lastWithKm = [...rows].reverse().find(r => Number.isFinite(Number(r.kmTotal)));
   const totalKm    = lastWithKm ? Number(lastWithKm.kmTotal).toFixed(1) : "—";
   const waypointCount = rows.filter(r => r.source !== "synthetic").length;
@@ -145,11 +145,13 @@ function buildDocxHeader(rows, meta, logoPngData) {
   const tripText  = meta.tripName  ? `Trip: ${meta.tripName}`   : null;
   const dayParts  = [meta.dayNumber && `Day ${meta.dayNumber}`, meta.stageNumber && `Stage ${meta.stageNumber}`].filter(Boolean).join(" ");
   const routeText = meta.routeName ? `Route: ${meta.routeName}` : (meta.stageName || null);
+  const crewText  = author ? `Crew: ${author}` : null;
 
   const stageInfoParas = [
     tripText  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: tripText,  bold: true, size: 28, font: "Arial" })] }),
     dayParts  && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: dayParts,  bold: true, size: 28, font: "Arial" })] }),
-    routeText && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: routeText, bold: true, size: 28, font: "Arial" })] }),
+    routeText && new Paragraph({ spacing: { before: 0, after: 40 }, children: [new TextRun({ text: routeText, bold: true, size: 28, font: "Arial" })] }),
+    crewText  && new Paragraph({ spacing: { before: 0, after: 0  }, children: [new TextRun({ text: crewText,  bold: true, size: 24, font: "Arial" })] }),
   ].filter(Boolean);
 
   const brandTable = new Table({

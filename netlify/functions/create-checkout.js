@@ -63,7 +63,7 @@ exports.handler = async (event) => {
   // ── Get or create Stripe customer ──────────────────────────────────────────
   const { data: profile } = await supabase
     .from("profiles")
-    .select("stripe_customer_id")
+    .select("stripe_customer_id, full_name, phone")
     .eq("id", user.id)
     .single();
 
@@ -72,6 +72,8 @@ exports.handler = async (event) => {
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: user.email,
+      name: profile?.full_name || undefined,
+      phone: profile?.phone || undefined,
       metadata: { supabase_user_id: user.id },
     });
     customerId = customer.id;
@@ -80,6 +82,17 @@ exports.handler = async (event) => {
       .from("profiles")
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
+  } else if (profile?.full_name || profile?.phone) {
+    // Existing customer — sync any name/phone updates back to Stripe so
+    // billing receipts and tax docs stay current.
+    try {
+      await stripe.customers.update(customerId, {
+        name: profile.full_name || undefined,
+        phone: profile.phone || undefined,
+      });
+    } catch (e) {
+      console.warn("stripe customer update failed:", e.message);
+    }
   }
 
   // ── Create Checkout Session ────────────────────────────────────────────────
