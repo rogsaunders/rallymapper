@@ -8,8 +8,8 @@
  * Redirect the current user to Stripe Checkout for the given price.
  *
  * @param {string} priceId   — Stripe price ID (from stripePrices.js)
- * @param {string} planType  — 'solo_monthly' | 'solo_yearly' | 'pro_monthly' |
- *                             'pro_yearly' | 'event_pass'
+ * @param {string} planType  — 'solo_monthly' | 'pro_monthly' | 'pro_yearly' |
+ *                             'event_pass'
  * @param {object} session   — Supabase session object (for the JWT)
  */
 export async function redirectToCheckout(priceId, planType, session) {

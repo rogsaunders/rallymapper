@@ -1985,34 +1985,19 @@ export default function RouteMapperLayout() {
                 {/* Solo */}
                 <div className="border rounded-xl p-3 flex flex-col gap-1">
                   <div className="font-semibold text-sm">Solo</div>
-                  <div className="flex gap-2">
-                    <button
-                      className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
-                      onClick={() => {
-                        setUpgradePrompt(null);
-                        redirectToCheckout(
-                          STRIPE_PRICES.solo_monthly,
-                          "solo_monthly",
-                          session,
-                        ).catch((e) => alert(e.message));
-                      }}
-                    >
-                      A$9.99 / month
-                    </button>
-                    <button
-                      className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
-                      onClick={() => {
-                        setUpgradePrompt(null);
-                        redirectToCheckout(
-                          STRIPE_PRICES.solo_yearly,
-                          "solo_yearly",
-                          session,
-                        ).catch((e) => alert(e.message));
-                      }}
-                    >
-                      A$89 / year
-                    </button>
-                  </div>
+                  <button
+                    className="w-full text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
+                    onClick={() => {
+                      setUpgradePrompt(null);
+                      redirectToCheckout(
+                        STRIPE_PRICES.solo_monthly,
+                        "solo_monthly",
+                        session,
+                      ).catch((e) => alert(e.message));
+                    }}
+                  >
+                    A$9.99 / month
+                  </button>
                   <div className="text-xs text-gray-500">
                     Unlimited · non-commercial · single user
                   </div>
@@ -2120,10 +2105,6 @@ export default function RouteMapperLayout() {
                   cls: "bg-amber-100 text-amber-700",
                 },
                 solo_monthly: {
-                  label: "Solo",
-                  cls: "bg-blue-100 text-blue-700",
-                },
-                solo_yearly: {
                   label: "Solo",
                   cls: "bg-blue-100 text-blue-700",
                 },

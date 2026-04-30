@@ -9,7 +9,6 @@ const PLAN_LABELS = {
   free: "Free",
   event_pass: "Event Pass",
   solo_monthly: "Solo (monthly)",
-  solo_yearly: "Solo (yearly)",
   pro_monthly: "Pro (monthly)",
   pro_yearly: "Pro (yearly)",
 };
