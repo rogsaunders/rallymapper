@@ -7,7 +7,12 @@ import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
 import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
-import { getLimits, countLocalStages, countRemoteStages, UPGRADE_REASONS } from "./lib/planLimits";
+import {
+  getLimits,
+  countLocalStages,
+  countRemoteStages,
+  UPGRADE_REASONS,
+} from "./lib/planLimits";
 import { STRIPE_PRICES } from "./lib/stripePrices";
 import { redirectToCheckout, redirectToPortal } from "./lib/checkout";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
@@ -384,7 +389,8 @@ export default function RouteMapperLayout() {
     // Remove the param from the URL without a page reload
     params.delete("billing");
     params.delete("plan");
-    const clean = window.location.pathname + (params.toString() ? `?${params}` : "");
+    const clean =
+      window.location.pathname + (params.toString() ? `?${params}` : "");
     window.history.replaceState({}, "", clean);
 
     if (billing === "success") {
@@ -463,8 +469,8 @@ export default function RouteMapperLayout() {
   const [snapTimeoutSec, setSnapTimeoutSec] = useState(
     () => Number(localStorage.getItem("rm_handsfree_snap_sec")) || 5,
   );
-  const snapTimerRef = useRef(null);      // setInterval handle
-  const snapTimeoutSecRef = useRef(5);    // always-fresh copy for async callbacks
+  const snapTimerRef = useRef(null); // setInterval handle
+  const snapTimeoutSecRef = useRef(5); // always-fresh copy for async callbacks
   // Always-fresh copy of the current type/icon selection for async callbacks.
   // Updated by a useEffect whenever the selection changes.
   const currentDefaultsRef = useRef({ type: "note", iconId: null });
@@ -473,7 +479,7 @@ export default function RouteMapperLayout() {
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
   const [leafletMap, setLeafletMap] = useState(null);
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
-  const [billingToast, setBillingToast] = useState(null);   // null | 'success' | 'cancelled'
+  const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
 
   // Trip meta
   const [tripName, setTripName] = useState("");
@@ -528,11 +534,15 @@ export default function RouteMapperLayout() {
   // Keep async-callback refs in sync with React state.
   useEffect(() => {
     const iconId =
-      waypointType === "hazard" ? hazardIconId
-      : waypointType === "nav" ? navIconId
-      : waypointType === "control" ? controlIconId
-      : waypointType === "terrain" ? terrainIconId
-      : null;
+      waypointType === "hazard"
+        ? hazardIconId
+        : waypointType === "nav"
+          ? navIconId
+          : waypointType === "control"
+            ? controlIconId
+            : waypointType === "terrain"
+              ? terrainIconId
+              : null;
     currentDefaultsRef.current = { type: waypointType, iconId };
   }, [waypointType, hazardIconId, navIconId, controlIconId, terrainIconId]);
 
@@ -740,7 +750,9 @@ export default function RouteMapperLayout() {
       ).length;
       if (nonStartCount >= planLimits.waypoints) {
         // Can't show a blocking modal while driving — log silently and return.
-        console.warn("planLimits: waypoint limit reached, voice command dropped");
+        console.warn(
+          "planLimits: waypoint limit reached, voice command dropped",
+        );
         return;
       }
     }
@@ -1383,11 +1395,11 @@ export default function RouteMapperLayout() {
         // Free / guest: core GPX files only. Paid plans get the full package.
         const fullExport = planLimits.fullExport;
         const blob = await buildRoutePackage(stageWithRoadbook, {
-          includeHema:        fullExport,
-          includeGarmin:      fullExport,
-          includeRallyNav:    fullExport,
+          includeHema: fullExport,
+          includeGarmin: fullExport,
+          includeRallyNav: fullExport,
           includeGoogleEarth: fullExport,
-          includeGaia:        fullExport,
+          includeGaia: fullExport,
           includePdf: false,
         });
 
@@ -1463,9 +1475,7 @@ export default function RouteMapperLayout() {
   // to show the reset button only when it's relevant.
   const hasSavedStageOnScreen =
     !stageActive &&
-    (trackPoints?.length > 0 ||
-      waypoints?.length > 0 ||
-      Boolean(startGPS));
+    (trackPoints?.length > 0 || waypoints?.length > 0 || Boolean(startGPS));
 
   // Explicit reset that the user triggers once they're done reviewing the
   // completed stage. Clears the stage-scoped data and bumps the stage
@@ -1523,8 +1533,12 @@ export default function RouteMapperLayout() {
   };
 
   // Data to display on the map: historical stage overrides live session.
-  const displayWaypoints = reviewStage ? (reviewStage.waypoints || []) : waypoints;
-  const displayTrackPoints = reviewStage ? (reviewStage.trackPoints || []) : trackPoints;
+  const displayWaypoints = reviewStage
+    ? reviewStage.waypoints || []
+    : waypoints;
+  const displayTrackPoints = reviewStage
+    ? reviewStage.trackPoints || []
+    : trackPoints;
   const displayStartGPS = reviewStage ? reviewStage.startGPS : startGPS;
 
   const handleSetStart = () => {
@@ -1909,13 +1923,16 @@ export default function RouteMapperLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-
       {/* ── Upgrade prompt modal ───────────────────────────────────────────── */}
       {upgradePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 flex flex-col gap-4">
-            <h2 className="text-lg font-bold text-gray-900">Upgrade Required</h2>
-            <p className="text-sm text-gray-600 whitespace-pre-line">{upgradePrompt}</p>
+            <h2 className="text-lg font-bold text-gray-900">
+              Upgrade Required
+            </h2>
+            <p className="text-sm text-gray-600 whitespace-pre-line">
+              {upgradePrompt}
+            </p>
 
             {/* Guest users must sign up before paying */}
             {guestMode ? (
@@ -1925,7 +1942,9 @@ export default function RouteMapperLayout() {
                 </p>
                 <button
                   className="btn btn-rally btn-green"
-                  onClick={() => { setUpgradePrompt(null); }}
+                  onClick={() => {
+                    setUpgradePrompt(null);
+                  }}
                 >
                   Sign Up
                 </button>
@@ -1937,13 +1956,17 @@ export default function RouteMapperLayout() {
                   className="w-full text-left border rounded-xl p-3 hover:bg-gray-50 transition"
                   onClick={() => {
                     setUpgradePrompt(null);
-                    redirectToCheckout(STRIPE_PRICES.event_pass, "event_pass", session).catch(
-                      (e) => alert(e.message),
-                    );
+                    redirectToCheckout(
+                      STRIPE_PRICES.event_pass,
+                      "event_pass",
+                      session,
+                    ).catch((e) => alert(e.message));
                   }}
                 >
                   <div className="font-semibold text-sm">Event Pass — A$39</div>
-                  <div className="text-xs text-gray-500">1 trip · unlimited stages · 60 days · one-time</div>
+                  <div className="text-xs text-gray-500">
+                    1 trip · unlimited stages · 60 days · one-time
+                  </div>
                 </button>
 
                 {/* Solo */}
@@ -1954,9 +1977,11 @@ export default function RouteMapperLayout() {
                       className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
                       onClick={() => {
                         setUpgradePrompt(null);
-                        redirectToCheckout(STRIPE_PRICES.solo_monthly, "solo_monthly", session).catch(
-                          (e) => alert(e.message),
-                        );
+                        redirectToCheckout(
+                          STRIPE_PRICES.solo_monthly,
+                          "solo_monthly",
+                          session,
+                        ).catch((e) => alert(e.message));
                       }}
                     >
                       A$9.99 / month
@@ -1965,15 +1990,19 @@ export default function RouteMapperLayout() {
                       className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
                       onClick={() => {
                         setUpgradePrompt(null);
-                        redirectToCheckout(STRIPE_PRICES.solo_yearly, "solo_yearly", session).catch(
-                          (e) => alert(e.message),
-                        );
+                        redirectToCheckout(
+                          STRIPE_PRICES.solo_yearly,
+                          "solo_yearly",
+                          session,
+                        ).catch((e) => alert(e.message));
                       }}
                     >
                       A$89 / year
                     </button>
                   </div>
-                  <div className="text-xs text-gray-500">Unlimited · non-commercial · single user</div>
+                  <div className="text-xs text-gray-500">
+                    Unlimited · non-commercial · single user
+                  </div>
                 </div>
 
                 {/* Pro */}
@@ -1984,9 +2013,11 @@ export default function RouteMapperLayout() {
                       className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
                       onClick={() => {
                         setUpgradePrompt(null);
-                        redirectToCheckout(STRIPE_PRICES.pro_monthly, "pro_monthly", session).catch(
-                          (e) => alert(e.message),
-                        );
+                        redirectToCheckout(
+                          STRIPE_PRICES.pro_monthly,
+                          "pro_monthly",
+                          session,
+                        ).catch((e) => alert(e.message));
                       }}
                     >
                       A$29.99 / month
@@ -1995,15 +2026,19 @@ export default function RouteMapperLayout() {
                       className="flex-1 text-xs bg-gray-100 rounded-lg p-2 hover:bg-gray-200 transition"
                       onClick={() => {
                         setUpgradePrompt(null);
-                        redirectToCheckout(STRIPE_PRICES.pro_yearly, "pro_yearly", session).catch(
-                          (e) => alert(e.message),
-                        );
+                        redirectToCheckout(
+                          STRIPE_PRICES.pro_yearly,
+                          "pro_yearly",
+                          session,
+                        ).catch((e) => alert(e.message));
                       }}
                     >
                       A$249 / year
                     </button>
                   </div>
-                  <div className="text-xs text-gray-500">Unlimited · commercial use · up to 10 users</div>
+                  <div className="text-xs text-gray-500">
+                    Unlimited · commercial use · up to 10 users
+                  </div>
                 </div>
               </div>
             )}
@@ -2020,9 +2055,11 @@ export default function RouteMapperLayout() {
 
       {/* ── Billing result toast ───────────────────────────────────────────── */}
       {billingToast && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all ${
-          billingToast === "success" ? "bg-green-600" : "bg-gray-500"
-        }`}>
+        <div
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all ${
+            billingToast === "success" ? "bg-green-600" : "bg-gray-500"
+          }`}
+        >
           {billingToast === "success"
             ? "✓ Payment successful — your plan has been upgraded!"
             : "Checkout cancelled — no payment was taken."}
@@ -2064,30 +2101,37 @@ export default function RouteMapperLayout() {
             {/* Plan badge */}
             {(() => {
               const planLabels = {
-                free:         { label: "Free",       cls: "bg-gray-100 text-gray-600" },
-                event_pass:   { label: "Event Pass", cls: "bg-amber-100 text-amber-700" },
-                solo_monthly: { label: "Solo",       cls: "bg-blue-100 text-blue-700" },
-                solo_yearly:  { label: "Solo",       cls: "bg-blue-100 text-blue-700" },
-                pro_monthly:  { label: "Pro",        cls: "bg-purple-100 text-purple-700" },
-                pro_yearly:   { label: "Pro",        cls: "bg-purple-100 text-purple-700" },
+                free: { label: "Free", cls: "bg-gray-100 text-gray-600" },
+                event_pass: {
+                  label: "Event Pass",
+                  cls: "bg-amber-100 text-amber-700",
+                },
+                solo_monthly: {
+                  label: "Solo",
+                  cls: "bg-blue-100 text-blue-700",
+                },
+                solo_yearly: {
+                  label: "Solo",
+                  cls: "bg-blue-100 text-blue-700",
+                },
+                pro_monthly: {
+                  label: "Pro",
+                  cls: "bg-purple-100 text-purple-700",
+                },
+                pro_yearly: {
+                  label: "Pro",
+                  cls: "bg-purple-100 text-purple-700",
+                },
               };
               const p = planLabels[plan] ?? planLabels.free;
               return (
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${p.cls}`}>
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${p.cls}`}
+                >
                   {p.label}
                 </span>
               );
             })()}
-
-            <div className="text-sm text-gray-700">
-              {user?.email ? (
-                <span>
-                  Signed in as <span className="font-medium">{user.email}</span>
-                </span>
-              ) : (
-                <span className="text-gray-500">Guest mode</span>
-              )}
-            </div>
 
             {/* Manage Billing — shown to paid users with a Stripe customer */}
             {user?.id && plan !== "free" && (
@@ -2100,6 +2144,16 @@ export default function RouteMapperLayout() {
                 Manage billing
               </button>
             )}
+
+            <div className="text-sm text-gray-700">
+              {user?.email ? (
+                <span>
+                  Signed in as <span className="font-medium">{user.email}</span>
+                </span>
+              ) : (
+                <span className="text-gray-500">Guest mode</span>
+              )}
+            </div>
 
             {user?.id && (
               <button
@@ -2235,9 +2289,19 @@ export default function RouteMapperLayout() {
                   className="ml-auto px-3 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white hover:bg-[#588233] hover:text-white shrink-0 flex items-center gap-1.5 text-sm transition-colors"
                   title="Browse and re-open saved stages"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
                     <circle cx="12" cy="12" r="10" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 6v6l4 2"
+                    />
                   </svg>
                   History
                 </button>
@@ -2264,10 +2328,15 @@ export default function RouteMapperLayout() {
                     Reviewing saved stage
                   </p>
                   <p className="text-sm text-amber-900 font-medium truncate mt-0.5">
-                    {reviewStage.meta?.stageName || reviewStage.meta?.tripName || "Unnamed stage"}
+                    {reviewStage.meta?.stageName ||
+                      reviewStage.meta?.tripName ||
+                      "Unnamed stage"}
                     {reviewStage.meta?.endedAt && (
                       <span className="font-normal text-amber-700 ml-2">
-                        {new Date(reviewStage.meta.endedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                        {new Date(reviewStage.meta.endedAt).toLocaleDateString(
+                          undefined,
+                          { day: "numeric", month: "short", year: "numeric" },
+                        )}
                       </span>
                     )}
                   </p>
@@ -2380,7 +2449,6 @@ export default function RouteMapperLayout() {
           >
             {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
           </button>
-
         </div>
 
         {/* INPUT CONTROLS ROW (above the two columns) */}
@@ -2727,7 +2795,10 @@ export default function RouteMapperLayout() {
                         className="inline-block w-3 h-3 rounded-full animate-pulse"
                         style={{ backgroundColor: "#f59e0b" }}
                       />
-                      <span className="text-sm font-semibold" style={{ color: "#b45309" }}>
+                      <span
+                        className="text-sm font-semibold"
+                        style={{ color: "#b45309" }}
+                      >
                         📍 GPS locked — say type or wait {snapCountdown}s
                       </span>
                       <button
@@ -2970,7 +3041,6 @@ export default function RouteMapperLayout() {
                 </div>
               </div>
             )}
-
           </div>
         </section>
 
