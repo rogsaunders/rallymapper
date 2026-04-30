@@ -19,7 +19,6 @@ const supabase = createClient(
 const VALID_PLAN_TYPES = [
   "event_pass",
   "solo_monthly",
-  "solo_yearly",
   "pro_monthly",
   "pro_yearly",
 ];

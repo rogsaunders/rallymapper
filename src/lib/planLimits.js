@@ -36,8 +36,8 @@ export const PLAN_LIMITS = {
 
 /**
  * Return the limits object for a given plan string.
- * Normalises 'solo_monthly' / 'solo_yearly' → 'solo' and
- * 'pro_monthly' / 'pro_yearly' → 'pro' before lookup.
+ * Strips '_monthly' / '_yearly' billing-cycle suffixes before lookup so
+ * 'solo_monthly' → 'solo' and 'pro_monthly' / 'pro_yearly' → 'pro'.
  * Defaults to 'free' for any unrecognised value (safe fallback).
  */
 export function getLimits(plan) {
