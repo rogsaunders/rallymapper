@@ -22,6 +22,7 @@ import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
 import { createWakeWordListener } from "./voice/wakeWordListener";
 import StageHistoryPanel from "./components/StageHistoryPanel";
+import AccountModal from "./components/AccountModal";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
 import startSoundUrl from "./assets/sounds/start.wav";
 import stopSoundUrl from "./assets/sounds/stop.wav";
@@ -356,7 +357,7 @@ function getCloudStatus({ online, userId, pendingCount }) {
 }
 
 export default function RouteMapperLayout() {
-  const { user, session, signOut, plan, guestMode, refreshProfile } = useAuth();
+  const { user, session, signOut, plan, profile, guestMode, refreshProfile } = useAuth();
   const localOwner = user?.id ?? getGuestOwnerId();
   const planLimits = getLimits(plan);
   const [pendingCount, setPendingCount] = useState(
@@ -365,6 +366,16 @@ export default function RouteMapperLayout() {
   const [online, setOnline] = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
+  const [showAccount, setShowAccount] = useState(false);
+  const [profileBannerDismissed, setProfileBannerDismissed] = useState(
+    () => sessionStorage.getItem("rm_profile_banner_dismissed") === "1",
+  );
+
+  // Show the "Complete your profile" banner only for signed-in users whose
+  // profile row is loaded but missing full_name (i.e. existing beta testers
+  // who pre-date the signup-form changes). Dismissal is per-session.
+  const showProfileBanner =
+    !!user?.id && !!profile && !profile.full_name && !profileBannerDismissed;
 
   useEffect(() => {
     const onUp = () => setOnline(true);
@@ -1401,6 +1412,7 @@ export default function RouteMapperLayout() {
           includeGoogleEarth: fullExport,
           includeGaia: fullExport,
           includePdf: false,
+          author: profile?.full_name || null,
         });
 
         downloadBlob(`${base}.zip`, blob);
@@ -1522,6 +1534,7 @@ export default function RouteMapperLayout() {
         includeGoogleEarth: true,
         includeGaia: true,
         includePdf: false,
+        author: profile?.full_name || null,
       });
       const m = reviewStage.meta || {};
       const base = `${safeSlug(m.tripName)}_day${m.dayNumber}_route${m.routeNumber}_stage${m.stageNumber}`;
@@ -2145,6 +2158,15 @@ export default function RouteMapperLayout() {
               </button>
             )}
 
+            {user?.id && (
+              <button
+                className="text-sm underline text-gray-700 hover:text-gray-900"
+                onClick={() => setShowAccount(true)}
+              >
+                Account
+              </button>
+            )}
+
             <div className="text-sm text-gray-700">
               {user?.email ? (
                 <span>
@@ -2166,6 +2188,35 @@ export default function RouteMapperLayout() {
           </div>
         </div>
       </header>
+
+      {showProfileBanner && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="mx-auto max-w-6xl px-3 py-2 flex items-center gap-3 text-sm">
+            <span className="font-semibold text-amber-800">
+              Complete your profile
+            </span>
+            <span className="text-amber-700 hidden sm:inline">
+              Please add your full name and (optional) phone to finish setting up your account.
+            </span>
+            <button
+              className="ml-auto px-3 py-1 rounded-lg font-semibold text-white"
+              style={{ backgroundColor: "#588233" }}
+              onClick={() => setShowAccount(true)}
+            >
+              Open Account
+            </button>
+            <button
+              className="text-amber-700 hover:text-amber-900 underline"
+              onClick={() => {
+                sessionStorage.setItem("rm_profile_banner_dismissed", "1");
+                setProfileBannerDismissed(true);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MAIN */}
       <main className="mx-auto max-w-6xl px-3 py-3 space-y-3">
@@ -3178,6 +3229,8 @@ export default function RouteMapperLayout() {
           </div>
         </section>
       </main>
+
+      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
     </div>
   );
 }

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
 import { useNavigate } from "react-router-dom";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 const isBeta = import.meta.env.VITE_BETA_MODE === "true";
 
@@ -10,6 +12,8 @@ export default function SignIn() {
   const [mode, setMode] = useState("signin"); // signin | signup | forgot
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState(""); // E.164, e.g. "+61412345678"
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const nav = useNavigate();
@@ -45,12 +49,28 @@ export default function SignIn() {
       }
 
       if (mode === "signup") {
+        const fullNameTrimmed = fullName.trim();
+        if (!fullNameTrimmed) {
+          setMsg("Please enter your full name.");
+          return;
+        }
+        if (phone && !isValidPhoneNumber(phone)) {
+          setMsg("Please enter a valid phone number, or leave it blank.");
+          return;
+        }
+
         const redirectTo = `${window.location.origin}/auth/reset`;
 
         const { data, error } = await supabase.auth.signUp({
           email: emailTrimmed,
           password,
-          options: { emailRedirectTo: redirectTo },
+          options: {
+            emailRedirectTo: redirectTo,
+            data: {
+              full_name: fullNameTrimmed,
+              phone: phone || null,
+            },
+          },
         });
 
         console.log("SIGN UP RESPONSE:", { data, error });
@@ -91,6 +111,24 @@ export default function SignIn() {
           Sign in to continue to Route Mapper.
         </p>
         <form onSubmit={onSubmit} className="mt-8 space-y-6">
+          {mode === "signup" && (
+            <div>
+              <label className="block text-gray-800 font-semibold mb-2">
+                Full name
+              </label>
+              <input
+                id="full_name"
+                name="full_name"
+                className="w-full p-4 rounded-xl border bg-blue-50 border-gray-300"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                type="text"
+                autoComplete="name"
+                required
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-gray-800 font-semibold mb-2">
               Email
@@ -106,6 +144,26 @@ export default function SignIn() {
               required
             />
           </div>
+
+          {mode === "signup" && (
+            <div>
+              <label className="block text-gray-800 font-semibold mb-2">
+                Phone <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <PhoneInput
+                international
+                defaultCountry="AU"
+                countryCallingCodeEditable={false}
+                value={phone}
+                onChange={(v) => setPhone(v || "")}
+                className="rm-phone-input w-full p-4 rounded-xl border bg-blue-50 border-gray-300"
+                autoComplete="tel"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Used for SMS / 2FA, emergency contact, and support.
+              </p>
+            </div>
+          )}
 
           {mode !== "forgot" && (
             <div>

@@ -19,7 +19,7 @@ const NAV_ICON_IDS = new Set(["left","right","keep_l","keep_r","straight","cauti
 
 // ─── Public export ────────────────────────────────────────────────────────────
 
-export async function exportRoadbookHtml(stage) {
+export async function exportRoadbookHtml(stage, opts = {}) {
   // Inline the logo as base64 so the HTML works as a standalone file
   let logoSrc = logoUrl;
   try {
@@ -188,7 +188,7 @@ ${buildIconPaletteHtml()}
 })();
 </script>
 <div class="page">
-  ${buildRmHeader(stage, rows, logoSrc)}
+  ${buildRmHeader(stage, rows, logoSrc, opts.author)}
   <div class="rm-warning">
     <div class="rm-warning-title">WARNING</div>
     <div class="rm-warning-body">
@@ -398,7 +398,7 @@ document.addEventListener('dblclick', e => {
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 
-function buildRmHeader(stage, rows, logoSrc) {
+function buildRmHeader(stage, rows, logoSrc, author) {
   const meta = stage?.meta || {};
   const lastWithKm = [...rows].reverse().find(r => Number.isFinite(Number(r.kmTotal)));
   const totalKm = lastWithKm ? Number(lastWithKm.kmTotal).toFixed(1) : "—";
@@ -410,6 +410,7 @@ function buildRmHeader(stage, rows, logoSrc) {
   const dayParts  = [meta.dayNumber && `Day ${meta.dayNumber}`, meta.stageNumber && `Stage ${meta.stageNumber}`].filter(Boolean).join(" ");
   const dayLine   = dayParts  ? `<div class="rm-hdr-line">${escapeHtml(dayParts)}</div>` : "";
   const routeLine = meta.routeName ? `<div class="rm-hdr-line rm-hdr-route">Route: ${escapeHtml(meta.routeName)}</div>` : "";
+  const crewLine  = author ? `<div class="rm-hdr-line rm-hdr-crew">Crew: ${escapeHtml(author)}</div>` : "";
 
   const logoHtml = logoSrc
     ? `<img src="${logoSrc}" class="rm-logo-img" alt="RouteMapper">`
@@ -418,7 +419,7 @@ function buildRmHeader(stage, rows, logoSrc) {
   return `<div class="rm-header">
   <div class="rm-brand-row">
     <div class="rm-brand-logo">${logoHtml}</div>
-    <div class="rm-brand-stage">${tripLine}${dayLine}${routeLine}</div>
+    <div class="rm-brand-stage">${tripLine}${dayLine}${routeLine}${crewLine}</div>
   </div>
   <div class="rm-data-row">
     <div class="rm-stat"><span class="rm-stat-n">${totalKm}</span><span class="rm-stat-l">Kilometers</span></div>

@@ -54,9 +54,10 @@ export async function buildRoutePackage(stage, options = {}) {
   coreFiles[`${safeBase}_combined.gpx`] = exportCombinedGpx(stage, config);
 
   if (roadbook) {
+    const exportOpts = { author: config.author || null };
     coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
-    coreFiles[`${safeBase}_roadbook.html`] = await exportRoadbookHtml(stage);
-    coreFiles[`${safeBase}_roadbook.docx`] = await exportRoadbookDocx(stage);
+    coreFiles[`${safeBase}_roadbook.html`] = await exportRoadbookHtml(stage, exportOpts);
+    coreFiles[`${safeBase}_roadbook.docx`] = await exportRoadbookDocx(stage, exportOpts);
   }
 
   // Embed the printable map PDF (captured while the map was still visible)
