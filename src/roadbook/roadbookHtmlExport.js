@@ -564,15 +564,19 @@ function formatGps(lat, lon) {
   if (lat == null || lon == null) return "";
   const latN = Number(lat), lonN = Number(lon);
   if (!Number.isFinite(latN) || !Number.isFinite(lonN)) return "";
-  return `${toDms(latN, "lat")}<br>${toDms(lonN, "lon")}`;
+  return `${toDmm(latN, "lat")}<br>${toDmm(lonN, "lon")}`;
 }
 
-function toDms(v, kind) {
-  const abs = Math.abs(v), deg = Math.floor(abs);
-  const mFull = (abs - deg) * 60, min = Math.floor(mFull);
-  const sec = ((mFull - min) * 60).toFixed(3);
+// Decimal-minutes (DMM) — matches Rally Navigator's display format,
+// e.g. -35.0342 → "35°02.052'S"
+function toDmm(v, kind) {
+  if (!Number.isFinite(v)) return "";
+  const abs = Math.abs(v);
+  const deg = Math.floor(abs);
+  const min = (abs - deg) * 60;
+  const minStr = min.toFixed(3).padStart(6, "0"); // "02.052"
   const hemi = kind === "lat" ? (v >= 0 ? "N" : "S") : (v >= 0 ? "E" : "W");
-  return `${deg}°${String(min).padStart(2, "0")}.${sec}'${hemi}`;
+  return `${deg}°${minStr}'${hemi}`;
 }
 
 function bearingBetween(lat1, lon1, lat2, lon2) {
