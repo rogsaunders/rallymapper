@@ -482,6 +482,10 @@ export default function RouteMapperLayout() {
   );
   const snapTimerRef = useRef(null); // setInterval handle
   const snapTimeoutSecRef = useRef(5); // always-fresh copy for async callbacks
+  // Live remaining-seconds counter for the snap countdown. Held in a ref so
+  // onInterim (firing in another closure) can reset it back to the full
+  // window when speech is detected, pausing the auto-commit timeout.
+  const snapRemainingRef = useRef(0);
   // Always-fresh copy of the current type/icon selection for async callbacks.
   // Updated by a useEffect whenever the selection changes.
   const currentDefaultsRef = useRef({ type: "note", iconId: null });
@@ -975,12 +979,15 @@ export default function RouteMapperLayout() {
         setSnapCountdown(snapTimeoutSecRef.current);
 
         // Countdown timer — auto-commits with defaults when it reaches 0.
+        // The remaining counter lives in a ref so onInterim (in the voice
+        // command handler) can reset it whenever speech is detected, which
+        // effectively pauses the timeout while the driver is still speaking.
         clearInterval(snapTimerRef.current);
-        let remaining = snapTimeoutSecRef.current;
+        snapRemainingRef.current = snapTimeoutSecRef.current;
         snapTimerRef.current = setInterval(() => {
-          remaining -= 1;
-          setSnapCountdown(remaining);
-          if (remaining <= 0) {
+          snapRemainingRef.current -= 1;
+          setSnapCountdown(snapRemainingRef.current);
+          if (snapRemainingRef.current <= 0) {
             clearInterval(snapTimerRef.current);
             snapTimerRef.current = null;
             setSnapCountdown(0);
@@ -1056,6 +1063,14 @@ export default function RouteMapperLayout() {
         // Transition to "command" state on first interim speech so the UI
         // shows the user is being heard.
         setHandsFreeMode("command");
+        // Reset the snap countdown — the driver is clearly still speaking,
+        // so the auto-commit-as-note fallback should not fire mid-sentence.
+        // The voice handler's silence-timeout decides when the command is
+        // actually complete; the countdown only resumes once speech stops.
+        if (snapTimerRef.current) {
+          snapRemainingRef.current = snapTimeoutSecRef.current;
+          setSnapCountdown(snapRemainingRef.current);
+        }
       },
 
       onCommand: (cmd) => {
