@@ -425,6 +425,34 @@ export default function RouteMapperLayout() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  // Auto-flush the pending queue when the user is signed in AND online.
+  // Fires on mount (so a queue stuck from a previous session drains itself)
+  // and again whenever the network comes back or sign-in completes. Without
+  // this, queued stages only sync when the user records and stops a NEW
+  // stage — making a partial-sync state self-sustaining.
+  const flushingRef = useRef(false);
+  useEffect(() => {
+    if (!user?.id || !online) return;
+    if (flushingRef.current) return;
+    if (readPendingQueue().length === 0) return;
+
+    flushingRef.current = true;
+    flushPendingQueue(user)
+      .then(({ flushed, remaining }) => {
+        if (flushed > 0) {
+          console.log(`✅ Auto-flushed ${flushed} pending stage(s) on reconnect`);
+        }
+        setPendingCount(remaining);
+      })
+      .catch((err) => {
+        console.warn("Auto-flush failed:", err);
+        setPendingCount(readPendingQueue().length);
+      })
+      .finally(() => {
+        flushingRef.current = false;
+      });
+  }, [user?.id, online]);
+
   const cloud = getCloudStatus({
     online,
     userId: user?.id,
