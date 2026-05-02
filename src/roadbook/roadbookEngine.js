@@ -22,6 +22,7 @@ export function generateRoadbook(stage, options = {}) {
   const mergedEvents = mergeWithWaypoints(
     classified,
     stage.waypoints || [],
+    preprocessedTrack,
     config,
   );
   const rows = buildRoadbookRows(mergedEvents);
