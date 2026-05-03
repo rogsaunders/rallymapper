@@ -22,26 +22,30 @@ export function mergeWithWaypoints(events, waypoints, preprocessedTrack, config)
     // the waypoint is too close to the track start/end to sample reliably.
     const angleData = computeAngleAtDistance(track, waypoint.distanceM);
 
+    // Resolve which bearings/angle to apply based on the manual icon:
+    //  • non-directional icons (note, straight, gate, …) get angle:null so
+    //    the renderer falls back to the canned template
+    //  • directional icons (left, right, bear_*, sharp_*, hairpin_*) get
+    //    the measured magnitude, sign-flipped if it disagrees with the
+    //    icon's direction — driver knows which way they turned
+    const resolved = resolveAngleForIcon(waypoint.icon, angleData);
+
     const nearby = merged.find(
       (event) =>
         Math.abs((event.distanceM ?? 0) - waypoint.distanceM) <= mergeRadiusM,
     );
 
     if (nearby) {
-      // Manual waypoint always wins — override classification, note, and the
-      // bearings/angle. Using the waypoint's own track-position angle ensures
-      // the rendered tulip direction matches the manual icon, even when a
-      // nearby auto-detected event had the opposite sign.
+      // Manual waypoint always wins — override classification, note, and
+      // the bearings/angle.
       nearby.icon = waypoint.icon || nearby.icon;
       nearby.eventType = waypoint.eventType || nearby.eventType;
       nearby.tulipTemplate = waypoint.eventType || nearby.tulipTemplate;
       nearby.notes = waypoint.note || nearby.notes;
       nearby.source = "merged";
-      if (angleData) {
-        nearby.bearingIn = angleData.bearingIn;
-        nearby.bearingOut = angleData.bearingOut;
-        nearby.angle = angleData.angle;
-      }
+      nearby.bearingIn = resolved.bearingIn;
+      nearby.bearingOut = resolved.bearingOut;
+      nearby.angle = resolved.angle;
 
       const existingIds = Array.isArray(nearby.linkedWaypointIds)
         ? nearby.linkedWaypointIds.filter(Boolean)
@@ -66,14 +70,73 @@ export function mergeWithWaypoints(events, waypoints, preprocessedTrack, config)
       notes: waypoint.note,
       source: "manual",
       confidence: 0.95,
-      bearingIn: angleData?.bearingIn ?? null,
-      bearingOut: angleData?.bearingOut ?? null,
-      angle: angleData?.angle ?? null,
+      bearingIn: resolved.bearingIn,
+      bearingOut: resolved.bearingOut,
+      angle: resolved.angle,
       linkedWaypointIds: waypoint.id ? [waypoint.id] : [],
     });
   }
 
   return merged.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0));
+}
+
+// Decide what bearings/angle to apply to a manual waypoint, given its icon
+// and the angle data measured from the surrounding track points.
+//
+//  • Non-directional icons (note, straight, gate, start, finish, …) return
+//    nulls so the renderer falls back to the canned template. Otherwise a
+//    "keep straight" waypoint placed near a real road bend would render as
+//    a corner labelled "straight".
+//
+//  • Directional icons (left, right, keep_l/r, bear_*, sharp_*, hairpin_*)
+//    return the measured magnitude. If the measured sign disagrees with the
+//    icon's direction (e.g. driver said "Left" but the GPS curve there
+//    measured +60°), the sign is flipped so the rendered direction matches
+//    the spoken intent. Magnitude is preserved either way.
+function resolveAngleForIcon(icon, angleData) {
+  if (!angleData || !isDirectionalIcon(icon)) {
+    return { bearingIn: null, bearingOut: null, angle: null };
+  }
+  const iconDir = directionFromIcon(icon);
+  const angleDir =
+    angleData.angle > 0 ? "right" : angleData.angle < 0 ? "left" : null;
+  const angle =
+    iconDir && angleDir && iconDir !== angleDir
+      ? -angleData.angle
+      : angleData.angle;
+  return {
+    bearingIn: angleData.bearingIn,
+    bearingOut: angleData.bearingOut,
+    angle,
+  };
+}
+
+const DIRECTIONAL_ICONS = new Set([
+  "left",
+  "right",
+  "keep_l",
+  "keep_r",
+  "bear_left",
+  "bear_right",
+  "sharp_left",
+  "sharp_right",
+  "hairpin_left",
+  "hairpin_right",
+]);
+
+function isDirectionalIcon(icon) {
+  return DIRECTIONAL_ICONS.has(icon);
+}
+
+function directionFromIcon(icon) {
+  if (!icon) return null;
+  if (icon === "left" || icon === "keep_l" || icon.endsWith("_left")) {
+    return "left";
+  }
+  if (icon === "right" || icon === "keep_r" || icon.endsWith("_right")) {
+    return "right";
+  }
+  return null;
 }
 
 // Find the track point nearest to the given distance-from-start and compute
