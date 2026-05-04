@@ -45,11 +45,40 @@ const svgToDivIcon = (svg, className = "") =>
     popupAnchor: [0, -13],
   });
 
+// Watches the map's container element and calls invalidateSize() whenever
+// its rendered size changes. Solves two problems with the previous
+// timeout-based approach:
+//   1. iPad PWA mounts: layout settles asynchronously after first paint,
+//      so a 50 ms timeout could fire before the container had its real
+//      size — Leaflet then captured a stale size and rendered tiles for
+//      a region that didn't match what the user saw.
+//   2. Class-driven resizes (Hide/Show, normal ↔ review): no longer
+//      need an explicit resizeKey prop to coordinate — the observer
+//      catches them naturally.
+//
+// Falls back to a single timeout invalidation when ResizeObserver is
+// unavailable (very old Safari, mostly).
 function FixResize({ resizeKey }) {
   const map = useMap();
   useEffect(() => {
-    const t = setTimeout(() => map.invalidateSize(), 50);
-    return () => clearTimeout(t);
+    const container = map.getContainer();
+    if (!container) return;
+
+    // Always do an immediate invalidation — handles the case where the
+    // observer fires before the map has painted any tiles.
+    map.invalidateSize();
+
+    if (typeof ResizeObserver === "undefined") {
+      // Old-Safari fallback: a single delayed invalidation.
+      const t = setTimeout(() => map.invalidateSize(), 250);
+      return () => clearTimeout(t);
+    }
+
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
   }, [map, resizeKey]);
   return null;
 }
@@ -265,7 +294,6 @@ export default function MapView({
         style={{ height: "100%", width: "100%" }}
         preferCanvas={true}
       >
-        <FixResize showMap={showMap} />
         <FixResize resizeKey={resizeKey} />
 
         <TileLayer
