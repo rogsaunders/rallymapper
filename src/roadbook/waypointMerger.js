@@ -5,6 +5,16 @@ import {
   normalizeAngle,
 } from "./geo";
 
+// How far ahead/behind a manual waypoint to search for an auto-detected
+// turn candidate to snap onto, when the locally-measured angle is shallow.
+// Sized to forgive realistic offsets:
+//   • driver glances at signage on approach and calls "Mapper" early
+//   • call lands on the entry to a roundabout but the actual exit turn
+//     is on the other side of the loop (~300–400 m of road distance)
+// Still tight enough that the next turn down a long straight won't be
+// confused for the one the driver was naming.
+const SNAP_SEARCH_RADIUS_M = 400;
+
 export function mergeWithWaypoints(events, waypoints, preprocessedTrack, config) {
   const mergeRadiusM = config.mergeRadiusM ?? 20;
   const merged = [...events];
@@ -20,7 +30,36 @@ export function mergeWithWaypoints(events, waypoints, preprocessedTrack, config)
     // waypoint's recorded distance. Mirrors the windowing in turnDetection.js
     // so manual and derived events use the same yardstick. Returns null when
     // the waypoint is too close to the track start/end to sample reliably.
-    const angleData = computeAngleAtDistance(track, waypoint.distanceM);
+    let angleData = computeAngleAtDistance(track, waypoint.distanceM);
+
+    // Snap-to-nearby-turn fallback for directional manual waypoints.
+    // If the locally-measured angle is shallow (driver called "Mapper"
+    // before reaching the apex, or the GPS pin landed slightly off the
+    // turn), search nearby auto-detected turn candidates within
+    // SNAP_SEARCH_RADIUS_M of the waypoint's distance for one whose
+    // direction matches the manual icon — adopt its bearings/angle so
+    // the rendered tulip reflects the actual turn the driver intended.
+    const minTurnAngleDeg = config.minTurnAngleDeg ?? 25;
+    if (
+      isDirectionalIcon(waypoint.icon) &&
+      isShallow(angleData, minTurnAngleDeg)
+    ) {
+      const iconDir = directionFromIcon(waypoint.icon);
+      const snapped = findNearbyDirectionalTurn(
+        events,
+        waypoint.distanceM,
+        iconDir,
+        SNAP_SEARCH_RADIUS_M,
+        minTurnAngleDeg,
+      );
+      if (snapped) {
+        angleData = {
+          bearingIn: snapped.bearingIn,
+          bearingOut: snapped.bearingOut,
+          angle: snapped.angle,
+        };
+      }
+    }
 
     // Resolve which bearings/angle to apply based on the manual icon:
     //  • non-directional icons (note, straight, gate, …) get angle:null so
@@ -137,6 +176,50 @@ function directionFromIcon(icon) {
     return "right";
   }
   return null;
+}
+
+// Treat a measured angle as "shallow" when its magnitude is below the
+// auto-detector's own minimum-turn threshold. Below this, the driver is
+// effectively on a straight section and any L/R icon they placed here
+// almost certainly refers to a turn slightly ahead/behind.
+function isShallow(angleData, minTurnAngleDeg) {
+  if (!angleData || !Number.isFinite(angleData.angle)) return true;
+  return Math.abs(angleData.angle) < minTurnAngleDeg;
+}
+
+// Search the auto-detected turn candidates for the nearest one (by road
+// distance) within `searchRadiusM` of the given distance whose direction
+// matches the manual icon and whose magnitude clears the minimum
+// threshold. Returns null if nothing suitable is found.
+function findNearbyDirectionalTurn(
+  events,
+  distanceM,
+  iconDir,
+  searchRadiusM,
+  minMagnitudeDeg,
+) {
+  if (!iconDir || !Number.isFinite(distanceM)) return null;
+
+  let best = null;
+  let bestDelta = Infinity;
+  for (const event of events) {
+    if (event?.source !== "derived") continue;
+    if (!Number.isFinite(event.angle) || !Number.isFinite(event.distanceM)) {
+      continue;
+    }
+    if (Math.abs(event.angle) < minMagnitudeDeg) continue;
+
+    const eventDir = event.angle > 0 ? "right" : "left";
+    if (eventDir !== iconDir) continue;
+
+    const delta = Math.abs(event.distanceM - distanceM);
+    if (delta > searchRadiusM) continue;
+    if (delta >= bestDelta) continue;
+
+    bestDelta = delta;
+    best = event;
+  }
+  return best;
 }
 
 // Find the track point nearest to the given distance-from-start and compute
