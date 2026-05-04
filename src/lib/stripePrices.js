@@ -1,11 +1,14 @@
 // src/lib/stripePrices.js
 //
 // Stripe price IDs — safe to commit, these are not secrets.
-// Switch to live price IDs when moving out of test mode.
+// These IDs are from the LIVE Stripe account (acct_1TQdpzF7LrulzgMx).
+// They MUST be paired with sk_live_… in STRIPE_SECRET_KEY and a live-mode
+// webhook signing secret in STRIPE_WEBHOOK_SECRET on Netlify; otherwise
+// Checkout will return "No such price" or signature-verification errors.
 
 export const STRIPE_PRICES = {
-  event_pass:   "price_1TQe1SF0VPT8NPEyfO6dZFiV",
-  solo_monthly: "price_1TQe6nF0VPT8NPEyNGQsMS5N",
-  pro_monthly:  "price_1TQeEfF0VPT8NPEyTDqjv878",
-  pro_yearly:   "price_1TQeGKF0VPT8NPEyBmQPIqnh",
+  event_pass:   "price_1TS4QHF7LrulzgMx3E3bQ4Ya",
+  solo_monthly: "price_1TS4SPF7LrulzgMxb0sufYSM",
+  pro_monthly:  "price_1TS4UMF7LrulzgMxqzxG6BjC",
+  pro_yearly:   "price_1TS4X7F7LrulzgMxi55pKBRY",
 };
