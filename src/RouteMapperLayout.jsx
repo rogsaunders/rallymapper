@@ -1,5 +1,5 @@
 // src/RouteMapperLayout.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
@@ -426,12 +426,18 @@ export default function RouteMapperLayout() {
   }, []);
 
   // Auto-flush the pending queue when the user is signed in AND online.
-  // Fires on mount (so a queue stuck from a previous session drains itself)
-  // and again whenever the network comes back or sign-in completes. Without
-  // this, queued stages only sync when the user records and stops a NEW
-  // stage — making a partial-sync state self-sustaining.
+  // Fires from three triggers, all using the same guarded helper:
+  //   1. Mount + (user.id, online) becoming truthy — drains a queue stuck
+  //      from a previous session, or after sign-in / reconnect.
+  //   2. visibilitychange → visible — covers the iPad PWA case where the
+  //      Stop-Stage flush was throttled by iOS while the app was in a
+  //      transitional state. As soon as the user backgrounds and returns,
+  //      the queue drains.
+  //   3. A 30-second retry timer that runs only while the queue is
+  //      non-empty — covers the user who stays foregrounded watching the
+  //      "Pending" badge. Self-stops when pendingCount hits 0.
   const flushingRef = useRef(false);
-  useEffect(() => {
+  const tryFlush = useCallback(() => {
     if (!user?.id || !online) return;
     if (flushingRef.current) return;
     if (readPendingQueue().length === 0) return;
@@ -440,7 +446,7 @@ export default function RouteMapperLayout() {
     flushPendingQueue(user)
       .then(({ flushed, remaining }) => {
         if (flushed > 0) {
-          console.log(`✅ Auto-flushed ${flushed} pending stage(s) on reconnect`);
+          console.log(`✅ Auto-flushed ${flushed} pending stage(s)`);
         }
         setPendingCount(remaining);
       })
@@ -451,7 +457,28 @@ export default function RouteMapperLayout() {
       .finally(() => {
         flushingRef.current = false;
       });
-  }, [user?.id, online]);
+  }, [user, online]);
+
+  // Trigger 1: deps change (sign-in / reconnect / mount).
+  useEffect(() => {
+    tryFlush();
+  }, [tryFlush]);
+
+  // Trigger 2: tab/app becomes visible.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tryFlush();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [tryFlush]);
+
+  // Trigger 3: periodic retry while queue is non-empty.
+  useEffect(() => {
+    if (pendingCount === 0) return;
+    const id = setInterval(tryFlush, 30000);
+    return () => clearInterval(id);
+  }, [pendingCount, tryFlush]);
 
   const cloud = getCloudStatus({
     online,
