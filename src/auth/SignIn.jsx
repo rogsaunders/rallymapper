@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "./AuthProvider";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +6,18 @@ import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
 const isBeta = import.meta.env.VITE_BETA_MODE === "true";
+
+// Plans the marketing site can deep-link to via ?plan=<id>. We persist the
+// chosen plan to localStorage so it survives the email-confirmation round
+// trip on signup and the redirect to "/" on signin. RouteMapperLayout reads
+// this key after auth completes and auto-opens the upgrade panel.
+const PENDING_PLAN_KEY = "rm_pending_plan";
+const VALID_PENDING_PLANS = new Set([
+  "event_pass",
+  "solo_monthly",
+  "pro_monthly",
+  "pro_yearly",
+]);
 
 export default function SignIn() {
   const { enableGuest, disableGuest } = useAuth();
@@ -17,6 +29,22 @@ export default function SignIn() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const nav = useNavigate();
+
+  // Capture ?plan=<id> from the URL on mount (deep-link from marketing site).
+  // Default the form to "signup" since deep-linkers are usually new users
+  // arriving from a Pricing CTA. They can still toggle to Sign in.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get("plan");
+    if (plan && VALID_PENDING_PLANS.has(plan)) {
+      try {
+        localStorage.setItem(PENDING_PLAN_KEY, plan);
+      } catch {
+        // localStorage write may fail in private mode; non-fatal.
+      }
+      setMode("signup");
+    }
+  }, []);
 
   async function onSubmit(e) {
     e.preventDefault();

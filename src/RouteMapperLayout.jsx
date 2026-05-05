@@ -480,6 +480,28 @@ export default function RouteMapperLayout() {
     return () => clearInterval(id);
   }, [pendingCount, tryFlush]);
 
+  // Marketing-site deep-link: SignIn captured ?plan=<id> on mount and stored
+  // it in localStorage. Once the user is signed in and on the free plan,
+  // auto-open the upgrade panel so they can confirm and pay without
+  // hunting for the upgrade button. One-shot — clear the flag immediately.
+  useEffect(() => {
+    if (!user?.id || !profile) return;
+    if (profile.plan && profile.plan !== "free") return;
+    let pending;
+    try {
+      pending = localStorage.getItem("rm_pending_plan");
+    } catch {
+      pending = null;
+    }
+    if (!pending) return;
+    try {
+      localStorage.removeItem("rm_pending_plan");
+    } catch {
+      /* ignore */
+    }
+    setUpgradePrompt(UPGRADE_REASONS.browse);
+  }, [user?.id, profile]);
+
   const cloud = getCloudStatus({
     online,
     userId: user?.id,

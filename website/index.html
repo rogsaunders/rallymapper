@@ -105,6 +105,7 @@
         <nav class="nav-menu">
           <a href="index.html#features">Features</a>
           <a href="index.html#usecases">Use Cases</a>
+          <a href="index.html#pricing">Pricing</a>
           <!--<a href="index.html#testimonials">Testimonials</a>-->
           <a href="index.html#roadmap">Roadmap</a>
           <a href="updates.html">Updates</a>
@@ -386,31 +387,113 @@
       </section>
       -->
 
-    <section id="beta" class="section funding">
-      <div class="container center">
-        <h2>Get Started Today</h2>
-        <p class="lead-text">
-          RouteMapper v0.1.0 is live. Sign up for a free account or jump
-          straight in as a guest — no installation required.
+    <section id="pricing" class="section pricing">
+      <div class="container">
+        <h2 class="center">Plans &amp; Pricing</h2>
+        <p class="lead-text center">
+          Start free. Upgrade when you need unlimited stages, full export
+          formats, or commercial use. All prices in AUD, GST inclusive.
         </p>
-        <div class="fund-grid">
-          <div class="fund-card primary">
-            <h3>Free to Try</h3>
-            <p>
-              Create an account to save your routes to the cloud, or use guest
-              mode for a quick test drive. Real-world ready — built and tested
-              on active rally recon.
-            </p>
-            <ul class="funding-perks">
-              <li>Works on any modern browser — no app store needed</li>
-              <li>Guest mode — no sign-up required to explore</li>
-              <li>Cloud sync across devices with a free account</li>
+
+        <div class="pricing-grid">
+          <!-- Free -->
+          <div class="pricing-card">
+            <h3>Free</h3>
+            <p class="price"><span class="amount">A$0</span></p>
+            <p class="price-note">Try the full workflow on a single stage.</p>
+            <ul class="pricing-perks">
+              <li>1 saved stage</li>
+              <li>20 waypoints per stage</li>
+              <li>Core GPX export</li>
+              <li>Cloud sync &amp; multi-device access</li>
             </ul>
-            <a class="btn btn-green" href="https://app.routemapper.net"
-              >Launch App</a
+            <a class="btn btn-outline" href="https://app.routemapper.net/auth"
+              >Sign up free</a
+            >
+          </div>
+
+          <!-- Event Pass -->
+          <div class="pricing-card">
+            <h3>Event Pass</h3>
+            <p class="price"><span class="amount">A$39</span><span class="period"> one-off</span></p>
+            <p class="price-note">One trip, 60 days, unlimited stages.</p>
+            <ul class="pricing-perks">
+              <li>Unlimited stages for one trip</li>
+              <li>Unlimited waypoints</li>
+              <li>Full export package — GPX, KML, Hema, Garmin, Gaia</li>
+              <li>Roadbook HTML &amp; DOCX</li>
+              <li>60-day access from purchase</li>
+            </ul>
+            <a
+              class="btn btn-green"
+              href="https://app.routemapper.net/auth?plan=event_pass"
+              >Get Event Pass</a
+            >
+          </div>
+
+          <!-- Solo Monthly (highlighted as most popular) -->
+          <div class="pricing-card featured">
+            <p class="badge">Most popular</p>
+            <h3>Solo</h3>
+            <p class="price"><span class="amount">A$9.99</span><span class="period"> / month</span></p>
+            <p class="price-note">For regular personal use.</p>
+            <ul class="pricing-perks">
+              <li>Unlimited stages &amp; waypoints</li>
+              <li>Full export package</li>
+              <li>Roadbook HTML &amp; DOCX</li>
+              <li>Hands-free voice mapping</li>
+              <li>Single user, non-commercial</li>
+              <li>Cancel any time</li>
+            </ul>
+            <a
+              class="btn btn-green"
+              href="https://app.routemapper.net/auth?plan=solo_monthly"
+              >Start Solo</a
+            >
+          </div>
+
+          <!-- Pro Monthly -->
+          <div class="pricing-card">
+            <h3>Pro Monthly</h3>
+            <p class="price"><span class="amount">A$29.99</span><span class="period"> / month</span></p>
+            <p class="price-note">Commercial use for organisers &amp; operators.</p>
+            <ul class="pricing-perks">
+              <li>Everything in Solo</li>
+              <li>Commercial use licence</li>
+              <li>Priority email support</li>
+              <li>Cancel any time</li>
+            </ul>
+            <a
+              class="btn btn-outline"
+              href="https://app.routemapper.net/auth?plan=pro_monthly"
+              >Start Pro Monthly</a
+            >
+          </div>
+
+          <!-- Pro Yearly -->
+          <div class="pricing-card">
+            <h3>Pro Yearly</h3>
+            <p class="price"><span class="amount">A$249</span><span class="period"> / year</span></p>
+            <p class="price-note">Same as Pro Monthly, save over A$110 / year.</p>
+            <ul class="pricing-perks">
+              <li>Everything in Pro Monthly</li>
+              <li>Save A$110+ vs monthly billing</li>
+              <li>Commercial use licence</li>
+              <li>Priority email support</li>
+            </ul>
+            <a
+              class="btn btn-outline"
+              href="https://app.routemapper.net/auth?plan=pro_yearly"
+              >Start Pro Yearly</a
             >
           </div>
         </div>
+
+        <p class="pricing-footnote center">
+          Already have an account?
+          <a href="https://app.routemapper.net">Launch the app</a> and upgrade
+          from the Account panel. All plans handled securely through Stripe.
+        </p>
       </div>
     </section>
 
