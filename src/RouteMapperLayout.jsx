@@ -2011,7 +2011,9 @@ export default function RouteMapperLayout() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 flex flex-col gap-4">
             <h2 className="text-lg font-bold text-gray-900">
-              Upgrade Required
+              {upgradePrompt === UPGRADE_REASONS.browse
+                ? "Upgrade your plan"
+                : "Upgrade Required"}
             </h2>
             <p className="text-sm text-gray-600 whitespace-pre-line">
               {upgradePrompt}
@@ -3281,7 +3283,21 @@ export default function RouteMapperLayout() {
         </section>
       </main>
 
-      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} />
+      <AccountModal
+        open={showAccount}
+        onClose={() => setShowAccount(false)}
+        onUpgradeRequest={() => {
+          // Close the Account modal and open the existing upgrade panel —
+          // the same one users see when they hit a free-plan limit, but in
+          // "browse" mode (no limit-specific message).
+          setShowAccount(false);
+          setUpgradePrompt(UPGRADE_REASONS.browse);
+        }}
+        onManagePlan={() => {
+          setShowAccount(false);
+          redirectToPortal(session).catch((e) => alert(e.message));
+        }}
+      />
     </div>
   );
 }
