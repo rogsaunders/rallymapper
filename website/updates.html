@@ -15,6 +15,48 @@
     <main class="section">
       <div class="container">
         <h1>Updates</h1>
+        <article id="may-2026" class="card">
+          <h2>May 2026 — Public Launch</h2>
+          <p>
+            <strong>RouteMapper is live</strong> at
+            <a href="https://app.routemapper.net">app.routemapper.net</a>.
+            Free tier plus four paid tiers, billing wired through Stripe with
+            Australian GST applied automatically. Beta program closed; existing
+            beta testers transitioned smoothly to the Free tier.
+          </p>
+          <p>
+            <strong>Roadbook accuracy</strong> — manual waypoint angles now
+            computed from the GPS track at the waypoint position; direction
+            follows the spoken icon (sign-flip for mismatches); shallow-angle
+            waypoints snap to the nearest matching turn within 400 m. Generated
+            roadbooks now correlate cleanly with Rally Navigator imports.
+          </p>
+          <p>
+            <strong>GPS format</strong> — fixed a long-standing bug where
+            decimal-minute coordinates rendered with a stray decimal point
+            (<code>35°02.3.129'S</code>). Now matches Rally Navigator's
+            display format (<code>35°02.052'S</code>).
+          </p>
+          <p>
+            <strong>Hands-free voice</strong> — fixed a race condition where
+            the snap countdown could fire mid-command and replace a real
+            instruction with a generic note. Speaking now pauses the
+            countdown until the command is complete.
+          </p>
+          <p>
+            <strong>iPad polish</strong> — pending sync status auto-clears via
+            visibilitychange + 30 s retry. Map renders the correct visible
+            region from first paint via ResizeObserver — no more Hide/Show
+            workaround.
+          </p>
+          <p>
+            <strong>Account profile</strong> — new Account modal in the
+            top-bar lets users edit full name, username, and phone (E.164
+            with country selector). Used as the billing name on Stripe and
+            the crew line on generated roadbook PDFs.
+          </p>
+          <small>Current</small>
+        </article>
         <article id="mar-2026" class="card">
           <h2>March 2026</h2>
           <p>
