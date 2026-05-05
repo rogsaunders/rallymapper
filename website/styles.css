@@ -910,3 +910,128 @@ body.nav-open .nav-toggle .hamburger::after {
   padding-left: max(18px, env(safe-area-inset-left));
   padding-right: max(18px, env(safe-area-inset-right));
 }
+
+/* ── Pricing section ─────────────────────────────────────────────────── */
+.section.pricing {
+  background: #fafaf6;
+}
+.section.pricing h2.center,
+.section.pricing p.center,
+.section.pricing .pricing-footnote {
+  text-align: center;
+}
+.section.pricing .lead-text {
+  margin: 0 auto 2rem;
+  max-width: 640px;
+  color: #555;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  align-items: stretch;
+  margin-top: 1.5rem;
+}
+
+.pricing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e3e3dc;
+  border-radius: 12px;
+  padding: 24px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pricing-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.pricing-card .price {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: #333;
+}
+.pricing-card .price .amount {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #111;
+}
+.pricing-card .price .period {
+  font-size: 0.95rem;
+  color: #666;
+}
+
+.pricing-card .price-note {
+  margin: 0 0 14px;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.pricing-card .pricing-perks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  flex: 1;
+}
+.pricing-card .pricing-perks li {
+  position: relative;
+  padding: 4px 0 4px 20px;
+  font-size: 0.92rem;
+  color: #333;
+}
+.pricing-card .pricing-perks li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #588233;
+  font-weight: 700;
+}
+
+.pricing-card .btn {
+  align-self: stretch;
+  text-align: center;
+}
+
+/* Featured (Most popular) — slight lift */
+.pricing-card.featured {
+  border: 2px solid #588233;
+  box-shadow: 0 6px 20px rgba(88, 130, 51, 0.18);
+  transform: translateY(-4px);
+}
+.pricing-card.featured .badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #588233;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.pricing-footnote {
+  margin-top: 1.75rem;
+  color: #555;
+  font-size: 0.9rem;
+}
+.pricing-footnote a {
+  color: #588233;
+  text-decoration: underline;
+}
+
+/* On narrow screens, drop the lift so cards align cleanly */
+@media (max-width: 640px) {
+  .pricing-card.featured {
+    transform: none;
+  }
+}
