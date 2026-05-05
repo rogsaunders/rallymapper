@@ -16,8 +16,34 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
-// Map Stripe subscription status to plan behaviour
-const INACTIVE_STATUSES = ["past_due", "unpaid", "cancelled", "incomplete_expired"];
+// Map Stripe subscription status to plan behaviour.
+//
+// Stripe's API uses the American spelling "canceled" (one L). We list both
+// spellings so the includes() check is robust either way and so that any
+// future API change won't silently break the inactive→free transition.
+// Internally we prefer the British "cancelled" (one of Roger's preferences
+// — RouteMapper is an Australian app) when WRITING our own status values.
+const INACTIVE_STATUSES = [
+  "past_due",
+  "unpaid",
+  "canceled",   // Stripe API value
+  "cancelled",  // British spelling — kept for forward compatibility / our own writes
+  "incomplete_expired",
+];
+
+// Read current_period_end from a Stripe subscription object, tolerating both
+// the legacy top-level field and the newer nested location at
+// subscription.items.data[0].current_period_end. Returns an ISO timestamp,
+// or null when neither is present (e.g. trial subscriptions).
+function readPeriodEndIso(subscription) {
+  const unix =
+    subscription?.current_period_end ??
+    subscription?.items?.data?.[0]?.current_period_end ??
+    null;
+  if (unix == null) return null;
+  const ms = Number(unix) * 1000;
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
 
 exports.handler = async (event) => {
   // ── Verify Stripe signature ────────────────────────────────────────────────
@@ -74,8 +100,7 @@ exports.handler = async (event) => {
         session.subscription,
       );
 
-      const periodEndMs = Number(subscription.current_period_end) * 1000;
-      const periodEndIso = isNaN(periodEndMs) ? null : new Date(periodEndMs).toISOString();
+      const periodEndIso = readPeriodEndIso(subscription);
 
       const { error } = await supabase.from("subscriptions").insert({
         user_id:                userId,
@@ -99,8 +124,7 @@ exports.handler = async (event) => {
   if (type === "customer.subscription.updated") {
     const subscription = object;
 
-    const updatedPeriodMs = Number(subscription.current_period_end) * 1000;
-    const updatedPeriodIso = isNaN(updatedPeriodMs) ? null : new Date(updatedPeriodMs).toISOString();
+    const updatedPeriodIso = readPeriodEndIso(subscription);
 
     const { data: sub, error } = await supabase
       .from("subscriptions")
