@@ -1035,3 +1035,10 @@ body.nav-open .nav-toggle .hamburger::after {
     transform: none;
   }
 }
+
+/* Hero secondary line — sits between .lead and the CTA buttons */
+.lead-sub {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0.25rem 0 1.25rem;
+}

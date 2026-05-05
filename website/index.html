@@ -123,8 +123,13 @@
             organisers of fun, fundraising and competitive rallies, explorer
             tours and discovery trips.
           </p>
+          <p class="lead-sub">
+            Now in production. Free to try, no installation — runs in any
+            modern browser.
+          </p>
           <div class="cta-row">
             <a class="btn btn-green btn-large" href="https://app.routemapper.net">Launch App</a>
+            <a class="btn btn-outline btn-large" href="index.html#pricing">View Pricing</a>
           </div>
         </div>
       </div>
@@ -503,42 +508,58 @@
         <ol class="timeline">
           <li class="timeline-done">
             <span class="timeline-period">Complete</span>
-            <strong>Prototype Development</strong>
+            <strong>Prototype & Field Testing</strong>
             <p>
               Core mapping engine, waypoint capture, voice notes, 10+ export
-              formats, roadbook generation, and cloud sync.
+              formats, roadbook generation, and cloud sync — built and tuned
+              on active outback recon.
             </p>
           </li>
           <li class="timeline-done">
             <span class="timeline-period">Complete</span>
-            <strong>Field Testing</strong>
+            <strong>Beta Program</strong>
             <p>
-              Active outback recon and competitive stage surveying. Tuning GPS
-              accuracy, turn detection, and offline sync under real conditions.
+              Invite-only beta across multiple rally recon teams, refining
+              hands-free voice mapping, sync reliability, and roadbook
+              accuracy based on real road-test feedback.
             </p>
           </li>
           <li class="timeline-done">
-            <span class="timeline-period">Complete</span>
-            <strong>Beta Testing</strong>
+            <span class="timeline-period">Complete · May 2026</span>
+            <strong>Public Launch</strong>
             <p>
-              Invite-only beta with real-world rally recon teams. Bug fixes, UX
-              refinements, and HF voice tuning based on field feedback.
+              RouteMapper went live at app.routemapper.net with a Free tier
+              and four paid tiers. Stripe billing wired end-to-end with
+              Australian GST handled automatically.
             </p>
           </li>
           <li class="timeline-active">
             <span class="timeline-period">Now</span>
-            <strong>v0.1.0 — Public Launch</strong>
+            <strong>Roadbook Accuracy Pass</strong>
             <p>
-              RouteMapper is live at app.routemapper.net. Free to try, no
-              installation required. Sign up or continue as guest.
+              Manual waypoint angles computed from the GPS track,
+              direction-aware sign correction, and snap-to-nearby-turn
+              fallback for shallow calls — generated roadbooks now correlate
+              cleanly with Rally Navigator imports.
             </p>
           </li>
           <li>
-            <span class="timeline-period">Post-launch</span>
-            <strong>Feature Expansion</strong>
+            <span class="timeline-period">Coming next</span>
+            <strong>Snap-First Waypoint Capture</strong>
             <p>
-              Additional icon packs, team collaboration tools, Android tablet
-              support, and strategic partnerships.
+              At highway speed every second of GPS lag matters. The next
+              release flips the waypoint flow: tap once to lock the position,
+              then refine icon and notes during a brief edit window —
+              eliminating up to 125 m of positional drift on fast stages.
+            </p>
+          </li>
+          <li>
+            <span class="timeline-period">Later</span>
+            <strong>Expansion</strong>
+            <p>
+              Stage history browser, additional icon packs, team
+              collaboration tools, Android tablet support, and strategic
+              partnerships.
             </p>
           </li>
         </ol>
@@ -550,22 +571,23 @@
         <h2>Latest Updates</h2>
         <ul class="updates">
           <li>
+            <time datetime="2026-05">May 2026</time>
+            <a href="updates.html#may-2026"
+              >Public launch · Stripe billing live · roadbook accuracy pass ·
+              iPad polish</a
+            >
+          </li>
+          <li>
             <time datetime="2026-03">March 2026</time>
             <a href="updates.html#mar-2026"
-              >Two-row controls, OpenRally GPX, iOS GPS fix, offline sync & turn
-              detection tuning</a
+              >Two-row controls, OpenRally GPX, iOS GPS fix, offline sync &amp;
+              turn detection tuning</a
             >
           </li>
           <li>
             <time datetime="2025-12">December 2025</time>
             <a href="updates.html#v40"
               >v4.0: Icon selector, single-mode voice notes, export focus</a
-            >
-          </li>
-          <li>
-            <time datetime="2025-11">November 2025</time>
-            <a href="updates.html#field-testing"
-              >Field testing: outback recon & stage design</a
             >
           </li>
         </ul>
@@ -598,36 +620,51 @@
           <details>
             <summary>What devices does it work on?</summary>
             <p>
-              RouteMapper is optimised for iPad (iPadOS 14+) — iPad, iPad Air,
-              iPad Pro, and iPad mini — in both landscape and portrait
-              orientations. The PWA runs on iPhone too, but the interface is
-              designed for tablet real estate. Android tablet support is on the
-              roadmap post-launch.
-            </p>
-          </details>
-          <details>
-            <summary>When is the Android version coming?</summary>
-            <p>
-              Android tablet support is planned post-App Store launch. We'll
-              prioritise based on demand and field feedback from the iOS
-              release.
-            </p>
-          </details>
-          <details>
-            <summary>Can I use this for hiking or mountain biking?</summary>
-            <p>
-              Absolutely! While designed for rally navigation, RouteMapper works
-              perfectly for any route planning activity including hiking,
-              mountain biking, overlanding, and expedition planning.
+              RouteMapper runs in any modern browser — no app to install. It's
+              optimised for iPad (Safari, iPadOS 14+) in both landscape and
+              portrait orientations, and works on iPhone, Mac, and PC too.
+              Add it to your iPad's Home Screen for a full-screen, app-like
+              experience.
             </p>
           </details>
           <details>
             <summary>Is there a free trial?</summary>
             <p>
-              Request early access and you'll receive a TestFlight invitation
-              Guest Mode is available now for instant offline use with no login
-              required. Post-launch pricing details will be announced closer to
-              the App Store release.
+              Yes — there's a permanent <strong>Free</strong> tier (1 saved
+              stage, 20 waypoints) plus a Guest Mode that needs no sign-up at
+              all. Both let you try the full waypoint and roadbook workflow
+              before deciding whether to upgrade. See the
+              <a href="index.html#pricing">Pricing</a> section for the paid
+              tiers.
+            </p>
+          </details>
+          <details>
+            <summary>Can I use this for hiking or mountain biking?</summary>
+            <p>
+              Absolutely. While designed for rally navigation, RouteMapper
+              works for any route-planning activity — hiking, mountain biking,
+              overlanding, expedition planning, scout camps. The export
+              formats (KML, GPX, Hema, Gaia) are widely supported by other
+              tools in those communities.
+            </p>
+          </details>
+          <details>
+            <summary>What about Android tablets?</summary>
+            <p>
+              Android tablet support is on the roadmap, prioritised by user
+              demand. The web app already runs in Chrome on Android — feature
+              parity is the goal — but we haven't yet tuned the
+              glove-friendly controls for the Android tablet form factor.
+            </p>
+          </details>
+          <details>
+            <summary>How does cancellation work?</summary>
+            <p>
+              Cancel any time from the
+              <a href="https://app.routemapper.net">Manage Billing</a> link
+              in the app. Cancelling at end of period keeps your access
+              until the next billing date; cancelling immediately reverts
+              you to Free straight away. Either way, no questions asked.
             </p>
           </details>
         </div>
