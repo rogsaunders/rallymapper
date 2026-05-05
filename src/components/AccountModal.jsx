@@ -16,7 +16,12 @@ const PLAN_LABELS = {
 // Allowed username chars: lowercase letters, digits, dot, hyphen, underscore.
 const USERNAME_RE = /^[a-z0-9._-]{2,32}$/;
 
-export default function AccountModal({ open, onClose }) {
+export default function AccountModal({
+  open,
+  onClose,
+  onUpgradeRequest,
+  onManagePlan,
+}) {
   const { user, profile, refreshProfile } = useAuth();
 
   const [fullName, setFullName] = useState("");
@@ -158,10 +163,33 @@ export default function AccountModal({ open, onClose }) {
             </p>
           </div>
 
-          {/* Plan badge */}
+          {/* Plan + change-plan action */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
-            <p className="p-2.5 bg-gray-50 rounded-lg text-sm text-gray-800">{planLabel}</p>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 p-2.5 bg-gray-50 rounded-lg text-sm text-gray-800">
+                {planLabel}
+              </p>
+              {profile?.plan === "free" && onUpgradeRequest && (
+                <button
+                  type="button"
+                  onClick={onUpgradeRequest}
+                  className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold text-white"
+                  style={{ backgroundColor: "#588233" }}
+                >
+                  Upgrade →
+                </button>
+              )}
+              {profile?.plan && profile.plan !== "free" && onManagePlan && (
+                <button
+                  type="button"
+                  onClick={onManagePlan}
+                  className="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Manage →
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Full name */}

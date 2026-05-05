@@ -87,4 +87,9 @@ export const UPGRADE_REASONS = {
     "Free accounts are limited to 1 saved stage.\n\nUpgrade to Solo or Pro for unlimited stages.",
   waypoint_limit:
     "Free accounts are limited to 20 waypoints per stage.\n\nUpgrade to Solo or Pro for unlimited waypoints.",
+  // Used when the user opens the upgrade panel proactively (e.g. from the
+  // Account modal's "Upgrade plan" button) rather than because they hit a
+  // limit. The same panel + price buttons render; only the message differs.
+  browse:
+    "Pick a plan that suits how you use RouteMapper.",
 };
