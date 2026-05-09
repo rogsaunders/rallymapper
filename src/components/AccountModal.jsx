@@ -276,13 +276,21 @@ export default function AccountModal({
           )}
         </div>
 
-        <div className="flex gap-2 p-5 border-t">
+        <div className="flex items-center gap-2 p-5 border-t">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
           >
             Cancel
           </button>
+          <a
+            href="https://routemapper.net/guide"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-gray-600 hover:text-gray-900 underline"
+          >
+            User Guide ↗
+          </a>
           <button
             onClick={onSave}
             disabled={!canSave}

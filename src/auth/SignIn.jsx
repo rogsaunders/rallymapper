@@ -271,6 +271,17 @@ export default function SignIn() {
               </p>
             </>
           )}
+          <p className="mt-6 text-center text-xs text-gray-500">
+            New to RouteMapper?{" "}
+            <a
+              href="https://routemapper.net/guide"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-gray-700"
+            >
+              Read the user guide ↗
+            </a>
+          </p>
         </div>
       </div>
     </div>
