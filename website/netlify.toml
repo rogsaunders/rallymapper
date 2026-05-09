@@ -1,2 +1,14 @@
 [build]
   publish = "."
+
+[[redirects]]
+  from = "/guide"
+  to = "https://canary-speedwell-bf4.notion.site/RouteMapper-User-Guide-35b87469a8ea80108cc7c86ae9484fbc"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/user-guide"
+  to = "https://canary-speedwell-bf4.notion.site/RouteMapper-User-Guide-35b87469a8ea80108cc7c86ae9484fbc"
+  status = 302
+  force = true
