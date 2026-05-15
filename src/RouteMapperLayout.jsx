@@ -39,6 +39,43 @@ function getGuestOwnerId() {
   return v;
 }
 
+// Build a mailto: URL that opens the user's default mail client with the
+// To/Subject pre-filled and the body pre-populated with diagnostic context
+// (account, plan, app version, browser, current URL). The diagnostic block
+// drastically cuts the back-and-forth of "what browser are you on?" and
+// "what plan?" — most support tickets arrive with everything we need.
+//
+// Built on demand at click time so the URL always reflects current state
+// (plan changes, navigation, etc.). Encodes both subject and body via
+// encodeURIComponent so newlines and special characters survive intact.
+function buildSupportMailto({ user, plan, guestMode }) {
+  const version =
+    typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "unknown";
+  const lines = [
+    "Hi RouteMapper team,",
+    "",
+    "[Please describe the issue or question here.]",
+    "",
+    "",
+    "---",
+    "Diagnostic info (please leave this section as-is):",
+    guestMode
+      ? "Mode: Guest (not signed in)"
+      : `Account: ${user?.email || "(unknown)"}`,
+    `Plan: ${plan || "free"}`,
+    `App version: ${version}`,
+    `Browser: ${navigator.userAgent}`,
+    `URL: ${window.location.href}`,
+  ];
+  const subject = `RouteMapper support — ${
+    guestMode ? "guest" : user?.email || "user"
+  }`;
+  const body = lines.join("\n");
+  return `mailto:hello@routemapper.net?subject=${encodeURIComponent(
+    subject,
+  )}&body=${encodeURIComponent(body)}`;
+}
+
 function haversineMeters(a, b) {
   if (!a || !b) return Infinity;
   if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon)) return Infinity;
@@ -2251,6 +2288,27 @@ export default function RouteMapperLayout() {
                 <span className="text-gray-500">Guest mode</span>
               )}
             </div>
+
+            {/* Support — opens the user's default mail client pre-filled
+                with diagnostic context (account / plan / version / UA / URL).
+                Path 1 of the stacked plan; Path 2 (in-app form + Resend)
+                tracked in MEMORY backlog for when support volume justifies. */}
+            {(user?.id || guestMode) && (
+              <a
+                className="text-sm underline text-gray-700 hover:text-gray-900"
+                href="mailto:hello@routemapper.net"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = buildSupportMailto({
+                    user,
+                    plan,
+                    guestMode,
+                  });
+                }}
+              >
+                Support
+              </a>
+            )}
 
             {user?.id && (
               <button
