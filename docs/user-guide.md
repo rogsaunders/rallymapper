@@ -117,6 +117,20 @@ GPS locks the moment you tap **Add Waypoint** — no position drift while you ch
 
 **Adjustable:** the **Snap window (edit after tap)** slider in the ⚙️ settings cog runs 2–10 seconds. A second tap while pending auto-commits the first and snaps a new one.
 
+### Waypoint icons
+
+RouteMapper organises 29 icons into 5 types. Your last-used type persists between waypoints, so a sequence of same-type captures takes one tap each.
+
+| Type | Icons |
+|------|-------|
+| **Note** | Note (general purpose) |
+| **Hazard** | Danger 1 · Danger 2 · Danger 3 |
+| **Terrain** | Bump · Bumps · Dip · Twisty · Ruts · Washout · Up Hill · Down Hill |
+| **Nav** | Left · Right · Keep Left · Keep Right · Straight · Gate · Cattle Gate · Railroad · Give Way · Caution |
+| **Control** | Start · Finish · Stop · Checkpoint · Time Control · Fuel · Service |
+
+All 29 icons follow OpenRally and Garmin symbol standards. They render identically across the in-app map, generated roadbook tulips, and KML/GPX exports.
+
 ### Hands-Free voice mapping
 
 Hands-Free mode locks GPS the instant the wake word "Mapper" is recognised — **before you say anything else**. At speed, the recorded position is where you were when you called it, not where you ended up while speaking the command.
@@ -124,8 +138,21 @@ Hands-Free mode locks GPS the instant the wake word "Mapper" is recognised — *
 **Flow:**
 1. Tap **Activate** in the Hands-Free panel — listening for the wake word.
 2. Say **"Mapper"** — beep + the panel turns amber ("📍 GPS locked"). GPS is locked at this instant.
+   > Speech recognition handles common variations — *"map"*, *"map a"*, and *"map her"* are all heard as *"Mapper"*.
 3. Speak: *type + icon + dash + note*
-   - Examples: *"hazard danger two — deep ruts"*, *"left — onto gravel road"*, *"terrain washout"*, *"note — fuel stop in 5 km"*
+
+   | You say | Result |
+   |---------|--------|
+   | *"Mapper… hazard danger two — rocks on track"* | Hazard waypoint, Danger 2 icon, *"rocks on track"* note |
+   | *"Mapper… left — onto gravel road"* | Nav waypoint, Left icon, *"onto gravel road"* note |
+   | *"Mapper… terrain washout"* | Terrain waypoint, Washout icon, no note |
+   | *"Mapper… bump"* | Terrain waypoint, Bump icon (type inferred) |
+   | *"Mapper… control fuel — stop for fuel"* | Control waypoint, Fuel icon, *"stop for fuel"* note |
+   | *"Mapper… note — fuel stop ahead"* | Note waypoint, *"fuel stop ahead"* |
+   | *"Mapper… caution"* | Nav waypoint, Caution icon (type inferred) |
+   | *"Mapper… keep left"* | Nav waypoint, Keep Left icon |
+
+   You can omit the type if the icon name is unambiguous — *"Mapper… left"* works as well as *"Mapper… nav left"*.
 4. After a short silence, the waypoint commits to the locked GPS position.
 5. Say nothing for the voice snap window and it auto-commits with the last-used icon — useful for repeated waypoints of the same type.
 6. Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint.
@@ -136,6 +163,19 @@ Hands-Free mode locks GPS the instant the wake word "Mapper" is recognised — *
 - **Snap window (edit after tap)** — for the manual tap flow, not Hands-Free (2–10 s)
 
 A Bluetooth headset with mic significantly improves accuracy in noisy or windy conditions.
+
+### Trip, Day, Route, Stage
+
+Multi-day events are organised in a four-level hierarchy:
+
+- **Trip Name** — the overall event (e.g. *Flinders Ranges 2026*)
+- **Day** — increments the day number; resets route and stage to 1
+- **Route** — increments the route within the day; resets stage to 1
+- **Stage** — increments the stage within the route
+
+Day, Route, and Stage controls are disabled while a stage is recording and unlock when you tap **End Stage**. The **Route name** field is editable for each route — give each one a descriptive label (e.g. *Wilpena Pound Loop*).
+
+Every stage is saved independently, so a multi-day event becomes a clean tree in your export ZIP: *Day 1 / Route 1 / Stage 1.gpx*, *Day 1 / Route 1 / Stage 2.gpx*, and so on.
 
 ### Stage History
 
