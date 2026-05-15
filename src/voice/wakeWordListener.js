@@ -1,19 +1,19 @@
 // src/voice/wakeWordListener.js
 //
-// Continuously listens via the Web Speech API for a wake word (default: "mapper").
+// Continuously listens via the Web Speech API for a wake word (default: "tag").
 // When detected, fires the onWake callback and stops listening.
 // The caller is responsible for re-arming after the command cycle completes.
 //
 // Safari/WKWebView compatible — uses continuous mode with interim results
 // so the wake word is caught quickly without waiting for a full sentence.
 
-const DEFAULT_WAKE_WORD = "mapper";
+const DEFAULT_WAKE_WORD = "tag";
 
 /**
  * Create a wake word listener.
  *
  * @param {Object} opts
- * @param {string}           [opts.wakeWord="mapper"]  — the trigger word (case-insensitive)
+ * @param {string}           [opts.wakeWord="tag"]  — the trigger word (case-insensitive)
  * @param {function(): void}  opts.onWake              — called when the wake word is detected
  * @param {function(): void} [opts.onListening]         — called when mic starts
  * @param {function(): void} [opts.onStopped]           — called when mic stops
@@ -30,9 +30,6 @@ export function createWakeWordListener(opts) {
   } = opts;
 
   const wakeWordLower = wakeWord.toLowerCase();
-  // Safari often transcribes "Mapper" as "map", "map a", "map her", etc.
-  // Accept the full word OR a prefix of at least 3 characters.
-  const wakeMinPrefix = wakeWordLower.slice(0, 3); // "map"
   let recognition = null;
   let active = false;
   let wakeDetected = false;
@@ -65,11 +62,11 @@ export function createWakeWordListener(opts) {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = (event.results[i]?.[0]?.transcript || "").toLowerCase().trim();
 
-        // Match the full wake word, OR a standalone prefix (Safari often
-        // transcribes "Mapper" as "map", "map a", "map her", etc.)
+        // Match the wake word as a standalone word in the transcript.
+        // Word-boundary check avoids false-triggers from "tagged", "tagging",
+        // "stagger", etc. that would otherwise match a substring search.
         const words = transcript.split(/\s+/);
-        const matched = transcript.includes(wakeWordLower)
-          || words.some((w) => w === wakeMinPrefix || w.startsWith(wakeWordLower));
+        const matched = words.includes(wakeWordLower);
 
         if (matched) {
           wakeDetected = true;

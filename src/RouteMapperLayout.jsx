@@ -587,7 +587,7 @@ export default function RouteMapperLayout() {
   const handsFreeActiveRef = useRef(false); // mirrors handsFreeActive for async callbacks
 
   // ── Snap-on-wake state ────────────────────────────────────────────
-  // GPS is locked the instant "Mapper" is heard; the user then has
+  // GPS is locked the instant "Tag" is heard; the user then has
   // snapTimeoutSec seconds to say the waypoint type/icon before the
   // pending waypoint is auto-committed with the current defaults.
   const [snapCountdown, setSnapCountdown] = useState(0);
@@ -848,7 +848,7 @@ export default function RouteMapperLayout() {
 
   // ── Hands-free voice command mode (Phase 2 — wake word) ────────────
   //
-  // Flow: Activate → Standby (listening for "Mapper") → Command (recording)
+  // Flow: Activate → Standby (listening for "Tag") → Command (recording)
   //       → commit waypoint → back to Standby → … → Stop
 
   // ── Pending waypoint (snap-first) helpers — manual "Add Waypoint" tap ─
@@ -1080,11 +1080,11 @@ export default function RouteMapperLayout() {
     wakeWordRef.current?.stop();
 
     const listener = createWakeWordListener({
-      wakeWord: "mapper",
+      wakeWord: "tag",
 
       onWake: () => {
         // ── SNAP ── capture GPS and current type/icon at the instant
-        // "Mapper" is recognised — before any command is spoken.
+        // "Tag" is recognised — before any command is spoken.
         const snappedGps = currentGPSRef.current;
         const snappedDefaults = { ...currentDefaultsRef.current };
 
@@ -2969,7 +2969,7 @@ export default function RouteMapperLayout() {
                         style={{ backgroundColor: "#2563eb" }}
                       />
                       <span className="text-sm text-blue-600 font-medium">
-                        Say "Mapper"
+                        Say "Tag"
                       </span>
                     </>
                   )}
@@ -3140,7 +3140,7 @@ export default function RouteMapperLayout() {
                       <span>10s (relaxed)</span>
                     </div>
                     <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-                      How long after "Mapper" to wait for a type/icon command
+                      How long after "Tag" to wait for a type/icon command
                       before auto-committing with the last-used icon.
                     </p>
                   </div>
@@ -3174,7 +3174,7 @@ export default function RouteMapperLayout() {
                     !handsFreeLastCommand &&
                     handsFreeMode !== "command" && (
                       <div className="text-xs text-gray-400">
-                        Say "Mapper" then your command. E.g. "Mapper" ...
+                        Say "Tag" then your command. E.g. "Tag" ...
                         "hazard danger two — rocks on track"
                       </div>
                     )}
