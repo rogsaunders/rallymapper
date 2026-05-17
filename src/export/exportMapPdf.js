@@ -17,6 +17,7 @@
 //   });
 
 import jsPDF from "jspdf";
+import L from "leaflet";
 import SimpleMapScreenshoter from "leaflet-simple-map-screenshoter";
 
 function slugify(s) {
@@ -49,6 +50,51 @@ function formatDate(d) {
   } catch {
     return new Date().toLocaleDateString();
   }
+}
+
+/**
+ * Wait until the tile layer's visible tiles have fully loaded AND two animation
+ * frames have elapsed, so the browser has flushed any pending tile-pane
+ * `translate3d()` updates to the DOM before we capture.
+ *
+ * On iPad Safari a fixed `setTimeout(2000)` is unreliable: Leaflet has finished
+ * its `setView`/`fitBounds` computation but the tile pane's CSS transform may
+ * not yet be reflected in `getBoundingClientRect()` / `getComputedStyle()`
+ * when `dom-to-image` walks the DOM.  The capture then shows tiles at stale
+ * positions while markers and `latLngToContainerPoint()` already reflect the
+ * new pixel origin — a uniform ~50 m offset between tiles and the
+ * polyline/markers laid on top.  Listening for the tile layer's `load` event
+ * (which fires when every tile in the current viewport has loaded) and then
+ * waiting two rAFs gives a deterministic "everything has settled" signal.
+ *
+ * A 6 s safety net resolves the promise even if tiles never finish loading
+ * (e.g. offline / blocked tile server).
+ */
+async function waitForTilesAndPaint(map) {
+  let tileLayer = null;
+  map.eachLayer((l) => {
+    if (l instanceof L.TileLayer) tileLayer = l;
+  });
+
+  await new Promise((resolve) => {
+    const twoFrames = () =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+
+    if (!tileLayer || !tileLayer.isLoading()) {
+      twoFrames();
+      return;
+    }
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      tileLayer.off("load", finish);
+      twoFrames();
+    };
+    tileLayer.once("load", finish);
+    setTimeout(finish, 6000);
+  });
 }
 
 /**
@@ -186,6 +232,15 @@ export async function buildMapPdfBlob(map, meta = {}) {
     background: container.style.background,
   };
 
+  // Reset window scroll to (0, 0) for the duration of the capture.  iPad
+  // Safari's rubber-band scroll can leave a non-zero `pageYOffset` even at the
+  // top of the page; combined with our `position:fixed` container, this
+  // produced a uniform ~50 m NW offset between the captured tile image and the
+  // polyline/markers projected via `latLngToContainerPoint()`.  Anchoring
+  // scroll to (0, 0) before resize removes that variable from the equation.
+  const savedScroll = { x: window.scrollX, y: window.scrollY };
+  window.scrollTo(0, 0);
+
   // Target: A4 landscape usable area (273×172 mm) rendered at ~150 DPI
   const TARGET_W = 1600;
   const TARGET_H = 1000;
@@ -220,10 +275,15 @@ export async function buildMapPdfBlob(map, meta = {}) {
     map.setView(savedCenter, savedZoom, { animate: false });
   }
 
-  // Let the tiles settle before capture.
-  // 2 s gives mobile connections enough time to load the new viewport's
-  // tiles after any re-zoom, reducing blank tile grid-lines in the PDF.
-  await new Promise((r) => setTimeout(r, 2000));
+  // Force a synchronous CSS reflow so `getBoundingClientRect()` / computed
+  // transforms reflect the new layout before any further measurement.
+  // eslint-disable-next-line no-unused-expressions
+  container.offsetHeight;
+
+  // Wait for tiles to finish loading and two animation frames to flush, so
+  // the tile pane's translate3d is fully reflected in the DOM before capture.
+  // Replaces a fragile `setTimeout(2000)` that lost the race on iPad Safari.
+  await waitForTilesAndPaint(map);
 
   // Hide the Leaflet SVG overlay pane before capture.
   //
@@ -297,6 +357,12 @@ export async function buildMapPdfBlob(map, meta = {}) {
     Object.assign(container.style, savedStyle);
     try {
       map.invalidateSize({ animate: false, pan: false });
+    } catch {
+      /* no-op */
+    }
+    // Restore the scroll position the user had before export.
+    try {
+      window.scrollTo(savedScroll.x, savedScroll.y);
     } catch {
       /* no-op */
     }
