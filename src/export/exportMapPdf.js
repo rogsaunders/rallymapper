@@ -18,7 +18,11 @@
 
 import jsPDF from "jspdf";
 import L from "leaflet";
-import SimpleMapScreenshoter from "leaflet-simple-map-screenshoter";
+
+// html2canvas is dynamically imported inside `buildMapPdfBlob` to keep it out
+// of the initial bundle (it's ~200 KB minified and only needed when the user
+// actually exports a PDF).  Avoids bumping vite-plugin-pwa's precache over
+// the 2 MiB default limit.
 
 function slugify(s) {
   return String(s || "routemapper-map")
@@ -285,55 +289,65 @@ export async function buildMapPdfBlob(map, meta = {}) {
   // Replaces a fragile `setTimeout(2000)` that lost the race on iPad Safari.
   await waitForTilesAndPaint(map);
 
-  // Hide the Leaflet SVG overlay pane before capture.
+  // Hide the Leaflet SVG overlay pane and the zoom controls before capture.
   //
-  // dom-to-image applies Leaflet's large translate3d() world-coordinate
-  // offsets from the overlay pane's SVG incorrectly, so the route polyline
-  // appears at a wrong, view-dependent position (the "phantom line" bug).
+  // Overlay pane: the live <Polyline> renders into the SVG overlay pane.  If
+  // we let it capture, our canvas-composite polyline (drawn afterwards via
+  // `drawRouteOverlay`) would double up with the live SVG line.  `display:
+  // none` removes the SVG from the render tree entirely.
   //
-  // Using `display: none` (not just opacity:0) is essential: dom-to-image
-  // can still rasterise SVG elements that have opacity:0 inherited from a
-  // parent div in some browser/engine combinations, producing the phantom.
-  // `display: none` removes the element from the render tree entirely.
-  //
-  // drawRouteOverlay() re-draws the route correctly via canvas composite
-  // while the container is still at 1600×1000 (before finally restores it).
+  // Controls: previously handled by SimpleMapScreenshoter's hide list; we now
+  // hide them explicitly since html2canvas doesn't have an equivalent option.
   const overlayPane = map.getPane("overlayPane");
   const savedOverlayDisplay = overlayPane ? overlayPane.style.display : null;
   if (overlayPane) overlayPane.style.display = "none";
 
-  // Zoom controls are handled by SimpleMapScreenshoter's own hide list.
-  const screenshoter = new SimpleMapScreenshoter({
-    hidden: true,
-    hideElementsWithSelectors: [".leaflet-control-container"],
-  }).addTo(map);
+  const controlsContainer = container.querySelector(".leaflet-control-container");
+  const savedControlsDisplay = controlsContainer
+    ? controlsContainer.style.display
+    : null;
+  if (controlsContainer) controlsContainer.style.display = "none";
+
+  // Dynamic import keeps html2canvas (~200 KB) out of the initial bundle.
+  const { default: html2canvas } = await import("html2canvas");
 
   let pngDataUrl;
   try {
-    try {
-      pngDataUrl = await screenshoter.takeScreen("image");
-    } catch (captureErr) {
-      // dom-to-image returns "data:," when the canvas is tainted by cross-origin
-      // tile requests.  This is common on iOS/Safari: tiles already in the browser
-      // cache may have been stored without the CORS response headers, so when
-      // dom-to-image fetches them via XHR the browser rejects the cached entry as
-      // a CORS violation and canvas.toDataURL() returns the empty "data:," URL,
-      // which SimpleMapScreenshoter correctly detects and rejects as
-      // "Base64 image generation error".
-      //
-      // Fix: retry with cacheBust=true so dom-to-image appends a timestamp to
-      // every tile URL, bypassing the cache and forcing fresh CORS-valid responses.
-      if (captureErr?.message?.includes("Base64 image generation error")) {
-        console.warn(
-          "exportMapAsPdf: first capture tainted by CORS — retrying with cache-bust",
-        );
-        pngDataUrl = await screenshoter.takeScreen("image", {
-          domtoimageOptions: { cacheBust: true },
-        });
-      } else {
-        throw captureErr;
-      }
-    }
+    // html2canvas replaces SimpleMapScreenshoter (which wraps dom-to-image-more).
+    //
+    // Why the swap: dom-to-image-more on iPad Safari rendered tile-pane and
+    // marker-pane `translate3d` transforms inconsistently — markers/polyline
+    // ended up ~50 m offset (consistently NW originally, then west-ish after
+    // the scroll-reset fix) from the captured tile content.  html2canvas walks
+    // the DOM and re-draws each element directly to canvas via its own
+    // renderer rather than through SVG/foreignObject, which gives consistent
+    // transform handling across sibling panes on Safari.
+    //
+    // `useCORS: true` requests tile images cross-origin (the TileLayer is
+    // already configured with `crossOrigin="anonymous"`).  `allowTaint: false`
+    // forces an error rather than a tainted canvas if any image lacks CORS
+    // headers, so we fail loudly instead of producing a blank PDF.
+    // `scale: 1` keeps the output at CSS-pixel resolution to match the
+    // container we sized to 1600×1000 — `drawRouteOverlay` re-scales as
+    // needed via the natural-vs-CSS-dimension ratio.
+    const captureCanvas = await html2canvas(container, {
+      width:           TARGET_W,
+      height:          TARGET_H,
+      windowWidth:     TARGET_W,
+      windowHeight:    TARGET_H,
+      x:               0,
+      y:               0,
+      scrollX:         0,
+      scrollY:         0,
+      scale:           1,
+      useCORS:         true,
+      allowTaint:      false,
+      backgroundColor: "#fff",
+      logging:         false,
+      imageTimeout:    8000,
+    });
+
+    pngDataUrl = captureCanvas.toDataURL("image/png");
 
     // Composite the route polyline while the container is STILL at 1600×1000.
     // map.latLngToContainerPoint() gives pixel coordinates matching the capture
@@ -345,14 +359,12 @@ export async function buildMapPdfBlob(map, meta = {}) {
     pngDataUrl = await drawRouteOverlay(pngDataUrl, map, routePositions);
 
   } finally {
-    // Always restore the overlay pane, container and screenshoter — even on failure.
+    // Always restore the overlay pane, controls, container — even on failure.
     if (overlayPane && savedOverlayDisplay !== null) {
       overlayPane.style.display = savedOverlayDisplay;
     }
-    try {
-      screenshoter.remove();
-    } catch {
-      /* no-op */
+    if (controlsContainer && savedControlsDisplay !== null) {
+      controlsContainer.style.display = savedControlsDisplay;
     }
     Object.assign(container.style, savedStyle);
     try {
