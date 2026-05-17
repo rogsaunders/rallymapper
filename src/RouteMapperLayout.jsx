@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
+import { exportMapAsPdf, buildMapPdfBlob } from "./export/exportMapPdf";
 import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
 import { ICON_ORDER } from "./icons/iconRegistry";
@@ -607,6 +608,7 @@ export default function RouteMapperLayout() {
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
   const [leafletMap, setLeafletMap] = useState(null);
+  const [exportingMapPdf, setExportingMapPdf] = useState(false);
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
   const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
 
@@ -1313,6 +1315,22 @@ export default function RouteMapperLayout() {
         if (!stageActiveRef.current) return;
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
+        // Discard fixes with very poor accuracy — these are usually network-
+        // location guesses (Wi-Fi / cell tower) that iOS returns before GPS
+        // satellites are fully acquired. Such fixes can be hundreds of metres
+        // to kilometres off the true position and create phantom lines on
+        // the map and in the PDF that don't follow any road.
+        // 80 m covers good GPS (5–15 m), GPS in light forest (30–50 m), and
+        // marginal satellite fixes (50–80 m) while rejecting network-only
+        // location estimates (typically >100 m, often >>200 m).
+        const TRACK_MAX_ACCURACY_M = 80;
+        if (
+          Number.isFinite(accuracy) &&
+          accuracy > TRACK_MAX_ACCURACY_M
+        ) {
+          return;
+        }
+
         const now = Date.now();
         if (now - lastTrackTimeRef.current < TRACK_INTERVAL_MS) return; // time gate
 
@@ -1532,6 +1550,80 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
+        // Capture the printable map PDF BEFORE the ZIP is built, while the
+        // Leaflet map is still mounted and populated with this stage's
+        // track/waypoints. Best-effort — if capture fails we still ship the
+        // rest of the ZIP.
+        let mapPdfBlob = null;
+        if (leafletMap && showMap) {
+          try {
+            // Raw waypoints/trackPoints in state carry distanceFromStartM, not
+            // totalMeters, so read from the assembled stage to get the total.
+            const lastTrackPt = stageWithRoadbook.trackPoints?.at(-1);
+            const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
+
+            const stageWaypoints = stageWithRoadbook.waypoints || [];
+            const wpCount = stageWaypoints.filter(
+              (w) => w.kind !== "start" && w.poi !== "START",
+            ).length;
+
+            // fitBoundsTo: all points (start + track + waypoints) so the
+            // captured view fits the whole stage.
+            const pts = [];
+            if (startGPS?.lat && startGPS?.lon) {
+              pts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+            }
+            (stageWithRoadbook.trackPoints || []).forEach((p) => {
+              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                pts.push([Number(p.lat), Number(p.lon)]);
+              }
+            });
+            stageWaypoints.forEach((p) => {
+              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                pts.push([Number(p.lat), Number(p.lon)]);
+              }
+            });
+
+            // routePositions: track points only (+ start). Waypoints are
+            // already shown as markers; including them in the polyline array
+            // causes spurious straight lines between them.
+            const routePts = [];
+            if (startGPS?.lat && startGPS?.lon) {
+              routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+            }
+            (stageWithRoadbook.trackPoints || []).forEach((p) => {
+              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                routePts.push([Number(p.lat), Number(p.lon)]);
+              }
+            });
+
+            const baseTitle =
+              `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+
+            const result = await buildMapPdfBlob(leafletMap, {
+              title: baseTitle,
+              date: new Date(),
+              totalDistanceKm: totalKm,
+              waypointCount: wpCount,
+              tileAttribution:
+                mapSource === "esri_imagery"
+                  ? "Tiles © Esri"
+                  : mapSource === "opentopo"
+                    ? "© OpenTopoMap (CC-BY-SA)"
+                    : "© OpenStreetMap contributors",
+              fitBoundsTo: pts.length >= 2 ? pts : null,
+              routePositions: routePts.length >= 2 ? routePts : null,
+              filename: baseTitle || "routemapper-map",
+            });
+            mapPdfBlob = result?.blob ?? null;
+          } catch (mapErr) {
+            console.warn(
+              "Map PDF capture failed — continuing with ZIP without it",
+              mapErr,
+            );
+          }
+        }
+
         // Free / guest: core GPX files only. Paid plans get the full package.
         const fullExport = planLimits.fullExport;
         const blob = await buildRoutePackage(stageWithRoadbook, {
@@ -1542,6 +1634,7 @@ export default function RouteMapperLayout() {
           includeGaia: fullExport,
           includePdf: false,
           author: profile?.full_name || null,
+          mapPdfBlob,
         });
 
         downloadBlob(`${base}.zip`, blob);
@@ -2632,6 +2725,66 @@ export default function RouteMapperLayout() {
             title="Show generated roadbook preview"
           >
             {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
+            disabled={!showMap || !leafletMap || exportingMapPdf}
+            title="Export the current map view as a printable PDF. Tip: let the map fully load before exporting — tiles may take up to 30 seconds on a mobile connection."
+            onClick={async () => {
+              if (!leafletMap) return;
+              setExportingMapPdf(true);
+              try {
+                const lastTrackPt = trackPoints?.[trackPoints.length - 1];
+                const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
+
+                // routePositions: track points only (+ start) for the polyline overlay.
+                // Waypoints are already drawn as markers, so excluding them here
+                // prevents spurious straight lines between marker locations.
+                const routePts = [];
+                if (startGPS?.lat && startGPS?.lon) {
+                  routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+                }
+                (trackPoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    routePts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+
+                const baseTitle =
+                  `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+
+                await exportMapAsPdf(leafletMap, {
+                  title: baseTitle,
+                  date: new Date(),
+                  totalDistanceKm: totalKm,
+                  waypointCount: (waypoints || []).filter(
+                    (w) => w.kind !== "start" && w.poi !== "START",
+                  ).length,
+                  tileAttribution:
+                    mapSource === "esri_imagery"
+                      ? "Tiles © Esri"
+                      : mapSource === "opentopo"
+                        ? "© OpenTopoMap (CC-BY-SA)"
+                        : "© OpenStreetMap contributors",
+                  // Mid-stage manual export: preserve the user's current
+                  // zoom/pan — don't refit to the full route.
+                  fitBoundsTo: null,
+                  routePositions: routePts.length >= 2 ? routePts : null,
+                  filename: baseTitle || "routemapper-map",
+                });
+              } catch (err) {
+                console.error("Export Map PDF failed", err);
+                alert(
+                  `Could not export map PDF.\n\n${err?.message || err}\n\nIf you're using satellite or topo tiles, try switching to OSM and exporting again.`,
+                );
+              } finally {
+                setExportingMapPdf(false);
+              }
+            }}
+          >
+            {exportingMapPdf ? "Exporting…" : "Export Map PDF"}
           </button>
         </div>
 

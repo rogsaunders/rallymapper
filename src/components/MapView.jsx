@@ -103,9 +103,79 @@ function Recenter({ center, zoom, enabled }) {
   return null;
 }
 
-function fmtKm(meters) {
-  const km = meters / 1000;
-  return km >= 10 ? `${km.toFixed(1)} km` : `${km.toFixed(2)} km`;
+// ── Waypoint map marker helpers ───────────────────────────────────────────────
+//
+// Map markers use a compact two-row HTML badge instead of the full SVG icons.
+// The top row shows an abbreviated type/icon label (L, R, H1, N, …) on a
+// coloured background; the bottom row shows the sequential WP number.
+// This approach:
+//   • avoids the "NOTE" text rendered by note.svg
+//   • works reliably in PDF captures (pure HTML/CSS, no canvas timing issues)
+//   • lets navigators cross-reference with the roadbook instantly
+
+const ICON_ABBR = {
+  // Nav
+  left: "L", right: "R", keep_l: "KL", keep_r: "KR",
+  straight: "S", gate: "GT", cattle_gate: "CG",
+  railroad: "RR", give_way: "GW", caution: "CA",
+  // Hazard
+  danger_1: "H1", danger_2: "H2", danger_3: "H3",
+  // Terrain
+  bump: "B", bumps: "BB", dip: "D", twisty: "TW",
+  ruts: "RT", washout: "WO", up_hill: "UP", down_hill: "DN",
+  // Control
+  start: "ST", finish: "FN", stop: "SP", checkpoint: "CP",
+  time: "TC", fuel: "F", service: "SV",
+};
+
+const TYPE_COLOR = {
+  nav:     "#1d4ed8", // blue
+  hazard:  "#dc2626", // red
+  control: "#7c3aed", // purple
+  terrain: "#b45309", // amber/brown
+  note:    "#374151", // grey
+};
+
+function getIconAbbr(type, iconId) {
+  const id = (iconId || "").toLowerCase();
+  if (id && ICON_ABBR[id]) return ICON_ABBR[id];
+  const t = (type || "note").toLowerCase();
+  return { nav: "N", hazard: "H", control: "C", terrain: "T", note: "N" }[t] ?? "N";
+}
+
+function getTypeColor(type) {
+  return TYPE_COLOR[(type || "note").toLowerCase()] ?? TYPE_COLOR.note;
+}
+
+function makeWaypointDivIcon(type, iconId, number) {
+  const abbr  = getIconAbbr(type, iconId);
+  const bg    = getTypeColor(type);
+  const numHtml = number != null
+    ? `<div style="background:#fff;border:1.5px solid #374151;border-radius:3px;
+                   font-size:9px;font-weight:700;padding:1px 4px;color:#111;
+                   font-family:sans-serif;line-height:1.2;text-align:center;
+                   box-shadow:0 1px 2px rgba(0,0,0,0.18);">${number}</div>`
+    : "";
+
+  const html = `<div style="display:flex;flex-direction:column;align-items:center;
+                             gap:2px;pointer-events:none;">
+    <div style="background:${bg};color:#fff;border-radius:4px;padding:2px 5px;
+                font-size:10px;font-weight:800;font-family:sans-serif;line-height:1.3;
+                white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.35);
+                border:1.5px solid rgba(255,255,255,0.35);">${abbr}</div>
+    ${numHtml}
+  </div>`;
+
+  const w = Math.max(24, abbr.length * 7 + 12);
+  const h = number != null ? 34 : 20;
+
+  return L.divIcon({
+    className: "rm-waypoint-icon",
+    html,
+    iconSize:    [w, h],
+    iconAnchor:  [w / 2, h / 2],
+    popupAnchor: [0, -(h / 2)],
+  });
 }
 
 export default function MapView({
@@ -243,40 +313,17 @@ export default function MapView({
     return pts;
   }, [startGPS, trackPoints, waypoints]);
 
-  const segmentLabels = useMemo(() => {
-    // Use only START + WAYPOINTS for labels (not track points)
-    const pts = [];
-
-    const add = (lat, lon) => {
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      pts.push([lat, lon]);
-    };
-
-    if (startGPS) add(Number(startGPS.lat), Number(startGPS.lon));
-
-    (waypoints || [])
-      .filter((wp) => wp && wp.kind !== "start" && wp.poi !== "START")
-      .forEach((wp) => add(Number(wp.lat), Number(wp.lon)));
-
-    if (pts.length < 2) return [];
-
-    const labels = [];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i];
-      const b = pts[i + 1];
-      const meters = L.latLng(a[0], a[1]).distanceTo(L.latLng(b[0], b[1]));
-      if (meters < 25) continue;
-
-      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      labels.push({
-        key: `wpseg-${i}`,
-        position: mid,
-        text: fmtKm(meters),
-      });
+  // Map each non-start waypoint object → its 1-based display number (WP 1, WP 2, …)
+  const waypointNumberMap = useMemo(() => {
+    const m = new Map();
+    let n = 0;
+    for (const wp of waypoints || []) {
+      if (wp.kind !== "start" && wp.poi !== "START") {
+        m.set(wp, ++n);
+      }
     }
-
-    return labels;
-  }, [startGPS, waypoints]);
+    return m;
+  }, [waypoints]);
 
   return (
     <div
@@ -292,7 +339,6 @@ export default function MapView({
         center={[defaultCenter.lat, defaultCenter.lon]}
         zoom={14}
         style={{ height: "100%", width: "100%" }}
-        preferCanvas={true}
       >
         <FixResize resizeKey={resizeKey} />
 
@@ -313,20 +359,6 @@ export default function MapView({
             pathOptions={{ color: "red", weight: 5, opacity: 0.9 }}
           />
         )}
-
-        {segmentLabels.map((s) => (
-          <Marker
-            key={s.key}
-            position={s.position}
-            interactive={false}
-            icon={L.divIcon({
-              className: "segment-label",
-              html: `<div>${s.text}</div>`,
-              iconSize: [80, 24], // optional
-              iconAnchor: [40, 12], // optional (center the label)
-            })}
-          />
-        ))}
 
         {/* Live GPS */}
         {currentGPS && (
@@ -352,73 +384,21 @@ export default function MapView({
           </Marker>
         )}
 
-        {/* Waypoints */}
+        {/* Waypoints — compact badge markers (abbreviated type + WP number) */}
         {(waypoints || []).map((wp, idx) => {
           const lat = Number(wp?.lat);
           const lon = Number(wp?.lon);
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
-          const type = String(wp.type || "").toLowerCase();
-          const iconId = String(wp.iconId || "").toLowerCase();
-          const rawIconId = wp.iconId; // ✅ add this (or just use wp.iconId directly)
+          const type    = String(wp.type   || "note").toLowerCase();
+          const iconId  = String(wp.iconId || "").toLowerCase();
           const isStart = wp.kind === "start" || wp.poi === "START";
+          const wpNumber = isStart ? null : waypointNumberMap.get(wp);
 
-          let svgFallback = ICONS.note?.svg;
-
-          if (isStart) {
-            svgFallback = START_SVG;
-          } else if (type === "hazard") {
-            const hazardKey = iconId || "danger_1";
-            svgFallback =
-              ICONS.hazard?.variants?.[hazardKey]?.svg ||
-              ICONS.hazard?.svg ||
-              ICONS.note?.svg;
-          } else if (type === "nav") {
-            const navKey = iconId || "straight";
-            const DEBUG = false;
-            if (DEBUG && type === "nav")
-              console.log("NAV waypoint debug:", {
-                type,
-                iconId,
-                hasVariant: !!ICONS.nav?.variants?.[iconId],
-              });
-            svgFallback =
-              ICONS.nav?.variants?.[navKey]?.svg ||
-              ICONS.nav?.svg ||
-              ICONS.note?.svg;
-          } else if (type === "control") {
-            const controlKey = iconId || "start";
-            svgFallback =
-              ICONS.control?.variants?.[controlKey]?.svg ||
-              ICONS.control?.svg ||
-              ICONS.note?.svg;
-          } else if (type === "terrain") {
-            const terrainKey = iconId || "bump";
-            svgFallback =
-              ICONS.terrain?.variants?.[terrainKey]?.svg ||
-              ICONS.terrain?.svg ||
-              ICONS.note?.svg;
-          } else if (ICONS[type]?.svg) {
-            svgFallback = ICONS[type].svg;
-          }
-          if (type === "nav") {
-            console.log("NAV waypoint iconId =", wp.iconId);
-          }
-
-          // console.log("NAV svgFallback starts:", svgFallback?.slice?.(0, 120));
-
-          const cacheKey = isStart ? "start" : `${type}:${iconId || "default"}`;
-          const icon = getLeafletIcon(cacheKey, svgFallback);
-
-          if (!icon) {
-            console.warn("Missing icon for waypoint", {
-              type,
-              iconId,
-              cacheKey,
-              svgFallbackLen: svgFallback?.length,
-              svgFallbackSample: svgFallback?.slice?.(0, 50),
-            });
-          }
+          // Start uses the blue-circle SVG icon; all others use the compact badge.
+          const icon = isStart
+            ? getLeafletIcon("start")
+            : makeWaypointDivIcon(type, iconId, wpNumber);
 
           return (
             <Marker
@@ -427,17 +407,13 @@ export default function MapView({
               icon={icon}
             >
               <Popup>
-                {isStart ? "START" : wp.poi || `Waypoint ${idx + 1}`}
+                {isStart ? "START" : wp.poi || `WP ${wpNumber}`}
                 <br />
                 <small>{wp.timestamp}</small>
-                {wp.type && (
+                {!isStart && (
                   <div style={{ fontSize: 12, opacity: 0.8 }}>
-                    Type: {String(wp.type).toUpperCase()}
-                  </div>
-                )}
-                {(type === "hazard" || type === "nav") && rawIconId && (
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>
-                    IconId: {String(rawIconId)}
+                    {String(type).toUpperCase()}
+                    {wp.iconId ? ` · ${wp.iconId}` : ""}
                   </div>
                 )}
               </Popup>

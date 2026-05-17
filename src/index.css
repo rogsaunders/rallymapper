@@ -183,11 +183,36 @@ bg_blue.wp-svg-wrap {
   border: none;
 }
 
+/* Compact badge marker used for all non-start waypoints */
+.rm-waypoint-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
 .rm-leaflet-svg-wrap {
+  position: relative; /* required for .wp-number-badge absolute positioning */
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
+}
+
+/* Small numbered badge that appears bottom-right of each waypoint marker */
+.wp-number-badge {
+  position: absolute;
+  bottom: -5px;
+  right: -8px;
+  background: #fff;
+  border: 1.5px solid #374151;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 3px;
+  color: #111;
+  font-family: sans-serif;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Pending (snap-first) waypoint — dashed amber ring + pulse */
