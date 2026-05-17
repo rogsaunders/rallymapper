@@ -2411,6 +2411,27 @@ export default function RouteMapperLayout() {
                 Sign out
               </button>
             )}
+
+            {/* Build stamp — short commit SHA + deploy context.  Lets a
+                non-technical user confirm at a glance which build they're
+                on, e.g. when a Netlify deploy preview has updated but the
+                iPad PWA service worker is still serving the prior bundle.
+                Defined by Vite at build time (see __COMMIT_SHA__ in
+                vite.config.js). */}
+            <span
+              className="text-[10px] font-mono text-gray-400 select-all"
+              title={`v${
+                typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "?"
+              } · ${
+                typeof __BUILD_CONTEXT__ !== "undefined"
+                  ? __BUILD_CONTEXT__
+                  : "dev"
+              } · commit ${
+                typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "?"
+              }`}
+            >
+              {typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "dev"}
+            </span>
           </div>
         </div>
       </header>

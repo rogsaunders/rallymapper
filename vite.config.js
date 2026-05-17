@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
@@ -25,9 +26,30 @@ function getHttpsConfig() {
 
 const pkg = JSON.parse(fs.readFileSync("./package.json", "utf-8"));
 
+// Short commit SHA stamped into the bundle so a non-technical user can verify
+// which build they're running (e.g. when a Netlify deploy preview has updated
+// but the iPad PWA service worker is still serving the prior bundle).  Netlify
+// exposes `COMMIT_REF` in the build environment; fall back to `git rev-parse`
+// for local dev, or `"dev"` if neither is available.
+function getCommitSha() {
+  if (process.env.COMMIT_REF) return process.env.COMMIT_REF.slice(0, 7);
+  try {
+    return execSync("git rev-parse --short HEAD").toString().trim();
+  } catch {
+    return "dev";
+  }
+}
+
+// Netlify deploy context: "production", "deploy-preview", "branch-deploy", or
+// "dev" when running locally.  Lets the in-app build stamp distinguish which
+// kind of build is in front of the user.
+const buildContext = process.env.CONTEXT || "dev";
+
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_VERSION__:   JSON.stringify(pkg.version),
+    __COMMIT_SHA__:    JSON.stringify(getCommitSha()),
+    __BUILD_CONTEXT__: JSON.stringify(buildContext),
   },
   server: {
     https: getHttpsConfig(),
