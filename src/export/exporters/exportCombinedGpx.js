@@ -1,47 +1,48 @@
+import { gpxFooter, gpxHeader, xmlEscape } from "./gpxShared";
 import {
-  gpxFooter,
-  gpxHeader,
-  openRallyTypeForIcon,
-  symbolForIcon,
-  xmlEscape,
-} from "./gpxShared";
+  buildStartWaypoint,
+  buildTrackpointXml,
+  buildWaypointXml,
+} from "./exportUniversalGpx";
 
+/**
+ * Combined GPX export — waypoints + recorded track in a single file.
+ *
+ * Composes the same waypoint and trackpoint builders used by the separate
+ * `_waypoints.gpx` and `_track.gpx` exports, so the combined output is
+ * structurally identical (same Number() casting, finite-coord filtering,
+ * START waypoint inclusion, time elements, and POI-aware naming).
+ *
+ * Targets downstream tools that expect both kinds of GPX entity in one
+ * file — Rally Navigator, Guru Maps, Hema, Garmin BaseCamp.
+ */
 export function exportCombinedGpx(stage, config = {}) {
-  const name = xmlEscape(stage?.meta?.stageName || "RouteMapper");
+  const trackName = xmlEscape(stage?.meta?.stageName || "RouteMapper");
 
-  const waypoints = (stage.waypoints || [])
-    .map((w, index) => {
-      const name = xmlEscape(w.name || w.iconId || `WP${index + 1}`);
-      const desc = xmlEscape(w.note || "");
-      const iconId = w.iconId || w.icon;
-      const sym = xmlEscape(symbolForIcon(iconId));
-      const orType = xmlEscape(openRallyTypeForIcon(iconId));
+  // Waypoints — start point (if present) followed by user-added waypoints
+  const startWaypoint = buildStartWaypoint(stage?.startGPS);
 
-      return [
-        `  <wpt lat="${w.lat}" lon="${w.lon}">`,
-        `    <name>${name}</name>`,
-        desc ? `    <desc>${desc}</desc>` : null,
-        `    <sym>${sym}</sym>`,
-        `    <type>${orType}</type>`,
-        `  </wpt>`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-    })
+  const regularWaypoints = (stage.waypoints || [])
+    .filter(
+      (w) => Number.isFinite(Number(w.lat)) && Number.isFinite(Number(w.lon)),
+    )
+    .map((w, index) => buildWaypointXml(w, index));
+
+  const allWaypoints = [startWaypoint, ...regularWaypoints]
+    .filter(Boolean)
     .join("\n");
 
+  // Track — single <trk> with one <trkseg>
   const trackPoints = (stage.trackPoints || [])
-    .map(
-      (p) =>
-        `    <trkpt lat="${p.lat}" lon="${p.lon}">${
-          p.time ? `\n      <time>${xmlEscape(p.time)}</time>\n    ` : ""
-        }</trkpt>`,
+    .filter(
+      (p) => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)),
     )
+    .map(buildTrackpointXml)
     .join("\n");
 
   const track = [
     `  <trk>`,
-    `    <name>${name}</name>`,
+    `    <name>${trackName}</name>`,
     `    <trkseg>`,
     trackPoints,
     `    </trkseg>`,
@@ -50,7 +51,7 @@ export function exportCombinedGpx(stage, config = {}) {
 
   return [
     gpxHeader(config.appName || "RouteMapper"),
-    waypoints,
+    allWaypoints,
     track,
     gpxFooter(),
   ].join("\n");
