@@ -89,13 +89,13 @@ Try all four methods:
 Tap the red **End Stage**. The app generates a roadbook, saves your data, and offers an export ZIP.
 
 ### 7. Check the export
-Open the ZIP. Inside you'll find:
-- GPX files (Rally Navigator, OpenRally, Garmin, universal, combined)
-- KML for Google Earth
-- CSVs for Hema and Gaia
-- HTML roadbook with tulip diagrams and CAP values
-- Map PDF (A4 landscape, ready to print)
-- Master JSON for re-import
+Open the ZIP and read the **`README.txt`** at the root — it tells you which file to use for which tool. The layout is:
+
+- **`Universal/`** — `route.gpx` and `route.kml` for any mapping tool (Garmin, Hema, Guru, Gaia, Google Earth)
+- **`RallyNavigator/`** — `route.gpx` bundled for Rally Navigator import
+- **`Printable/`** — `roadbook.html`, `roadbook.docx`, `roadbook.csv`, plus `map.pdf` when generated
+- **`Source/`** — `stage.json` to re-import back into RouteMapper
+- **`Garmin/`, `Hema/`, `Gaia/`** — tool-specific bundles for users who prefer pre-organised file conventions
 
 Open the HTML roadbook and the map PDF — both should render cleanly.
 
@@ -209,21 +209,17 @@ The HTML roadbook generates automatically when you end a stage. Each waypoint ap
 
 Open the HTML roadbook in any browser. It's print-friendly and works on any device — no special software required.
 
-### 10+ export formats
+### Export package
 
-A single ZIP covers every format your participants might need:
-- **Rally Navigator CSV** (raw and driver modes)
-- **Garmin GPX**
-- **OpenRally GPX**
-- **Universal GPX**
-- **Combined GPX**
-- **Google Earth KML**
-- **Hema Maps**
-- **Guru Maps**
-- **Gaia GPS**
-- **Roadbook HTML** with tulips
-- **Map PDF** (A4 landscape)
-- **Master JSON** (full re-import)
+One ZIP per stage, organised by use case rather than by file type. A `README.txt` at the root tells you which file to pick:
+
+- **`Universal/`** — `route.gpx` (waypoints + track combined) and `route.kml`. Works in Garmin BaseCamp, Hema Maps, Guru Maps, Gaia GPS, Google Earth, and any modern GPX/KML viewer.
+- **`RallyNavigator/`** — `route.gpx` bundled for Rally Navigator. RN imports the polyline and waypoints cleanly.
+- **`Printable/`** — `roadbook.html` (open in any browser and print), `roadbook.docx` (edit in Word or Pages first), `roadbook.csv` (tabular view for Excel / Numbers / Sheets), and `map.pdf` when generated.
+- **`Source/`** — `stage.json` to re-import the full stage back into RouteMapper, plus `roadbook.json` and `manifest.json` for technical use.
+- **`Garmin/`, `Hema/`, `Gaia/`** — tool-specific bundles in those products' preferred folder conventions.
+
+`Universal/` also includes `track.gpx` and `waypoints.gpx` (separate variants of `route.gpx`) for any consumer that prefers them split rather than combined.
 
 ---
 
