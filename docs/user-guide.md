@@ -76,12 +76,11 @@ Walk or drive a short loop — five to ten minutes is plenty. Watch a breadcrumb
 
 The snap-first flow: **tap first, refine second**. GPS locks the moment you tap; you then have a short window to choose icon and notes.
 
-Try all four methods:
+Try the three methods:
 
 1. **Tap-then-refine** — Tap **Add Waypoint (Current GPS)**. A pending amber card appears with a countdown. Choose an icon (e.g. Hazard → Danger 2) and/or type a POI note. Tap **✓ Done** to commit early, **Discard** to cancel, or just let it auto-commit.
-2. **Voice dictation** — Tap **Add Waypoint**, then tap **Dictate**. Speak your note while the pending card is active; the spoken text fills the POI field before auto-commit.
+2. **Voice push-to-talk** — Tap **🎙 Record** in the Voice panel and speak your command, e.g. *"left onto Forbes Road"*. See [Features in Depth → Voice waypoints](#voice-waypoints-push-to-talk) below.
 3. **Different icon types** — try Navigation, Hazard, Control, Terrain, and Note icons. Your last-used type persists, so for a stream of same-type waypoints you just tap → let it commit.
-4. **Hands-Free voice** *(for solo drivers)* — see [Features in Depth → Hands-Free voice mapping](#hands-free-voice-mapping) below.
 
 **Expected:** while pending, a dashed amber circle on the map at the captured GPS position. On commit, it switches to a solid icon marker and appears in the Waypoints panel with type, icon, time, and distance from the previous waypoint.
 
@@ -131,36 +130,39 @@ RouteMapper organises 29 icons into 5 types. Your last-used type persists betwee
 
 All 29 icons follow OpenRally and Garmin symbol standards. They render identically across the in-app map, generated roadbook tulips, and KML/GPX exports.
 
-### Hands-Free voice mapping
+### Voice waypoints (push-to-talk)
 
-Hands-Free mode locks GPS the instant the wake word "Mapper" is recognised — **before you say anything else**. At speed, the recorded position is where you were when you called it, not where you ended up while speaking the command.
+Tap **🎙 Record** and speak — RouteMapper locks your GPS at the moment of the tap, captures your spoken command, and creates a waypoint at the locked position. No wake word, no continuous listening; one button, your voice.
+
+The button is the trigger because in real vehicles wake words fail too often — engine noise, wind, and headset compression all degrade speech recognition. A button tap is deterministic and works every time.
 
 **Flow:**
-1. Tap **Activate** in the Hands-Free panel — listening for the wake word.
-2. Say **"Mapper"** — beep + the panel turns amber ("📍 GPS locked"). GPS is locked at this instant.
-   > Speech recognition handles common variations — *"map"*, *"map a"*, and *"map her"* are all heard as *"Mapper"*.
-3. Speak: *type + icon + dash + note*
+1. Tap **🎙 Record** in the Voice panel — beep + the panel turns amber (*"📍 GPS locked"*). GPS is locked at this instant.
+2. Speak your command: *type + icon + dash + note*.
+3. After a short silence (default 2.5 s), the waypoint commits to the locked GPS position.
+4. Say nothing for the snap window (default 5 s) and it auto-commits as a plain note.
+5. Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint. Or tap **⏹ Stop** on the button.
 
-   | You say | Result |
-   |---------|--------|
-   | *"Mapper… hazard danger two — rocks on track"* | Hazard waypoint, Danger 2 icon, *"rocks on track"* note |
-   | *"Mapper… left — onto gravel road"* | Nav waypoint, Left icon, *"onto gravel road"* note |
-   | *"Mapper… terrain washout"* | Terrain waypoint, Washout icon, no note |
-   | *"Mapper… bump"* | Terrain waypoint, Bump icon (type inferred) |
-   | *"Mapper… control fuel — stop for fuel"* | Control waypoint, Fuel icon, *"stop for fuel"* note |
-   | *"Mapper… note — fuel stop ahead"* | Note waypoint, *"fuel stop ahead"* |
-   | *"Mapper… caution"* | Nav waypoint, Caution icon (type inferred) |
-   | *"Mapper… keep left"* | Nav waypoint, Keep Left icon |
+**Example commands:**
 
-   You can omit the type if the icon name is unambiguous — *"Mapper… left"* works as well as *"Mapper… nav left"*.
-4. After a short silence, the waypoint commits to the locked GPS position.
-5. Say nothing for the voice snap window and it auto-commits with the last-used icon — useful for repeated waypoints of the same type.
-6. Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint.
+| You say | Result |
+|---------|--------|
+| *"hazard danger two — rocks on track"* | Hazard waypoint, Danger 2 icon, *"rocks on track"* note |
+| *"left — onto gravel road"* | Nav waypoint, Left icon, *"onto gravel road"* note |
+| *"left onto Forbes Road"* | Nav waypoint, Left icon, *"onto Forbes Road"* note |
+| *"terrain washout"* | Terrain waypoint, Washout icon, no note |
+| *"bump"* | Terrain waypoint, Bump icon (type inferred) |
+| *"control fuel — stop for fuel"* | Control waypoint, Fuel icon, *"stop for fuel"* note |
+| *"note — fuel stop ahead"* | Note waypoint, *"fuel stop ahead"* |
+| *"caution"* | Nav waypoint, Caution icon (type inferred) |
+| *"keep left"* | Nav waypoint, Keep Left icon |
 
-**Three sliders** in the ⚙️ panel, all in one place:
+You can omit the type if the icon name is unambiguous — *"left"* works as well as *"nav left"*.
+
+**Three sliders** in the ⚙️ panel:
 - **Silence timeout** — pause after speaking before the command fires (1.5–5 s)
-- **Voice snap window** — how long after "Mapper" before auto-commit (3–10 s)
-- **Snap window (edit after tap)** — for the manual tap flow, not Hands-Free (2–10 s)
+- **Voice snap window** — how long after tapping 🎙 Record before auto-commit (3–10 s)
+- **Snap window (edit after tap)** — for the manual tap flow, not Voice (2–10 s)
 
 A Bluetooth headset with mic significantly improves accuracy in noisy or windy conditions.
 
@@ -239,8 +241,8 @@ Current prices at [routemapper.net/#pricing](https://routemapper.net/#pricing). 
 ## Tips for the Field
 
 - **Charge your device** before recording — GPS drains battery quickly.
-- **Use a phone or tablet mount** if recording while driving — essential for Hands-Free mode.
-- **Hands-Free pacing** — pause briefly after "Mapper" before your command. The dash separator (or a natural pause) splits the icon type from your note text.
+- **Mount the iPad close to the navigator** so the 🎙 Record button is one easy reach away.
+- **Voice pacing** — after tapping 🎙 Record, you have a short snap window to start speaking. Use a dash or natural pause to separate the icon from the note text.
 - **Tune the snap windows** — the ⚙️ cog has three sliders. On open terrain, 3–4 s for voice snap is plenty; in tricky navigation, 7–8 s gives you room to think.
 - **Bluetooth headset** — in a noisy vehicle or windy conditions, a headset mic dramatically improves voice accuracy.
 - **Stage History is read-only** — review past stages freely between live sessions; nothing gets overwritten.

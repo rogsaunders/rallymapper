@@ -20,7 +20,6 @@ import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
-import { createWakeWordListener } from "./voice/wakeWordListener";
 import StageHistoryPanel from "./components/StageHistoryPanel";
 import AccountModal from "./components/AccountModal";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
@@ -158,10 +157,6 @@ function fmtKmNumber(meters) {
 function makeLocalId(meta) {
   // stable enough + human readable; includes timestamp to avoid collisions
   return `${meta.tripDate}_d${meta.dayNumber}_r${meta.routeNumber}_s${meta.stageNumber}_${meta.endedAt}`;
-}
-
-function getSpeechRecognition() {
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
 function safeSlug(s) {
@@ -559,14 +554,11 @@ export default function RouteMapperLayout() {
   const [navIconId, setNavIconId] = useState("straight");
   const [controlIconId, setControlIconId] = useState("start");
   const [terrainIconId, setTerrainIconId] = useState("bump");
-  const recognitionRef = useRef(null);
   // const localOwner = getGuestOwnerId();
   // const user = null;
 
-  const [isListening, setIsListening] = useState(false);
-  const [_dictationDraft, setDictationDraft] = useState("");
   const [handsFreeActive, setHandsFreeActive] = useState(false);
-  const [handsFreeMode, setHandsFreeMode] = useState("off"); // "off" | "standby" | "command"
+  const [handsFreeMode, setHandsFreeMode] = useState("off"); // "off" | "snap" | "command"
   const [_handsFreeListening, setHandsFreeListening] = useState(false);
   const [handsFreeTranscript, setHandsFreeTranscript] = useState("");
   const [handsFreeLastCommand, setHandsFreeLastCommand] = useState(null);
@@ -583,13 +575,12 @@ export default function RouteMapperLayout() {
   const pendingTimerRef = useRef(null);
   const [handsFreeToast, setHandsFreeToast] = useState(null); // { type, iconId, poi } for large toast
   const handsFreeRef = useRef(null); // voice command handler
-  const wakeWordRef = useRef(null); // wake word listener
   const handsFreeActiveRef = useRef(false); // mirrors handsFreeActive for async callbacks
 
-  // ── Snap-on-wake state ────────────────────────────────────────────
-  // GPS is locked the instant "Mapper" is heard; the user then has
-  // snapTimeoutSec seconds to say the waypoint type/icon before the
-  // pending waypoint is auto-committed with the current defaults.
+  // ── Snap-on-tap state ─────────────────────────────────────────────
+  // GPS is locked the instant 🎙 Record is tapped; the user then has
+  // snapTimeoutSec seconds to speak a command before the pending
+  // waypoint auto-commits as a plain note.
   const [snapCountdown, setSnapCountdown] = useState(0);
   const [snapTimeoutSec, setSnapTimeoutSec] = useState(
     () => Number(localStorage.getItem("rm_handsfree_snap_sec")) || 5,
@@ -772,84 +763,12 @@ export default function RouteMapperLayout() {
     }
   }, []);
 
-  const startDictation = () => {
-    const SR = getSpeechRecognition();
-    if (!SR) {
-      alert("Speech recognition not available in this browser.");
-      return;
-    }
-
-    // If already listening, ignore repeat tap
-    if (isListening) return;
-
-    // Create once
-    if (!recognitionRef.current) {
-      const rec = new SR();
-      rec.lang = "en-AU";
-      rec.continuous = false;
-      rec.interimResults = true;
-
-      rec.onstart = () => {
-        setIsListening(true);
-        setDictationDraft("");
-      };
-
-      rec.onresult = (event) => {
-        let finalText = "";
-        let interimText = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const res = event.results[i];
-          const transcript = res?.[0]?.transcript || "";
-          if (res.isFinal) finalText += transcript;
-          else interimText += transcript;
-        }
-
-        if (finalText.trim()) {
-          setPoi((prev) => (prev ? prev + " " : "") + finalText.trim());
-          setDictationDraft("");
-        } else {
-          setDictationDraft(interimText.trim());
-        }
-      };
-
-      rec.onerror = (e) => {
-        console.warn("Speech error:", e);
-        setIsListening(false);
-        setDictationDraft("");
-      };
-
-      rec.onend = () => {
-        setIsListening(false);
-        setDictationDraft("");
-      };
-
-      recognitionRef.current = rec;
-    }
-
-    try {
-      recognitionRef.current.start();
-    } catch (e) {
-      // Some browsers throw if called twice / too quickly
-      console.warn("Speech start failed:", e);
-    }
-  };
-
-  const stopDictation = () => {
-    try {
-      recognitionRef.current?.stop?.();
-    } catch (e) {
-      console.warn("Speech stop failed:", e);
-    } finally {
-      setIsListening(false);
-      setDictationDraft("");
-    }
-  };
-
-  // ── Hands-free voice command mode (Phase 2 — wake word) ────────────
+  // ── Hands-free voice command mode (push-to-talk) ───────────────────
   //
-  // Flow: Activate → Standby (listening for "Mapper") → Command (recording)
-  //       → commit waypoint → back to Standby → … → Stop
+  // Flow: tap 🎙 Record → GPS snap + start recording → user speaks →
+  //       silence timeout → commit waypoint → back to off.
+  // No wake word; the button is the trigger. Phase B will add a
+  // Bluetooth/media-key trigger that emulates the button tap.
 
   // ── Pending waypoint (snap-first) helpers — manual "Add Waypoint" tap ─
 
@@ -1061,102 +980,25 @@ export default function RouteMapperLayout() {
     setPoi("");
   };
 
-  // Cancel a pending snap — discard the locked GPS position and return to
-  // standby without adding a waypoint.
-  const cancelSnap = () => {
+  // Stop the active recording cycle and return to off — used both as the
+  // explicit Stop button handler and as the in-progress Cancel handler.
+  const stopHandsFree = () => {
     clearInterval(snapTimerRef.current);
     snapTimerRef.current = null;
     setSnapCountdown(0);
     handsFreeRef.current?.stop();
     handsFreeRef.current = null;
+    setHandsFreeActive(false);
+    handsFreeActiveRef.current = false;
+    setHandsFreeMode("off");
+    setHandsFreeListening(false);
     setHandsFreeTranscript("");
-    setHandsFreeMode("standby");
-    if (handsFreeActiveRef.current) armWakeWord();
   };
 
-  // Start wake word listening (Standby mode)
-  const armWakeWord = () => {
-    // Clean up any existing listener
-    wakeWordRef.current?.stop();
-
-    const listener = createWakeWordListener({
-      wakeWord: "mapper",
-
-      onWake: () => {
-        // ── SNAP ── capture GPS and current type/icon at the instant
-        // "Mapper" is recognised — before any command is spoken.
-        const snappedGps = currentGPSRef.current;
-        const snappedDefaults = { ...currentDefaultsRef.current };
-
-        playStartSound(); // distinct audio cue: GPS locked
-        setHandsFreeMode("snap");
-        setSnapCountdown(snapTimeoutSecRef.current);
-
-        // Countdown timer — auto-commits with defaults when it reaches 0.
-        // The remaining counter lives in a ref so onInterim (in the voice
-        // command handler) can reset it whenever speech is detected, which
-        // effectively pauses the timeout while the driver is still speaking.
-        clearInterval(snapTimerRef.current);
-        snapRemainingRef.current = snapTimeoutSecRef.current;
-        snapTimerRef.current = setInterval(() => {
-          snapRemainingRef.current -= 1;
-          setSnapCountdown(snapRemainingRef.current);
-          if (snapRemainingRef.current <= 0) {
-            clearInterval(snapTimerRef.current);
-            snapTimerRef.current = null;
-            setSnapCountdown(0);
-
-            if (!handsFreeActiveRef.current) return;
-
-            // Stop command listening (user didn't speak in time)
-            handsFreeRef.current?.stop();
-            handsFreeRef.current = null;
-
-            // Commit as a plain note when the countdown expires with no voice input.
-            // Using snappedDefaults here propagates the previous waypoint's type
-            // (e.g. KL → KL → KL…). A generic note is the safest fallback.
-            const cmd = {
-              type: "note",
-              iconId: null,
-              poi: "",
-            };
-            playStopSound();
-            commitVoiceWaypoint(cmd, snappedGps);
-            setHandsFreeLastCommand(cmd);
-            setHandsFreeToast(cmd);
-            setTimeout(() => setHandsFreeLastCommand(null), 4000);
-            setTimeout(() => setHandsFreeToast(null), 3000);
-
-            if (handsFreeActiveRef.current) armWakeWord();
-          }
-        }, 1000);
-
-        startCommandListening(snappedGps, snappedDefaults);
-      },
-
-      onListening: () => {
-        setHandsFreeMode("standby");
-      },
-
-      onStopped: () => {
-        // Only update if we're still in standby (not transitioning to command)
-      },
-
-      onError: (msg) => {
-        console.warn("Wake word error:", msg);
-      },
-    });
-
-    listener.start();
-    wakeWordRef.current = listener;
-  };
-
-  // Start command listening (after wake word detected).
-  // snappedGps     — GPS position locked at wake-word time (used for the waypoint).
-  // snappedDefaults — { type, iconId } captured at wake-word time (fallback if user
-  //                   doesn't speak within the timeout).
-  const startCommandListening = (snappedGps = null, snappedDefaults = null) => {
-    // Clean up any existing command handler
+  // Speech recognition handler — armed by startHandsFree at the moment of
+  // the snap. Owns the silence-timeout commit path and the "cancel" voice
+  // command; the snap-timeout path is owned by startHandsFree's interval.
+  const startCommandListening = (snappedGps = null) => {
     handsFreeRef.current?.stop();
 
     const handler = createVoiceCommandHandler({
@@ -1165,7 +1007,6 @@ export default function RouteMapperLayout() {
 
       onListeningStart: () => {
         setHandsFreeListening(true);
-        // Sound already played at snap — don't play again here.
       },
 
       onListeningStop: () => {
@@ -1179,8 +1020,6 @@ export default function RouteMapperLayout() {
         setHandsFreeMode("command");
         // Reset the snap countdown — the driver is clearly still speaking,
         // so the auto-commit-as-note fallback should not fire mid-sentence.
-        // The voice handler's silence-timeout decides when the command is
-        // actually complete; the countdown only resumes once speech stops.
         if (snapTimerRef.current) {
           snapRemainingRef.current = snapTimeoutSecRef.current;
           setSnapCountdown(snapRemainingRef.current);
@@ -1195,35 +1034,39 @@ export default function RouteMapperLayout() {
 
         setHandsFreeTranscript("");
 
-        // "cancel" / "discard" / "abort" — discard the snap, back to standby.
+        // "cancel" / "discard" / "abort" — discard the snap and return to off.
         if (cmd.type === "cancel") {
-          setHandsFreeMode("standby");
-          if (handsFreeActiveRef.current) armWakeWord();
+          setHandsFreeActive(false);
+          handsFreeActiveRef.current = false;
+          setHandsFreeMode("off");
           return;
         }
 
         playStopSound();
         setHandsFreeLastCommand(cmd);
-        // Use the GPS position snapped at wake-word time, not the current fix.
+        // Commit at the GPS position locked when the user tapped Record.
         commitVoiceWaypoint(cmd, snappedGps);
 
-        // Show large driving toast
+        // Driving toast
         setHandsFreeToast(cmd);
         setTimeout(() => setHandsFreeToast(null), 3000);
         setTimeout(() => setHandsFreeLastCommand(null), 4000);
+
+        // Return to off — push-to-talk is per-tap, not persistent.
+        setHandsFreeActive(false);
+        handsFreeActiveRef.current = false;
+        setHandsFreeMode("off");
       },
 
       onComplete: () => {
-        // Command cycle done — return to standby (re-arm wake word)
+        // Speech recognition session done — clean up the handler ref.
+        // Mode/active state transitions are owned by onCommand or the
+        // snap-timeout path in startHandsFree.
         handsFreeRef.current = null;
-        if (handsFreeActiveRef.current) {
-          armWakeWord();
-        }
       },
 
       onError: (msg) => {
-        console.warn("Hands-free command error:", msg);
-        // On error clear any pending snap state
+        console.warn("Voice command error:", msg);
         clearInterval(snapTimerRef.current);
         snapTimerRef.current = null;
         setSnapCountdown(0);
@@ -1238,30 +1081,58 @@ export default function RouteMapperLayout() {
     handsFreeRef.current = handler;
   };
 
+  // 🎙 Record — tap to capture one waypoint via voice. GPS locks at the
+  // instant of the tap; user speaks within the snap window; silence
+  // timeout commits the command; if no speech, snap timer commits a
+  // plain note. Either path returns us to "off" — push-to-talk is
+  // per-tap, no persistent listening state.
   const startHandsFree = () => {
     if (handsFreeActive) return;
-    // Stop manual dictation if running
-    stopDictation();
+
+    // SNAP at the instant the button is tapped — before any speech.
+    const snappedGps = currentGPSRef.current;
 
     setHandsFreeActive(true);
     handsFreeActiveRef.current = true;
-    setHandsFreeMode("standby");
-    armWakeWord();
-  };
+    setHandsFreeMode("snap");
+    playStartSound();
+    setSnapCountdown(snapTimeoutSecRef.current);
 
-  const stopHandsFree = () => {
+    // Snap timer — auto-commits as a plain note when it expires with no
+    // speech. Reset by onInterim while the driver is speaking.
     clearInterval(snapTimerRef.current);
-    snapTimerRef.current = null;
-    setSnapCountdown(0);
-    wakeWordRef.current?.stop();
-    wakeWordRef.current = null;
-    handsFreeRef.current?.stop();
-    handsFreeRef.current = null;
-    setHandsFreeActive(false);
-    handsFreeActiveRef.current = false;
-    setHandsFreeMode("off");
-    setHandsFreeListening(false);
-    setHandsFreeTranscript("");
+    snapRemainingRef.current = snapTimeoutSecRef.current;
+    snapTimerRef.current = setInterval(() => {
+      snapRemainingRef.current -= 1;
+      setSnapCountdown(snapRemainingRef.current);
+      if (snapRemainingRef.current <= 0) {
+        clearInterval(snapTimerRef.current);
+        snapTimerRef.current = null;
+        setSnapCountdown(0);
+
+        if (!handsFreeActiveRef.current) return;
+
+        handsFreeRef.current?.stop();
+        handsFreeRef.current = null;
+
+        // Generic note is the safest fallback — avoids inheriting the
+        // previous waypoint's icon type when the user is silent.
+        const cmd = { type: "note", iconId: null, poi: "" };
+        playStopSound();
+        commitVoiceWaypoint(cmd, snappedGps);
+        setHandsFreeLastCommand(cmd);
+        setHandsFreeToast(cmd);
+        setTimeout(() => setHandsFreeLastCommand(null), 4000);
+        setTimeout(() => setHandsFreeToast(null), 3000);
+
+        // Return to off
+        setHandsFreeActive(false);
+        handsFreeActiveRef.current = false;
+        setHandsFreeMode("off");
+      }
+    }, 1000);
+
+    startCommandListening(snappedGps);
   };
 
   // Clean up hands-free when stage ends
@@ -2936,7 +2807,7 @@ export default function RouteMapperLayout() {
               </div>
             )}
 
-            {/* ── Hands-Free Voice Mode ─────────────────────────── */}
+            {/* ── Voice (push-to-talk) ──────────────────────────── */}
             <div
               className="mt-3 border-2 rounded-xl p-2"
               style={{
@@ -2945,34 +2816,19 @@ export default function RouteMapperLayout() {
                     ? "#dc2626"
                     : handsFreeMode === "snap"
                       ? "#f59e0b"
-                      : handsFreeMode === "standby"
-                        ? "#2563eb"
-                        : "#e5e7eb",
+                      : "#e5e7eb",
                 backgroundColor:
                   handsFreeMode === "command"
                     ? "#fef2f2"
                     : handsFreeMode === "snap"
                       ? "#fffbeb"
-                      : handsFreeMode === "standby"
-                        ? "#eff6ff"
-                        : "white",
+                      : "white",
               }}
             >
               {/* Header row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-gray-700 mt-1">Hands-Free</span>
-                  {handsFreeMode === "standby" && (
-                    <>
-                      <span
-                        className="inline-block w-3 h-3 rounded-full"
-                        style={{ backgroundColor: "#2563eb" }}
-                      />
-                      <span className="text-sm text-blue-600 font-medium">
-                        Say "Mapper"
-                      </span>
-                    </>
-                  )}
+                  <span className="text-sm text-gray-700 mt-1">Voice</span>
                   {handsFreeMode === "snap" && (
                     <>
                       <span
@@ -2983,15 +2839,8 @@ export default function RouteMapperLayout() {
                         className="text-sm font-semibold"
                         style={{ color: "#b45309" }}
                       >
-                        📍 GPS locked — say type or wait {snapCountdown}s
+                        📍 GPS locked — speak or wait {snapCountdown}s
                       </span>
-                      <button
-                        type="button"
-                        onClick={cancelSnap}
-                        className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-100"
-                      >
-                        Cancel
-                      </button>
                     </>
                   )}
                   {handsFreeMode === "command" && (
@@ -3007,13 +2856,13 @@ export default function RouteMapperLayout() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Settings cog — only when idle or in standby */}
-                  {handsFreeMode !== "command" && handsFreeMode !== "snap" && (
+                  {/* Settings cog — only when idle */}
+                  {!handsFreeActive && (
                     <button
                       type="button"
                       onClick={() => setHandsFreeShowSettings((v) => !v)}
                       className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                      title="Hands-free settings"
+                      title="Voice settings"
                     >
                       <svg
                         className="w-4 h-4"
@@ -3040,18 +2889,18 @@ export default function RouteMapperLayout() {
                         handsFreeActive ? stopHandsFree() : startHandsFree();
                       }
                     }}
-                    className="px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors min-w-[90px]"
+                    className="px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors min-w-[110px]"
                     style={{
                       backgroundColor: !stageActive
                         ? "#9ca3af"
                         : handsFreeActive
                           ? "#dc2626"
-                          : "#2563eb",
+                          : "#588233",
                       opacity: !stageActive ? 0.5 : 1,
                     }}
                     disabled={!stageActive}
                   >
-                    {handsFreeActive ? "Stop" : "Activate"}
+                    {handsFreeActive ? "⏹ Stop" : "🎙 Record"}
                   </button>
                 </div>
               </div>
@@ -3140,8 +2989,8 @@ export default function RouteMapperLayout() {
                       <span>10s (relaxed)</span>
                     </div>
                     <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-                      How long after "Mapper" to wait for a type/icon command
-                      before auto-committing with the last-used icon.
+                      How long after tapping 🎙 Record to wait for a voice
+                      command before auto-committing as a plain note.
                     </p>
                   </div>
                   <div className="text-[11px] text-gray-400 leading-snug">
@@ -3174,30 +3023,20 @@ export default function RouteMapperLayout() {
                     !handsFreeLastCommand &&
                     handsFreeMode !== "command" && (
                       <div className="text-xs text-gray-400">
-                        Say "Mapper" then your command. E.g. "Mapper" ...
-                        "hazard danger two — rocks on track"
+                        Speak your command, e.g. "hazard danger two — rocks
+                        on track" or "left onto Forbes Road".
                       </div>
                     )}
                 </div>
               )}
             </div>
 
-            {/* ── Dictate (free-text POI notes via voice) ─────────── */}
-            <div className="mt-3 flex gap-2 items-center">
-              <button
-                type="button"
-                onClick={isListening ? stopDictation : startDictation}
-                className="px-3 py-2 rounded text-white whitespace-nowrap transition-colors disabled:opacity-50"
-                style={{ backgroundColor: isListening ? "#dc2626" : "#588234" }}
-                disabled={!stageActive}
-              >
-                {isListening ? "🎙️ Listening…" : "🎙️ Dictate"}
-              </button>
-
+            {/* ── Optional typed POI for the manual Add Waypoint flow ── */}
+            <div className="mt-3">
               <textarea
                 disabled={!stageActive}
-                className="flex-1 p-2 rounded bg-gray-100 resize-none"
-                placeholder="Optional point of interest"
+                className="w-full p-2 rounded bg-gray-100 resize-none"
+                placeholder="Optional point of interest (typed)"
                 rows={1}
                 value={poi}
                 onChange={(e) => setPoi(e.target.value)}
