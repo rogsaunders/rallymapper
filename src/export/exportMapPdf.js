@@ -71,8 +71,13 @@ function formatDate(d) {
  * (which fires when every tile in the current viewport has loaded) and then
  * waiting two rAFs gives a deterministic "everything has settled" signal.
  *
- * A 6 s safety net resolves the promise even if tiles never finish loading
- * (e.g. offline / blocked tile server).
+ * A 15 s safety net resolves the promise even if tiles never finish loading
+ * (e.g. offline / blocked tile server / very slow mobile).  Was 6 s originally;
+ * bumped after a real-world iPad test on a 25 km route exported on mobile data
+ * came back with faded tiles — `fitBounds` zooms further out than the live
+ * map's small viewport ever does, so the export must fetch a fresh batch of
+ * wider-zoom tiles after the user taps Export, which can comfortably take
+ * 10+ seconds on a mobile connection.
  */
 async function waitForTilesAndPaint(map) {
   let tileLayer = null;
@@ -97,7 +102,7 @@ async function waitForTilesAndPaint(map) {
       twoFrames();
     };
     tileLayer.once("load", finish);
-    setTimeout(finish, 6000);
+    setTimeout(finish, 15000);
   });
 }
 
@@ -289,24 +294,30 @@ export async function buildMapPdfBlob(map, meta = {}) {
   // Replaces a fragile `setTimeout(2000)` that lost the race on iPad Safari.
   await waitForTilesAndPaint(map);
 
-  // Hide the Leaflet SVG overlay pane and the zoom controls before capture.
+  // Hide only the zoom controls (and similar UI chrome) before capture.
   //
-  // Overlay pane: the live <Polyline> renders into the SVG overlay pane.  If
-  // we let it capture, our canvas-composite polyline (drawn afterwards via
-  // `drawRouteOverlay`) would double up with the live SVG line.  `display:
-  // none` removes the SVG from the render tree entirely.
+  // We deliberately DO NOT hide the overlay pane here: html2canvas captures
+  // Leaflet's SVG `<polyline>` correctly, and letting it render lets Leaflet's
+  // natural pane stack (tiles z200 → overlay z400 → marker z600) put markers
+  // ON TOP of the polyline, which is the visually correct order.  An earlier
+  // approach hid the overlay pane and re-drew the polyline on canvas via
+  // `drawRouteOverlay` afterwards — that was required when `dom-to-image-more`
+  // mis-rendered the SVG, but it had the side effect of drawing the polyline
+  // ABOVE the markers (they were already in the captured PNG), occluding them.
   //
-  // Controls: previously handled by SimpleMapScreenshoter's hide list; we now
-  // hide them explicitly since html2canvas doesn't have an equivalent option.
-  const overlayPane = map.getPane("overlayPane");
-  const savedOverlayDisplay = overlayPane ? overlayPane.style.display : null;
-  if (overlayPane) overlayPane.style.display = "none";
-
+  // Controls: previously handled by SimpleMapScreenshoter's hide list; we hide
+  // them explicitly since html2canvas doesn't have an equivalent option.
   const controlsContainer = container.querySelector(".leaflet-control-container");
   const savedControlsDisplay = controlsContainer
     ? controlsContainer.style.display
     : null;
   if (controlsContainer) controlsContainer.style.display = "none";
+
+  // Suppress unused-var warning for routePositions: it's accepted for API
+  // compatibility with earlier code that canvas-composited the polyline.
+  // We may bring `drawRouteOverlay` back later if a casing effect is wanted;
+  // for now Leaflet's native polyline render is used.
+  void routePositions;
 
   // Dynamic import keeps html2canvas (~200 KB) out of the initial bundle.
   const { default: html2canvas } = await import("html2canvas");
@@ -328,8 +339,7 @@ export async function buildMapPdfBlob(map, meta = {}) {
     // forces an error rather than a tainted canvas if any image lacks CORS
     // headers, so we fail loudly instead of producing a blank PDF.
     // `scale: 1` keeps the output at CSS-pixel resolution to match the
-    // container we sized to 1600×1000 — `drawRouteOverlay` re-scales as
-    // needed via the natural-vs-CSS-dimension ratio.
+    // container we sized to 1600×1000.
     const captureCanvas = await html2canvas(container, {
       width:           TARGET_W,
       height:          TARGET_H,
@@ -349,20 +359,8 @@ export async function buildMapPdfBlob(map, meta = {}) {
 
     pngDataUrl = captureCanvas.toDataURL("image/png");
 
-    // Composite the route polyline while the container is STILL at 1600×1000.
-    // map.latLngToContainerPoint() gives pixel coordinates matching the capture
-    // exactly at this moment. Must happen before the finally block restores the
-    // container — after that, coordinates would be for the wrong dimensions.
-    // routePositions must contain track points only — NOT waypoints.
-    // fitBoundsTo contains everything and must NOT be used as a fallback here,
-    // or the overlay will draw spurious straight lines to each waypoint.
-    pngDataUrl = await drawRouteOverlay(pngDataUrl, map, routePositions);
-
   } finally {
-    // Always restore the overlay pane, controls, container — even on failure.
-    if (overlayPane && savedOverlayDisplay !== null) {
-      overlayPane.style.display = savedOverlayDisplay;
-    }
+    // Always restore the controls and the container — even on failure.
     if (controlsContainer && savedControlsDisplay !== null) {
       controlsContainer.style.display = savedControlsDisplay;
     }
