@@ -66,8 +66,10 @@ Open the app. Sign in with your account, or tap **Continue as Guest**.
 Enter **Trip name**, **Day**, **Route**, and **Stage name** at the top.
 
 ### 3. Start recording
-Tap the green **Start Stage**. Allow location access when prompted.
-**Expected:** your position appears on the map; the GPS panel shows live coordinates.
+Tap the green **Start Stage**. Allow location access when prompted. This both starts recording and captures the current GPS position as the stage's start point.
+**Expected:** your position appears on the map; the **🟢 GPS** indicator turns green in the map controls row. If you tap Start Stage before GPS is ready, the start point is captured automatically the moment a valid fix arrives.
+
+If you realise the actual stage start was a little further on, tap **🚩 Update Start** (appears next to End Stage during an active stage) to reset the start position to your current location.
 
 ### 4. Record a short route
 Walk or drive a short loop — five to ten minutes is plenty. Watch a breadcrumb track build behind you on the map.

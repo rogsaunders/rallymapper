@@ -1,7 +1,6 @@
 // src/RouteMapperLayout.jsx
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
-import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
 import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
@@ -1236,11 +1235,6 @@ export default function RouteMapperLayout() {
     return () => geo.clearWatch(watchId);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startText = useMemo(() => {
-    if (!startGPS) return "Not set";
-    return `${startGPS.lat}, ${startGPS.lon}`;
-  }, [startGPS]);
-
   // const [stageStartedAt, setStageStartedAt] = useState(null);
 
   const canChangeMeta = !stageActive; // lock meta while stage is active (recommended)
@@ -1298,12 +1292,27 @@ export default function RouteMapperLayout() {
 
     // Clear stage-scoped data
     setWaypoints([]);
-    setStartGPS(null);
     setPoi("");
 
     setTrackPoints([]);
     trackLastRef.current = null;
     lastTrackTimeRef.current = 0; // reset time gate so first GPS fix records immediately
+
+    // Capture start GPS at the moment of the tap. If GPS isn't ready yet, the
+    // useEffect below will set it the instant a valid fix arrives.
+    if (
+      currentGPS &&
+      Number.isFinite(currentGPS.lat) &&
+      Number.isFinite(currentGPS.lon)
+    ) {
+      setStartGPS({
+        lat: currentGPS.lat,
+        lon: currentGPS.lon,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      setStartGPS(null);
+    }
 
     // Optional defaults
     // setWaypointType("note");
@@ -1554,7 +1563,10 @@ export default function RouteMapperLayout() {
     : trackPoints;
   const displayStartGPS = reviewStage ? reviewStage.startGPS : startGPS;
 
-  const handleSetStart = () => {
+  // Update the start position to the current GPS — used by the 🚩 Update
+  // Start auxiliary button when the user notices the stage actually starts
+  // a little further on than where they first tapped Start Stage.
+  const handleUpdateStart = () => {
     if (
       !Number.isFinite(currentGPS?.lat) ||
       !Number.isFinite(currentGPS?.lon)
@@ -1562,17 +1574,33 @@ export default function RouteMapperLayout() {
       return alert("GPS not ready yet — wait a moment and try again.");
     }
 
-    const ts = new Date().toISOString();
-
     setStartGPS({
       lat: currentGPS.lat,
       lon: currentGPS.lon,
-      timestamp: ts,
+      timestamp: new Date().toISOString(),
     });
 
-    // ✅ Option A: do NOT add a START waypoint to waypoints.
-    // The exporter will prepend startGPS automatically.
+    // The export pipeline prepends the START waypoint from startGPS — no
+    // need to add anything to the waypoints array here.
   };
+
+  // Auto-capture start GPS the moment a valid fix arrives, if the user
+  // tapped Start Stage before GPS was ready.
+  useEffect(() => {
+    if (!stageActive) return;
+    if (startGPS) return;
+    if (
+      currentGPS &&
+      Number.isFinite(currentGPS.lat) &&
+      Number.isFinite(currentGPS.lon)
+    ) {
+      setStartGPS({
+        lat: currentGPS.lat,
+        lon: currentGPS.lon,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [stageActive, startGPS, currentGPS]);
 
   useEffect(() => {
     if (waypointType !== "hazard") return;
@@ -2315,7 +2343,11 @@ export default function RouteMapperLayout() {
                 }}
                 onClick={stageActive ? handleEndStage : handleStartStage}
                 disabled={isEndingStage}
-                title={stageActive ? "End current stage" : "Start a new stage"}
+                title={
+                  stageActive
+                    ? "End current stage"
+                    : "Start a new stage — captures current GPS as the start"
+                }
               >
                 {isEndingStage
                   ? "Ending..."
@@ -2323,6 +2355,16 @@ export default function RouteMapperLayout() {
                     ? "⏹ End Stage"
                     : "Start Stage"}
               </button>
+              {stageActive && (
+                <button
+                  type="button"
+                  onClick={handleUpdateStart}
+                  className="px-3 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white hover:bg-[#588233] hover:text-white whitespace-nowrap shrink-0 transition-colors"
+                  title="Capture the current GPS as the new start position for this stage"
+                >
+                  🚩 Update Start
+                </button>
+              )}
               {hasSavedStageOnScreen && (
                 <button
                   type="button"
@@ -2504,48 +2546,51 @@ export default function RouteMapperLayout() {
           >
             {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
           </button>
+
+          {/* Right-side cluster: Follow Map toggle + GPS traffic light */}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFollowMap((v) => !v)}
+              className={`px-3 py-2 rounded-xl border text-sm font-medium ${
+                followMap
+                  ? "bg-[#588233] text-white border-[#588233]"
+                  : "bg-white text-gray-700"
+              }`}
+              title={
+                followMap
+                  ? "Map follows you — tap to stop auto-recentre"
+                  : "Map is free — tap to auto-recentre on your position"
+              }
+            >
+              🎯 Follow
+            </button>
+
+            {(() => {
+              const hasGpsFix =
+                currentGPS &&
+                Number.isFinite(Number(currentGPS.lat)) &&
+                Number.isFinite(Number(currentGPS.lon));
+              const gpsTitle = hasGpsFix
+                ? `GPS fix: ${Number(currentGPS.lat).toFixed(5)}, ${Number(currentGPS.lon).toFixed(5)}`
+                : "Waiting for GPS fix…";
+              return (
+                <div
+                  className={`text-sm px-3 py-1 rounded-full font-medium ${
+                    hasGpsFix ? "bg-green-500" : "bg-red-500"
+                  } bg-opacity-15`}
+                  title={gpsTitle}
+                >
+                  <span className="mr-1">{hasGpsFix ? "🟢" : "🔴"}</span>
+                  <span className="font-medium">GPS</span>
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* INPUT CONTROLS ROW (above the two columns) */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* GPS / Start */}
-          <div className="bg-white rounded-2xl shadow-sm border p-3">
-            <h2 className="font-semibold mb-2">GPS</h2>
-
-            <div className="text-sm">
-              Live:{" "}
-              {currentGPS
-                ? `${currentGPS.lat}, ${currentGPS.lon}`
-                : "Waiting for GPS…"}
-            </div>
-
-            <div className="text-sm mt-1">Start: {startText}</div>
-
-            <button
-              className="btn btn-primary mt-3 w-full"
-              disabled={!stageActive}
-              onClick={handleSetStart}
-            >
-              <img
-                src={startflag}
-                alt="Start Flag"
-                className="h-6 w-6 rounded"
-              />
-              Start Set (tap to update)
-            </button>
-
-            <label className="flex items-center gap-3 mt-3 select-none">
-              <input
-                type="checkbox"
-                checked={followMap}
-                onChange={(e) => setFollowMap(e.target.checked)}
-              />
-              <span className="text-sm font-medium">
-                Follow map (auto recenter)
-              </span>
-            </label>
-          </div>
-
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {showRoadbookPreview && (
             <section className="bg-white rounded-2xl shadow-sm border p-3">
               <div className="flex items-center justify-between mb-3">
