@@ -2771,19 +2771,6 @@ export default function RouteMapperLayout() {
               ))}
             </div>
 
-            <select
-              disabled={!stageActive}
-              className="w-full p-2 rounded bg-gray-100"
-              value={waypointType}
-              onChange={(e) => setWaypointType(e.target.value)}
-            >
-              {Object.keys(ICONS).map((k) => (
-                <option key={k} value={k}>
-                  {ICONS[k].label}
-                </option>
-              ))}
-            </select>
-
             {waypointType === "hazard" && ICONS.hazard?.variants && (
               <div className="mt-3">
                 <div className="text-sm mb-2">Hazard level</div>
