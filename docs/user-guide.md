@@ -168,6 +168,30 @@ You can omit the type if the icon name is unambiguous — *"left"* works as well
 
 A Bluetooth headset with mic significantly improves accuracy in noisy or windy conditions.
 
+#### External trigger (Bluetooth, foot pedal, presenter)
+
+You can fire the 🎙 Record button without tapping the iPad. Useful when the iPad is mounted out of reach, or when both your hands are on the wheel.
+
+**What works:**
+
+- **Bluetooth headsets** that send standard media key events (most AirPods, Plantronics/Poly, Jabra). A single press of the play/pause button fires Record.
+- **Bluetooth foot pedals** (AirTurn PED Pro, iKKEGOL, etc.) sending Page Up, Page Down, or media keys.
+- **Wireless presenter clickers** (Logitech R500/R800, Satechi) sending Page Up / Page Down.
+- **Bluetooth keyboards** — handy for testing the integration before buying specialised hardware. Press **Space**, **PageUp**, **PageDown**, or **F8**.
+
+**A second press while recording cancels** the snap and returns to idle.
+
+**Disabling the trigger:** in the ⚙️ Voice settings, uncheck **🎧 External trigger** if it ever fires accidentally. Default is on.
+
+**Testing without specialised hardware:**
+
+1. Pair a Bluetooth keyboard to your iPad.
+2. Start a stage.
+3. Tap somewhere outside any text field on the main map area.
+4. Press **Space** — the 🎙 Record flow should fire as if you had tapped the button.
+
+When the trigger is active, a small **🎧** icon appears next to "Voice" in the panel header.
+
 ### Trip, Day, Route, Stage
 
 Multi-day events are organised in a four-level hierarchy:

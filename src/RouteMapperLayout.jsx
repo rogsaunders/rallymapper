@@ -19,6 +19,7 @@ import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
+import { createRecordTrigger } from "./voice/recordTrigger";
 import StageHistoryPanel from "./components/StageHistoryPanel";
 import AccountModal from "./components/AccountModal";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
@@ -575,6 +576,11 @@ export default function RouteMapperLayout() {
   const [handsFreeToast, setHandsFreeToast] = useState(null); // { type, iconId, poi } for large toast
   const handsFreeRef = useRef(null); // voice command handler
   const handsFreeActiveRef = useRef(false); // mirrors handsFreeActive for async callbacks
+  const recordTriggerRef = useRef(null); // external Bluetooth / pedal / keyboard trigger
+  const [externalTriggerEnabled, setExternalTriggerEnabled] = useState(() => {
+    const stored = localStorage.getItem("rm_external_trigger_enabled");
+    return stored === null ? true : stored === "true";
+  });
 
   // ── Snap-on-tap state ─────────────────────────────────────────────
   // GPS is locked the instant 🎙 Record is tapped; the user then has
@@ -1140,6 +1146,35 @@ export default function RouteMapperLayout() {
       stopHandsFree();
     }
   }, [stageActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // External trigger (Phase B) — Bluetooth headset / foot pedal /
+  // presenter clicker / Bluetooth keyboard fires the 🎙 Record button
+  // remotely. Active only while a stage is recording and the user
+  // hasn't disabled it. A second trigger while recording cancels.
+  useEffect(() => {
+    if (!stageActive || !externalTriggerEnabled) {
+      recordTriggerRef.current?.stop();
+      recordTriggerRef.current = null;
+      return;
+    }
+
+    const trigger = createRecordTrigger({
+      onTrigger: () => {
+        if (handsFreeActiveRef.current) {
+          stopHandsFree();
+        } else {
+          startHandsFree();
+        }
+      },
+    });
+    trigger.start();
+    recordTriggerRef.current = trigger;
+
+    return () => {
+      trigger.stop();
+      recordTriggerRef.current = null;
+    };
+  }, [stageActive, externalTriggerEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track recording config
   const TRACK_INTERVAL_MS = 5000; // minimum ms between recorded points
@@ -2861,6 +2896,14 @@ export default function RouteMapperLayout() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-gray-700 mt-1">Voice</span>
+                  {externalTriggerEnabled && stageActive && (
+                    <span
+                      className="text-xs text-gray-400"
+                      title="External trigger ready (Bluetooth / pedal / presenter / keyboard)"
+                    >
+                      🎧
+                    </span>
+                  )}
                   {handsFreeMode === "snap" && (
                     <>
                       <span
@@ -3023,6 +3066,31 @@ export default function RouteMapperLayout() {
                     <p className="text-[11px] text-gray-400 mt-1 leading-snug">
                       How long after tapping 🎙 Record to wait for a voice
                       command before auto-committing as a plain note.
+                    </p>
+                  </div>
+                  <div className="pt-3 border-t border-gray-200">
+                    <label className="flex items-center gap-2 select-none cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={externalTriggerEnabled}
+                        onChange={(e) => {
+                          setExternalTriggerEnabled(e.target.checked);
+                          localStorage.setItem(
+                            "rm_external_trigger_enabled",
+                            String(e.target.checked),
+                          );
+                        }}
+                        className="accent-[#588233]"
+                      />
+                      <span className="text-xs font-medium text-gray-600">
+                        🎧 External trigger
+                      </span>
+                    </label>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                      Let external hardware fire the 🎙 Record button:
+                      Bluetooth headset (Play/Pause), foot pedal, presenter
+                      clicker, or Bluetooth keyboard (Space, PageUp, PageDown,
+                      F8). A second press while recording cancels.
                     </p>
                   </div>
                   <div className="text-[11px] text-gray-400 leading-snug">
