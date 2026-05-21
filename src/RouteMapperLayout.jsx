@@ -2,9 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import MapView from "./components/MapView";
-import { ICONS } from "./icons/iconRegistry";
+import { ICONS, ICON_ORDER, ICON_CATEGORIES } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
-import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
 import {
   getLimits,
@@ -158,6 +157,20 @@ function makeLocalId(meta) {
   // stable enough + human readable; includes timestamp to avoid collisions
   return `${meta.tripDate}_d${meta.dayNumber}_r${meta.routeNumber}_s${meta.stageNumber}_${meta.endedAt}`;
 }
+
+// First-icon-in-each-category map, derived from the registry. Used as the
+// initial state for iconIdByCategory and as the reset value when a stage
+// starts. The registry is JSON-manifest-driven, so adding a new category
+// (or a new icon in an existing category) updates this automatically.
+const DEFAULT_ICON_BY_CATEGORY = (() => {
+  const out = {};
+  for (const cat of ICON_CATEGORIES) {
+    const key = cat.toLowerCase();
+    const variants = ICONS[key]?.variants || {};
+    out[key] = Object.keys(variants)[0] || null;
+  }
+  return out;
+})();
 
 function safeSlug(s) {
   return String(s || "")
@@ -550,10 +563,13 @@ export default function RouteMapperLayout() {
   const [waypointType, setWaypointType] = useState("note");
   const [poi, setPoi] = useState("");
   const [followMap, setFollowMap] = useState(true);
-  const [hazardIconId, setHazardIconId] = useState("danger_1");
-  const [navIconId, setNavIconId] = useState("straight");
-  const [controlIconId, setControlIconId] = useState("start");
-  const [terrainIconId, setTerrainIconId] = useState("bump");
+  // One state object per category — auto-extends as the icon manifest
+  // grows. Replaces hazardIconId / navIconId / controlIconId / terrainIconId.
+  const [iconIdByCategory, setIconIdByCategory] = useState(
+    DEFAULT_ICON_BY_CATEGORY,
+  );
+  const setIconForCategory = (category, iconId) =>
+    setIconIdByCategory((prev) => ({ ...prev, [category]: iconId }));
   // const localOwner = getGuestOwnerId();
   // const user = null;
 
@@ -658,18 +674,9 @@ export default function RouteMapperLayout() {
 
   // Keep async-callback refs in sync with React state.
   useEffect(() => {
-    const iconId =
-      waypointType === "hazard"
-        ? hazardIconId
-        : waypointType === "nav"
-          ? navIconId
-          : waypointType === "control"
-            ? controlIconId
-            : waypointType === "terrain"
-              ? terrainIconId
-              : null;
+    const iconId = iconIdByCategory[waypointType] ?? null;
     currentDefaultsRef.current = { type: waypointType, iconId };
-  }, [waypointType, hazardIconId, navIconId, controlIconId, terrainIconId]);
+  }, [waypointType, iconIdByCategory]);
 
   useEffect(() => {
     snapTimeoutSecRef.current = snapTimeoutSec;
@@ -694,10 +701,7 @@ export default function RouteMapperLayout() {
       trackPoints,
       waypoints,
       waypointType,
-      hazardIconId,
-      navIconId,
-      controlIconId,
-      terrainIconId,
+      iconIdByCategory,
       poi,
     };
 
@@ -723,9 +727,7 @@ export default function RouteMapperLayout() {
     waypoints,
     trackPoints,
     waypointType,
-    hazardIconId,
-    navIconId,
-    controlIconId,
+    iconIdByCategory,
     poi,
   ]);
 
@@ -758,10 +760,19 @@ export default function RouteMapperLayout() {
       setWaypoints(Array.isArray(draft.waypoints) ? draft.waypoints : []);
       setTrackPoints(Array.isArray(draft.trackPoints) ? draft.trackPoints : []);
       setWaypointType(draft.waypointType ?? "note");
-      setHazardIconId(draft.hazardIconId ?? "danger_1");
-      setNavIconId(draft.navIconId ?? "straight");
-      setControlIconId(draft.controlIconId ?? "start");
-      setTerrainIconId(draft.terrainIconId ?? "bump");
+      // New-shape drafts have iconIdByCategory; legacy drafts have
+      // individual *IconId fields. Merge either onto the defaults so
+      // missing/added categories don't break the restore.
+      const restoredIcons = draft.iconIdByCategory
+        ? { ...DEFAULT_ICON_BY_CATEGORY, ...draft.iconIdByCategory }
+        : {
+            ...DEFAULT_ICON_BY_CATEGORY,
+            ...(draft.hazardIconId ? { hazard: draft.hazardIconId } : {}),
+            ...(draft.navIconId ? { nav: draft.navIconId } : {}),
+            ...(draft.controlIconId ? { control: draft.controlIconId } : {}),
+            ...(draft.terrainIconId ? { terrain: draft.terrainIconId } : {}),
+          };
+      setIconIdByCategory(restoredIcons);
       setPoi(draft.poi ?? "");
     } catch (e) {
       console.warn("Stage restore failed:", e);
@@ -812,10 +823,9 @@ export default function RouteMapperLayout() {
 
     // Sync UI type / icon selections to match the voice command in both paths.
     if (cmd.type) setWaypointType(cmd.type);
-    if (cmd.type === "hazard" && cmd.iconId) setHazardIconId(cmd.iconId);
-    else if (cmd.type === "nav" && cmd.iconId) setNavIconId(cmd.iconId);
-    else if (cmd.type === "control" && cmd.iconId) setControlIconId(cmd.iconId);
-    else if (cmd.type === "terrain" && cmd.iconId) setTerrainIconId(cmd.iconId);
+    if (cmd.type && cmd.iconId && cmd.type in iconIdByCategory) {
+      setIconForCategory(cmd.type, cmd.iconId);
+    }
     if (cmd.poi) setPoi(cmd.poi);
 
     if (gpsOverride) {
@@ -1349,12 +1359,9 @@ export default function RouteMapperLayout() {
       setStartGPS(null);
     }
 
-    // Optional defaults
+    // Reset all per-category icon selections to their first variant.
     // setWaypointType("note");
-    setHazardIconId("danger_1");
-    setNavIconId("straight");
-    setControlIconId("start");
-    setTerrainIconId("bump");
+    setIconIdByCategory(DEFAULT_ICON_BY_CATEGORY);
   };
 
   // Add this state near your other state hooks (once):
@@ -1545,9 +1552,7 @@ export default function RouteMapperLayout() {
     setWaypoints([]);
     setStartGPS(null);
     setPoi("");
-    setHazardIconId("danger_1");
-    setNavIconId("straight");
-    setControlIconId("start");
+    setIconIdByCategory(DEFAULT_ICON_BY_CATEGORY);
     setStageNumber((n) => n + 1);
     setTrackPoints([]);
     trackLastRef.current = null;
@@ -1637,58 +1642,19 @@ export default function RouteMapperLayout() {
     }
   }, [stageActive, startGPS, currentGPS]);
 
+  // When the current category's stored icon is missing from the manifest
+  // (e.g. the user upgraded and a previously-saved icon id was removed),
+  // fall back to the first variant for that category. Generic across all
+  // categories — no per-category branches required.
   useEffect(() => {
-    if (waypointType !== "hazard") return;
-
-    const variants = ICONS.hazard?.variants || {};
-    const hasCurrent = Boolean(variants[hazardIconId]);
-
-    if (!hasCurrent) {
-      // fallback to danger_1 or first variant
-      const fallback = variants.danger_1
-        ? "danger_1"
-        : Object.keys(variants)[0];
-      setHazardIconId(fallback || "danger_1");
+    const variants = ICONS[waypointType]?.variants || {};
+    if (Object.keys(variants).length === 0) return; // e.g. "note" has no variants
+    const currentId = iconIdByCategory[waypointType];
+    if (!variants[currentId]) {
+      const fallback = Object.keys(variants)[0];
+      if (fallback) setIconForCategory(waypointType, fallback);
     }
-  }, [waypointType, hazardIconId]);
-
-  useEffect(() => {
-    if (waypointType !== "nav") return;
-
-    const variants = ICONS.nav?.variants || {};
-    const hasCurrent = Boolean(variants[navIconId]);
-
-    if (!hasCurrent) {
-      const fallback = variants.straight
-        ? "straight"
-        : Object.keys(variants)[0];
-      setNavIconId(fallback || "straight");
-    }
-  }, [waypointType, navIconId]);
-
-  useEffect(() => {
-    if (waypointType !== "control") return;
-
-    const variants = ICONS.control?.variants || {};
-    const hasCurrent = Boolean(variants[controlIconId]);
-
-    if (!hasCurrent) {
-      const fallback = variants.start ? "start" : Object.keys(variants)[0];
-      setControlIconId(fallback || "start");
-    }
-  }, [waypointType, controlIconId]);
-
-  useEffect(() => {
-    if (waypointType !== "terrain") return;
-
-    const variants = ICONS.terrain?.variants || {};
-    const hasCurrent = Boolean(variants[terrainIconId]);
-
-    if (!hasCurrent) {
-      const fallback = variants.bump ? "bump" : Object.keys(variants)[0];
-      setTerrainIconId(fallback || "bump");
-    }
-  }, [waypointType, terrainIconId]);
+  }, [waypointType, iconIdByCategory]);
 
   // While a waypoint is pending, apply user edits (type/icon/poi) to the
   // pending slot and reset the auto-commit timer so the user gets a fresh
@@ -1697,16 +1663,7 @@ export default function RouteMapperLayout() {
     const pending = pendingWaypointRef.current;
     if (!pending) return;
 
-    const iconId =
-      waypointType === "hazard"
-        ? hazardIconId
-        : waypointType === "nav"
-          ? navIconId
-          : waypointType === "control"
-            ? controlIconId
-            : waypointType === "terrain"
-              ? terrainIconId
-              : null;
+    const iconId = iconIdByCategory[waypointType] ?? null;
 
     const updated = {
       ...pending,
@@ -1719,15 +1676,7 @@ export default function RouteMapperLayout() {
     setPendingWaypoint(updated);
     startPendingTimer(snapWindowMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    waypointType,
-    hazardIconId,
-    navIconId,
-    controlIconId,
-    terrainIconId,
-    poi,
-    snapWindowMs,
-  ]);
+  }, [waypointType, iconIdByCategory, poi, snapWindowMs]);
 
   // Tick the countdown display while a waypoint is pending.
   useEffect(() => {
@@ -1809,15 +1758,7 @@ export default function RouteMapperLayout() {
 
     const typeToSave = typeOverride ?? waypointType;
     const iconId =
-      typeToSave === "hazard"
-        ? hazardIconId || "danger_1"
-        : typeToSave === "nav"
-          ? navIconId || "straight"
-          : typeToSave === "control"
-            ? controlIconId || "start"
-            : typeToSave === "terrain"
-              ? terrainIconId || "bump"
-              : null;
+      iconIdByCategory[typeToSave] ?? DEFAULT_ICON_BY_CATEGORY[typeToSave] ?? null;
 
     // If a typeOverride was passed, sync the UI selection so the panel
     // reflects the pending waypoint's type.
@@ -2806,73 +2747,31 @@ export default function RouteMapperLayout() {
               ))}
             </div>
 
-            {waypointType === "hazard" && ICONS.hazard?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Hazard level</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.hazard.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={hazardIconId === id}
-                      onClick={() => setHazardIconId(id)}
-                    />
-                  ))}
+            {/* Variant icons for the currently-selected category — generic
+                over all categories. Adding a new category to iconManifest.json
+                surfaces its variants here automatically. */}
+            {(() => {
+              const variants = ICONS[waypointType]?.variants;
+              if (!variants || Object.keys(variants).length === 0) return null;
+              return (
+                <div className="mt-3">
+                  <div className="text-sm mb-2">
+                    {ICONS[waypointType]?.label || waypointType}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.entries(variants).map(([id, v]) => (
+                      <IconButton
+                        key={id}
+                        svg={v.svg}
+                        label={v.label}
+                        active={iconIdByCategory[waypointType] === id}
+                        onClick={() => setIconForCategory(waypointType, id)}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {waypointType === "nav" && ICONS.nav?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Navigation</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.nav.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={navIconId === id}
-                      onClick={() => setNavIconId(id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {waypointType === "control" && ICONS.control?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Control</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.control.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={controlIconId === id}
-                      onClick={() => setControlIconId(id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {waypointType === "terrain" && ICONS.terrain?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Terrain</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.terrain.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={terrainIconId === id}
-                      onClick={() => setTerrainIconId(id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── Voice (push-to-talk) ──────────────────────────── */}
             <div
