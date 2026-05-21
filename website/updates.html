@@ -15,6 +15,63 @@
     <main class="section">
       <div class="container">
         <h1>Updates</h1>
+        <article id="may-2026-part2" class="card">
+          <h2>May 2026 — Voice, validated exports, UI consolidation</h2>
+          <p>
+            A second tranche of May 2026 work, focused on what real recon
+            and rally crews told us mattered most.
+          </p>
+          <ul>
+            <li>
+              <strong>Push-to-talk voice</strong> — wake-word activation
+              ("Mapper") was replaced with a deterministic 🎙 Record button
+              after field testing showed in-vehicle speech recognition
+              wasn't reliable enough for the wake word to fire consistently.
+              The new button locks GPS at the moment of the tap, captures
+              the spoken command, and commits the waypoint to the locked
+              position. The Dictate button was retired at the same time
+              (the voice command parser already handles a full
+              icon + note utterance like <em>"left onto Forbes Road"</em>).
+            </li>
+            <li>
+              <strong>External trigger</strong> — Bluetooth headsets,
+              wireless foot pedals, presenter clickers and any Bluetooth
+              keyboard can fire the 🎙 Record button via standard media
+              keys (Play/Pause/Next/Previous) or key events (PageUp,
+              PageDown, F8, Space, Enter). Tested working with off-the-
+              shelf Bluetooth keyboards out of the box; specialised
+              hardware compatibility is now testable against a real app.
+            </li>
+            <li>
+              <strong>Rally Navigator import validated</strong> — the
+              <code>route.gpx</code> (combined waypoints + track) now
+              imports cleanly into Rally Navigator with the full waypoint
+              list — including the previously-missing START point — and
+              the recorded polyline rendered from the GPS track.
+              Confirmed on real recon data with a professional fundraising-
+              rally organiser.
+            </li>
+            <li>
+              <strong>Export ZIP reorganised by use case</strong> — instead
+              of a flat heap of files, the export now ships in clearly-
+              named folders (Universal, RallyNavigator, Printable, Source,
+              Garmin, Hema, Gaia) with a <code>README.txt</code> at the
+              root telling you exactly which file for which tool. Casual
+              users never need to read the folder structure.
+            </li>
+            <li>
+              <strong>UI consolidation</strong> — Start Stage now captures
+              the start GPS automatically on tap; a new 🚩 Update Start
+              auxiliary button lets you reset it mid-stage. The GPS panel
+              was removed entirely, replaced by a compact 🟢/🔴 GPS
+              traffic light and a 🎯 Follow Map toggle in the map controls
+              row. The redundant waypoint-type dropdown was removed since
+              the icon buttons above already do the same job. Result: more
+              room for the icon selector, less visual noise.
+            </li>
+          </ul>
+        </article>
+
         <article id="may-2026" class="card">
           <h2>May 2026 — Public Launch</h2>
           <p>

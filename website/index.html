@@ -12,7 +12,7 @@
 
     <meta
       name="description"
-      content="RouteMapper is the fastest way to scout and map real-world journeys — 2-second waypoint capture, auto track recording, roadbook generation, 10+ export formats including Rally Navigator, Garmin, Hema, and Google Earth."
+      content="RouteMapper is the fastest way to scout and map real-world journeys — 2-second waypoint capture, push-to-talk voice, auto track recording, roadbook generation, and one organised export ZIP per stage with bundles for Rally Navigator, Garmin, Hema, Guru Maps, Gaia GPS, and Google Earth."
     />
 
     <link rel="stylesheet" href="styles.css" />
@@ -47,7 +47,7 @@
     />
     <meta
       name="twitter:description"
-      content="The fastest way to map real-world routes with icons, timing and voice notes."
+      content="The fastest way to map real-world routes — push-to-talk voice, icons, timing, and a Rally-Navigator-ready export."
     />
     <meta name="twitter:image" content="assets/route-og.jpg" />
 
@@ -59,7 +59,7 @@
         "name": "RouteMapper",
         "applicationCategory": "MobileApplication",
         "operatingSystem": "iPadOS",
-        "description": "2-second waypoint capture with professional rally icons and voice notes; exports to Rally Navigator, Hema Maps, Guru Maps, Google Earth.",
+        "description": "2-second waypoint capture with professional rally icons and push-to-talk voice; exports to Rally Navigator, Hema Maps, Guru Maps, Gaia GPS, Garmin, and Google Earth.",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -151,14 +151,15 @@
           <h2 class="sr-only">Key Features</h2>
           <ul class="ticks">
             <li>Trips organised by Day, Route, Stage</li>
-            <li>2-second waypoints by clicklist or voice input</li>
-            <li>29 rally-standard icons · OpenRally & Garmin compatible</li>
+            <li>2-second waypoints by tap or push-to-talk voice</li>
+            <li>29 rally-standard icons · OpenRally &amp; Garmin compatible</li>
             <li>Auto track recording with live turn detection</li>
-            <li>Roadbook generation with tulip diagrams & CAP values</li>
+            <li>Roadbook generation with tulip diagrams &amp; CAP values</li>
             <li>
-              10+ export formats: Rally Navigator · Garmin · Hema · Guru ·
-              Google Earth · Gaia GPS · and more
+              One organised export ZIP per stage — bundles for Rally
+              Navigator, Garmin, Hema, Guru, Google Earth, Gaia GPS
             </li>
+            <li>External trigger ready — Bluetooth headset / foot pedal / presenter</li>
             <li>Offline-first · Guest Mode · Supabase cloud sync</li>
           </ul>
         </div>
@@ -211,11 +212,13 @@
             </p>
           </div>
           <div class="card">
-            <div class="card-icon">🎤</div>
-            <h3>Voice Notes</h3>
+            <div class="card-icon">🎙️</div>
+            <h3>Push-to-Talk Voice</h3>
             <p>
-              Hands-free voice capture for complex descriptions — single
-              streamlined mode, no mode-switching required.
+              Tap 🎙 Record and speak — *"left onto Forbes Road"* —
+              GPS locks at the tap, the waypoint captures itself.
+              Optional external trigger for Bluetooth headsets and
+              foot pedals.
             </p>
           </div>
           <div class="card">
@@ -236,11 +239,11 @@
           </div>
           <div class="card">
             <div class="card-icon">📤</div>
-            <h3>10+ Export Formats</h3>
+            <h3>Organised Export ZIP</h3>
             <p>
-              Rally Navigator CSV, Garmin GPX, OpenRally GPX, Hema, Guru Maps,
-              Google Earth KML, Gaia GPS, Roadbook HTML, JSON, and more — all in
-              one ZIP.
+              One ZIP per stage, organised by use case — Universal,
+              RallyNavigator, Printable, Garmin, Hema, Gaia, Source.
+              A README.txt at the root tells you which file for which tool.
             </p>
           </div>
           <div class="card">
@@ -289,8 +292,8 @@
             <div class="comparison-cell">✗ Generic pins</div>
           </div>
           <div class="comparison-row">
-            <div class="comparison-cell">Voice notes</div>
-            <div class="comparison-cell highlight">✓ Integrated</div>
+            <div class="comparison-cell">Voice capture</div>
+            <div class="comparison-cell highlight">✓ Push-to-talk + external trigger</div>
             <div class="comparison-cell">✗ Separate recorder</div>
             <div class="comparison-cell">~ Limited</div>
           </div>
@@ -461,7 +464,7 @@
               <li>Unlimited stages &amp; waypoints</li>
               <li>Full export package</li>
               <li>Roadbook HTML &amp; DOCX</li>
-              <li>Hands-free voice mapping</li>
+              <li>Push-to-talk voice capture</li>
               <li>Single user, non-commercial</li>
               <li>Cancel any time</li>
             </ul>
@@ -558,14 +561,35 @@
               GST handled automatically.
             </p>
           </li>
+          <li class="timeline-done">
+            <span class="timeline-period">Complete · May 2026</span>
+            <strong>Rally Navigator import validated</strong>
+            <p>
+              The combined GPX export now imports cleanly into Rally
+              Navigator with the full waypoint list (including the START
+              point) and the recorded polyline rendered from the track —
+              validated on real recon data with a professional fundraising-
+              rally organiser.
+            </p>
+          </li>
+          <li class="timeline-done">
+            <span class="timeline-period">Complete · May 2026</span>
+            <strong>Push-to-Talk voice + external trigger</strong>
+            <p>
+              Replaced wake-word activation with a deterministic 🎙 Record
+              button. Field testing showed in-vehicle speech recognition
+              degraded the wake word too often; push-to-talk is reliable
+              every time. External trigger added for Bluetooth headsets,
+              foot pedals, presenter clickers, and Bluetooth keyboards.
+            </p>
+          </li>
           <li class="timeline-active">
             <span class="timeline-period">Now</span>
-            <strong>Roadbook Accuracy Pass</strong>
+            <strong>Drive Mode (in-vehicle Roadbook Reader)</strong>
             <p>
-              Manual waypoint angles computed from the GPS track,
-              direction-aware sign correction, and snap-to-nearby-turn fallback
-              for shallow calls — generated roadbooks now correlate cleanly with
-              Rally Navigator imports.
+              Currently building the in-vehicle reader that consumes the
+              roadbook JSON and advances rows by GPS — turning RouteMapper
+              into a complete authoring + navigation workflow.
             </p>
           </li>
           <li>
@@ -585,6 +609,13 @@
       <div class="container">
         <h2>Latest Updates</h2>
         <ul class="updates">
+          <li>
+            <time datetime="2026-05">May 2026 · part 2</time>
+            <a href="updates.html#may-2026-part2"
+              >Push-to-talk voice · Rally Navigator import validated ·
+              external trigger · UI consolidation</a
+            >
+          </li>
           <li>
             <time datetime="2026-05">May 2026</time>
             <a href="updates.html#may-2026"
@@ -620,8 +651,9 @@
               Yes — the
               <a href="/guide">RouteMapper User Guide</a> covers everything
               from your first sign-in to exporting a roadbook, with sections
-              on the snap-first waypoint flow, Hands-Free voice mapping,
-              Stage History, Map PDF export, and all 10+ export formats.
+              on the snap-first waypoint flow, push-to-talk voice (and the
+              external trigger for Bluetooth headsets / foot pedals / presenters),
+              Stage History, Map PDF export, and the organised export ZIP.
             </p>
           </details>
           <details>
@@ -635,11 +667,18 @@
           <details>
             <summary>What export formats are supported?</summary>
             <p>
-              RouteMapper produces 10+ formats in a single ZIP: Rally Navigator
-              CSV (raw and driver modes), Garmin GPX, OpenRally-compatible GPX,
-              Universal GPX, Combined GPX, Google Earth KML, Hema Maps, Guru
-              Maps, Gaia GPS, Roadbook HTML with tulip diagrams, and a complete
-              Master JSON. All from one tap.
+              One ZIP per stage, organised by use case rather than by file
+              type. <strong>Universal/</strong> holds <code>route.gpx</code>
+              and <code>route.kml</code> for any mapping tool;
+              <strong>RallyNavigator/</strong> holds the GPX bundled for
+              Rally Navigator import (validated working — full waypoint list
+              + polyline render in RN); <strong>Printable/</strong> holds
+              the roadbook as HTML, DOCX, CSV plus the Map PDF;
+              <strong>Source/</strong> holds <code>stage.json</code> for
+              re-importing back into RouteMapper. Pre-organised Garmin,
+              Hema and Gaia folders included for users who prefer those
+              products' native file conventions. A <code>README.txt</code>
+              at the root tells you exactly which file for which tool.
             </p>
           </details>
           <details>
