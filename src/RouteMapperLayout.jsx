@@ -2754,16 +2754,18 @@ export default function RouteMapperLayout() {
               const variants = ICONS[waypointType]?.variants;
               if (!variants || Object.keys(variants).length === 0) return null;
               return (
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  {Object.entries(variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={iconIdByCategory[waypointType] === id}
-                      onClick={() => setIconForCategory(waypointType, id)}
-                    />
-                  ))}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.entries(variants).map(([id, v]) => (
+                      <IconButton
+                        key={id}
+                        svg={v.svg}
+                        label={v.label}
+                        active={iconIdByCategory[waypointType] === id}
+                        onClick={() => setIconForCategory(waypointType, id)}
+                      />
+                    ))}
+                  </div>
                 </div>
               );
             })()}
