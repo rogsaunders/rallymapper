@@ -598,6 +598,12 @@ export default function RouteMapperLayout() {
     return stored === null ? true : stored === "true";
   });
 
+  // ── Waypoint edit / delete state ──────────────────────────────────
+  // editDraft  — open the edit modal with a working copy of one waypoint
+  // deleteId   — ask the confirm modal to delete this waypoint
+  const [editDraft, setEditDraft] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+
   // ── Snap-on-tap state ─────────────────────────────────────────────
   // GPS is locked the instant 🎙 Record is tapped; the user then has
   // snapTimeoutSec seconds to speak a command before the pending
@@ -778,6 +784,65 @@ export default function RouteMapperLayout() {
       console.warn("Stage restore failed:", e);
     }
   }, []);
+
+  // ── Waypoint edit / delete helpers ────────────────────────────────
+  // openEditWaypoint  — populates the modal with a working copy of the
+  //                     selected waypoint; user can adjust type/icon/poi.
+  // saveEdit          — writes the modal's draft back into the waypoints
+  //                     array, preserving id, lat, lon, timestamp.
+  // requestDelete     — shows the confirm modal for a waypoint id.
+  // confirmDelete     — actually removes the waypoint from state.
+  // deleteWaypointsAfter(index) — exposed for a future "rewind N" feature
+  //                     (Medium → Large promotion path). Removes every
+  //                     non-START waypoint after the given index in the
+  //                     visible routePoints list.
+
+  const openEditWaypoint = (wp) => {
+    setEditDraft({
+      id: wp.id,
+      type: wp.type || "note",
+      iconId: wp.iconId || null,
+      poi: wp.poi || "",
+    });
+  };
+
+  const saveEdit = () => {
+    if (!editDraft) return;
+    setWaypoints((prev) =>
+      prev.map((w) =>
+        w.id === editDraft.id
+          ? {
+              ...w,
+              type: editDraft.type,
+              iconId: editDraft.iconId,
+              poi: editDraft.poi.trim(),
+            }
+          : w,
+      ),
+    );
+    setEditDraft(null);
+  };
+
+  const requestDelete = (wp) => setDeleteId(wp.id);
+
+  const confirmDelete = () => {
+    if (!deleteId) return;
+    setWaypoints((prev) => prev.filter((w) => w.id !== deleteId));
+    setDeleteId(null);
+  };
+
+  // Future "Delete last N" / rewind support — call this with the index
+  // (in routePoints terms) of the LAST waypoint you want to keep. Skips
+  // the START point and any null ids.
+  // eslint-disable-next-line no-unused-vars
+  const deleteWaypointsAfter = (keepThroughIndex) => {
+    const toDelete = routePoints
+      .slice(keepThroughIndex + 1)
+      .filter((p) => p.kind !== "start" && p.id)
+      .map((p) => p.id);
+    if (toDelete.length === 0) return;
+    setWaypoints((prev) => prev.filter((w) => !toDelete.includes(w.id)));
+  };
 
   // ── Push-to-talk voice command mode ───────────────────────────────
   //
@@ -3133,9 +3198,33 @@ export default function RouteMapperLayout() {
                         )}
                       </div>
 
-                      <div className="text-right text-[11px] text-gray-600 whitespace-nowrap">
-                        <div>seg {segKm} km</div>
-                        <div>tot {totKm} km</div>
+                      <div className="flex items-start gap-2 whitespace-nowrap">
+                        <div className="text-right text-[11px] text-gray-600">
+                          <div>seg {segKm} km</div>
+                          <div>tot {totKm} km</div>
+                        </div>
+                        {!isStart && wp.id && (
+                          <div className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openEditWaypoint(wp)}
+                              className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                              title={`Edit WP ${wpNumber}`}
+                              aria-label={`Edit waypoint ${wpNumber}`}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => requestDelete(wp)}
+                              className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+                              title={`Delete WP ${wpNumber}`}
+                              aria-label={`Delete waypoint ${wpNumber}`}
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -3213,6 +3302,161 @@ export default function RouteMapperLayout() {
           redirectToPortal(session).catch((e) => alert(e.message));
         }}
       />
+
+      {/* ── Waypoint Edit Modal ─────────────────────────────────────── */}
+      {editDraft &&
+        (() => {
+          const draftVariants = ICONS[editDraft.type]?.variants || {};
+          const setDraft = (patch) =>
+            setEditDraft((d) => ({ ...d, ...patch }));
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+              onClick={() => setEditDraft(null)}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-lg">Edit waypoint</h3>
+                  <button
+                    type="button"
+                    onClick={() => setEditDraft(null)}
+                    className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Type picker */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <div className="flex gap-2 flex-wrap">
+                    {ICON_ORDER.map((type) => (
+                      <IconButton
+                        key={type}
+                        svg={ICONS[type].svg}
+                        label={ICONS[type].label}
+                        active={editDraft.type === type}
+                        onClick={() => {
+                          const newVariants = ICONS[type]?.variants || {};
+                          setDraft({
+                            type,
+                            // Reset iconId to first variant when changing category
+                            iconId:
+                              newVariants[editDraft.iconId]
+                                ? editDraft.iconId
+                                : Object.keys(newVariants)[0] || null,
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Variant picker — only when category has variants */}
+                {Object.keys(draftVariants).length > 0 && (
+                  <div className="mb-3 pt-3 border-t border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Icon
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {Object.entries(draftVariants).map(([id, v]) => (
+                        <IconButton
+                          key={id}
+                          svg={v.svg}
+                          label={v.label}
+                          active={editDraft.iconId === id}
+                          onClick={() => setDraft({ iconId: id })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* POI text */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Point of interest (optional)
+                  </label>
+                  <textarea
+                    className="w-full p-2 rounded bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#588233]"
+                    rows={2}
+                    value={editDraft.poi}
+                    onChange={(e) => setDraft({ poi: e.target.value })}
+                    placeholder="e.g. onto Forbes Road"
+                  />
+                </div>
+
+                {/* Footer */}
+                <div className="flex gap-2 pt-3 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setEditDraft(null)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveEdit}
+                    className="ml-auto px-4 py-2 rounded-lg font-semibold text-white"
+                    style={{ backgroundColor: "#588233" }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+      {/* ── Delete Confirm Modal ────────────────────────────────────── */}
+      {deleteId &&
+        (() => {
+          const wp = waypoints.find((w) => w.id === deleteId);
+          const label =
+            (wp?.poi || "").trim() ||
+            (wp?.iconId ? wp.iconId.toUpperCase() : null) ||
+            (wp?.type ? wp.type.toUpperCase() : "this waypoint");
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+              onClick={() => setDeleteId(null)}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="font-semibold text-lg mb-2">Delete waypoint?</h3>
+                <p className="text-sm text-gray-700 mb-4">
+                  Delete <strong>{label}</strong>? This can't be undone — but
+                  the GPS track is unaffected.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteId(null)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDelete}
+                    className="ml-auto px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }
