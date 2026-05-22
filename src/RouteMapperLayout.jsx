@@ -3,7 +3,11 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
-import { exportMapAsPdf, buildMapPdfBlob } from "./export/exportMapPdf";
+import {
+  exportMapAsPdf,
+  buildMapPdfBlob,
+  computeBounds,
+} from "./export/exportMapPdf";
 import { ICONS } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
 import { ICON_ORDER } from "./icons/iconRegistry";
@@ -607,7 +611,11 @@ export default function RouteMapperLayout() {
   const [showMap, setShowMap] = useState(true);
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
-  const [leafletMap, setLeafletMap] = useState(null);
+  // We only need the setter — the live `leafletMap` instance is no longer
+  // consumed anywhere now that the Map PDF renders from scratch instead of
+  // screenshotting the live map.  MapView still calls `onMapReady`, so we
+  // keep the setter wired to avoid changing MapView's contract.
+  const [, setLeafletMap] = useState(null);
   const [exportingMapPdf, setExportingMapPdf] = useState(false);
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
   const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
@@ -1550,78 +1558,66 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
-        // Capture the printable map PDF BEFORE the ZIP is built, while the
-        // Leaflet map is still mounted and populated with this stage's
-        // track/waypoints. Best-effort — if capture fails we still ship the
-        // rest of the ZIP.
+        // Render the printable map PDF BEFORE the ZIP is built.  The new
+        // pipeline (staticMapRenderer) draws tiles + polyline + markers from
+        // scratch onto a canvas — no Leaflet map instance required, so this
+        // runs even if the user has Hide Map active.  Best-effort: any
+        // failure (network blip, blocked tile server) drops the PDF and
+        // ships the rest of the ZIP.
         let mapPdfBlob = null;
-        if (leafletMap && showMap) {
-          try {
-            // Raw waypoints/trackPoints in state carry distanceFromStartM, not
-            // totalMeters, so read from the assembled stage to get the total.
-            const lastTrackPt = stageWithRoadbook.trackPoints?.at(-1);
-            const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
+        try {
+          const lastTrackPt = stageWithRoadbook.trackPoints?.at(-1);
+          const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
 
-            const stageWaypoints = stageWithRoadbook.waypoints || [];
-            const wpCount = stageWaypoints.filter(
-              (w) => w.kind !== "start" && w.poi !== "START",
-            ).length;
+          const stageWaypoints = stageWithRoadbook.waypoints || [];
+          const wpCount = stageWaypoints.filter(
+            (w) => w.kind !== "start" && w.poi !== "START",
+          ).length;
 
-            // fitBoundsTo: all points (start + track + waypoints) so the
-            // captured view fits the whole stage.
-            const pts = [];
-            if (startGPS?.lat && startGPS?.lon) {
-              pts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+          // routePositions: start + track points only.  Waypoints are drawn
+          // as markers, NOT joined into the polyline.
+          const routePts = [];
+          if (startGPS?.lat && startGPS?.lon) {
+            routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+          }
+          (stageWithRoadbook.trackPoints || []).forEach((p) => {
+            if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+              routePts.push([Number(p.lat), Number(p.lon)]);
             }
-            (stageWithRoadbook.trackPoints || []).forEach((p) => {
-              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
-                pts.push([Number(p.lat), Number(p.lon)]);
-              }
-            });
-            stageWaypoints.forEach((p) => {
-              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
-                pts.push([Number(p.lat), Number(p.lon)]);
-              }
-            });
+          });
 
-            // routePositions: track points only (+ start). Waypoints are
-            // already shown as markers; including them in the polyline array
-            // causes spurious straight lines between them.
-            const routePts = [];
-            if (startGPS?.lat && startGPS?.lon) {
-              routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+          // bounds: every point that should be visible — start + track +
+          // waypoints — so fitBounds covers the whole stage.
+          const allPts = [...routePts];
+          stageWaypoints.forEach((p) => {
+            if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+              allPts.push([Number(p.lat), Number(p.lon)]);
             }
-            (stageWithRoadbook.trackPoints || []).forEach((p) => {
-              if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
-                routePts.push([Number(p.lat), Number(p.lon)]);
-              }
-            });
+          });
+          const bounds = computeBounds(allPts);
 
-            const baseTitle =
-              `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+          const baseTitle =
+            `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
 
-            const result = await buildMapPdfBlob(leafletMap, {
+          if (bounds && routePts.length >= 2) {
+            const result = await buildMapPdfBlob({
               title: baseTitle,
               date: new Date(),
               totalDistanceKm: totalKm,
               waypointCount: wpCount,
-              tileAttribution:
-                mapSource === "esri_imagery"
-                  ? "Tiles © Esri"
-                  : mapSource === "opentopo"
-                    ? "© OpenTopoMap (CC-BY-SA)"
-                    : "© OpenStreetMap contributors",
-              fitBoundsTo: pts.length >= 2 ? pts : null,
-              routePositions: routePts.length >= 2 ? routePts : null,
+              tileSource: mapSource,
+              routePositions: routePts,
+              waypoints: stageWaypoints,
+              bounds,
               filename: baseTitle || "routemapper-map",
             });
             mapPdfBlob = result?.blob ?? null;
-          } catch (mapErr) {
-            console.warn(
-              "Map PDF capture failed — continuing with ZIP without it",
-              mapErr,
-            );
           }
+        } catch (mapErr) {
+          console.warn(
+            "Map PDF render failed — continuing with ZIP without it",
+            mapErr,
+          );
         }
 
         // Free / guest: core GPX files only. Paid plans get the full package.
@@ -2751,18 +2747,16 @@ export default function RouteMapperLayout() {
           <button
             type="button"
             className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
-            disabled={!showMap || !leafletMap || exportingMapPdf}
-            title="Export the current map view as a printable PDF. Tip: let the map fully load before exporting — tiles may take up to 30 seconds on a mobile connection."
+            disabled={exportingMapPdf || !startGPS}
+            title="Export the route + waypoints recorded so far as a printable PDF.  Renders the map from scratch (tiles fetched, polyline + markers drawn) — no Leaflet screenshot, so it works even with the map hidden."
             onClick={async () => {
-              if (!leafletMap) return;
               setExportingMapPdf(true);
               try {
                 const lastTrackPt = trackPoints?.[trackPoints.length - 1];
                 const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
 
-                // routePositions: track points only (+ start) for the polyline overlay.
-                // Waypoints are already drawn as markers, so excluding them here
-                // prevents spurious straight lines between marker locations.
+                // routePositions: start + track points only.  Waypoints are
+                // drawn as markers, NOT joined into the polyline.
                 const routePts = [];
                 if (startGPS?.lat && startGPS?.lon) {
                   routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
@@ -2773,26 +2767,39 @@ export default function RouteMapperLayout() {
                   }
                 });
 
+                // bounds: every point we want visible (start + track + every
+                // waypoint), so the rendered map fits the whole stage.
+                // v1 always fit-bounds; mid-stage "honour current zoom" is a
+                // potential follow-up.
+                const allPts = [...routePts];
+                (waypoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    allPts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+                const bounds = computeBounds(allPts);
+
                 const baseTitle =
                   `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
 
-                await exportMapAsPdf(leafletMap, {
+                if (!bounds || routePts.length < 2) {
+                  alert(
+                    "Not enough recorded data yet to render a map — start a stage and record at least one track point first.",
+                  );
+                  return;
+                }
+
+                await exportMapAsPdf({
                   title: baseTitle,
                   date: new Date(),
                   totalDistanceKm: totalKm,
                   waypointCount: (waypoints || []).filter(
                     (w) => w.kind !== "start" && w.poi !== "START",
                   ).length,
-                  tileAttribution:
-                    mapSource === "esri_imagery"
-                      ? "Tiles © Esri"
-                      : mapSource === "opentopo"
-                        ? "© OpenTopoMap (CC-BY-SA)"
-                        : "© OpenStreetMap contributors",
-                  // Mid-stage manual export: preserve the user's current
-                  // zoom/pan — don't refit to the full route.
-                  fitBoundsTo: null,
-                  routePositions: routePts.length >= 2 ? routePts : null,
+                  tileSource: mapSource,
+                  routePositions: routePts,
+                  waypoints: waypoints || [],
+                  bounds,
                   filename: baseTitle || "routemapper-map",
                 });
               } catch (err) {
