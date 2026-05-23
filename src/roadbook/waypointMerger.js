@@ -69,10 +69,21 @@ export function mergeWithWaypoints(events, waypoints, preprocessedTrack, config)
     //    icon's direction — driver knows which way they turned
     const resolved = resolveAngleForIcon(waypoint.icon, angleData);
 
-    const nearby = merged.find(
-      (event) =>
-        Math.abs((event.distanceM ?? 0) - waypoint.distanceM) <= mergeRadiusM,
-    );
+    // Stage-start waypoints are sacrosanct: they must always render as
+    // their own roadbook row (the Start tulip + "Start" note), never be
+    // merged into a turn detected at the same coordinates, and never have
+    // a separate waypoint (e.g. a Bump tapped immediately after Start
+    // Stage at the same GPS) collapsed INTO them.  Without this, the
+    // typical "Add Waypoint at distance 0" case overwrites the start's
+    // icon/notes with whatever the user just added.
+    const isStartWaypoint = waypoint.eventType === "start";
+    const nearby = isStartWaypoint
+      ? null
+      : merged.find(
+          (event) =>
+            Math.abs((event.distanceM ?? 0) - waypoint.distanceM) <=
+              mergeRadiusM && event.eventType !== "start",
+        );
 
     if (nearby) {
       // Manual waypoint always wins — override classification, note, and
