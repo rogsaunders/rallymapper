@@ -10,6 +10,7 @@ import { exportGarminFiles } from "./exporters/exportGarminFiles";
 import { exportGoogleEarthKml } from "./exporters/exportGoogleEarthKml";
 import { exportGaiaFiles } from "./exporters/exportGaiaFiles";
 import { exportCombinedGpx } from "./exporters/exportCombinedGpx";
+import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv";
 import { exportRoadbookHtml } from ".././roadbook/roadbookHtmlExport";
 import { exportRoadbookDocx } from "./exporters/exportRoadbookDocx";
 import {
@@ -18,12 +19,37 @@ import {
   numberWaypoints,
 } from "./staticMapRenderer";
 
+/**
+ * Assemble a stage export ZIP organised by use case rather than by file type.
+ *
+ * Layout:
+ *
+ *   README.txt
+ *   Universal/
+ *     route.gpx      — combined waypoints + track (preferred for most tools)
+ *     route.kml      — Google Earth and KML viewers
+ *     track.gpx      — track only (fallback for picky importers)
+ *     waypoints.gpx  — waypoints only (fallback for picky importers)
+ *   RallyNavigator/
+ *     route.gpx      — copy of Universal/route.gpx for one-stop RN import
+ *   Printable/       — when a roadbook is present
+ *     roadbook.html
+ *     roadbook.docx
+ *     roadbook.csv   — tabular roadbook view (open in Excel / Numbers / Sheets)
+ *     map.pdf        — when a Map PDF blob is provided
+ *   Source/
+ *     stage.json     — full RouteMapper data (re-importable into the app)
+ *     roadbook.json  — structured roadbook
+ *     manifest.json  — export metadata
+ *   Garmin/, Hema/, Gaia/  — tool-specific bundles
+ *
+ * The README.txt at the root tells the user which file to pick for which
+ * tool, so casual users never need to read the folder structure.
+ */
 export async function buildRoutePackage(stage, options = {}) {
   validateStage(stage);
 
   const roadbook = stage?.roadbook ?? null;
-  console.log("buildRoutePackage roadbook?", roadbook);
-  console.log("buildRoutePackage roadbook rows:", roadbook?.rows?.length);
 
   const config = {
     includeHema: true,
@@ -33,8 +59,8 @@ export async function buildRoutePackage(stage, options = {}) {
     includeGaia: true,
     includePdf: false,
     // Optional printable map PDF blob captured from the live Leaflet map.
-    // When provided, it's embedded in the ZIP as `${safeBase}_map.pdf` so
-    // organisers/entrants get the printable map alongside the track files.
+    // When provided, it's embedded in Printable/ so organisers/entrants get
+    // the printable map alongside the track files.
     mapPdfBlob: null,
     exportedAt: new Date().toISOString(),
     appName: "RouteMapper",
@@ -44,27 +70,49 @@ export async function buildRoutePackage(stage, options = {}) {
 
   const zip = new JSZip();
   const safeBase = makeBaseName(stage, config);
+  const stageName = stage?.meta?.stageName || "Stage";
+  const dateStr = config.exportedAt.slice(0, 10);
 
-  const coreFiles = {};
-  coreFiles[`${safeBase}_stage.json`] = exportMasterJson(
-    stage,
-    roadbook,
-    config,
-  );
-  coreFiles[`${safeBase}_track.gpx`] = exportUniversalTrackGpx(stage, config);
-  coreFiles[`${safeBase}_waypoints.gpx`] = exportUniversalWaypointsGpx(
-    stage,
-    config,
-  );
-  coreFiles[`${safeBase}_combined.gpx`] = exportCombinedGpx(stage, config);
+  // ── README at root — the only place a casual user needs to look ──────
+  zip.file("README.txt", buildReadme(stageName, dateStr, config, roadbook));
 
+  // ── Universal/ — works in every modern mapping tool ──────────────────
+  // route.gpx is the primary file (waypoints + track in one). Separate
+  // track/waypoints variants kept alongside for any consumer that prefers
+  // them, until the interop validation pass tells us they can be dropped.
+  const universal = zip.folder("Universal");
+  const combinedGpx = exportCombinedGpx(stage, config);
+  universal.file("route.gpx", combinedGpx);
+  universal.file("track.gpx", exportUniversalTrackGpx(stage, config));
+  universal.file("waypoints.gpx", exportUniversalWaypointsGpx(stage, config));
+
+  // Google Earth KML lives under Universal/ too — a single discoverable
+  // location for any KML-compatible viewer (Google Earth, ArcGIS Earth,
+  // many mobile mapping apps).
+  const kmlBundle = exportGoogleEarthKml(stage, config, safeBase);
+  const kmlContent = Object.values(kmlBundle)[0];
+  universal.file("route.kml", kmlContent);
+
+  // ── RallyNavigator/ — self-contained for RN users ────────────────────
+  // Per design call: duplicate route.gpx here so RN users get a complete
+  // bundle in one folder rather than having to look in Universal/ too.
+  // The duplication is trivial in size; the UX win is real.
+  if (config.includeRallyNav) {
+    const rn = zip.folder("RallyNavigator");
+    rn.file("route.gpx", combinedGpx);
+  }
+
+  // ── Printable/ — print-ready and spreadsheet outputs ─────────────────
+  let printable = null;
   if (roadbook) {
+    printable = zip.folder("Printable");
+
     // Pre-render the stage-overview map ONCE and hand the same image to
-    // both roadbook exporters.  This keeps HTML and DOCX visually identical,
-    // and amortises ~30 OSM tile fetches across both files.
-    //
-    // Best-effort: any failure (offline, blocked tile server, no GPS data)
-    // skips the map silently and ships the roadbook unchanged.
+    // both roadbook exporters.  Keeps HTML and DOCX visually identical and
+    // amortises ~30 OSM tile fetches across both files.  Best-effort: any
+    // failure (offline, blocked tile server, insufficient track data) is
+    // logged and the roadbook ships without the embedded map rather than
+    // failing the whole package.
     let mapImage = null;
     try {
       mapImage = await renderRoadbookMap(stage, config);
@@ -80,82 +128,50 @@ export async function buildRoutePackage(stage, options = {}) {
       mapImageDataUrl: mapImage?.dataUrl ?? null,
       mapImageBytes:   mapImage?.bytes   ?? null,
     };
-    coreFiles[`${safeBase}_roadbook.json`] = JSON.stringify(roadbook, null, 2);
-    coreFiles[`${safeBase}_roadbook.html`] = await exportRoadbookHtml(stage, exportOpts);
-    coreFiles[`${safeBase}_roadbook.docx`] = await exportRoadbookDocx(stage, exportOpts);
+    printable.file("roadbook.html", await exportRoadbookHtml(stage, exportOpts));
+    printable.file("roadbook.docx", await exportRoadbookDocx(stage, exportOpts));
+    // Tabular roadbook view — useful for Excel/Numbers analysis. Note:
+    // this is NOT a Rally Navigator native import format despite the
+    // exporter being historically named exportRallyNavCsv.
+    printable.file("roadbook.csv", exportRallyNavCsv(stage, { mode: "driver" }));
   }
-
-  // Embed the printable map PDF (captured while the map was still visible)
-  // so the ZIP is a complete, share-ready package.
   if (config.mapPdfBlob) {
-    coreFiles[`${safeBase}_map.pdf`] = config.mapPdfBlob;
+    printable = printable || zip.folder("Printable");
+    printable.file("map.pdf", config.mapPdfBlob);
   }
 
-  Object.entries(coreFiles).forEach(([name, content]) =>
-    zip.file(name, content),
-  );
-
+  // ── Source/ — for re-import to RouteMapper and build metadata ────────
+  const source = zip.folder("Source");
+  source.file("stage.json", exportMasterJson(stage, roadbook, config));
+  if (roadbook) {
+    source.file("roadbook.json", JSON.stringify(roadbook, null, 2));
+  }
   const manifest = buildManifest(stage, config, safeBase, roadbook);
+  source.file("manifest.json", JSON.stringify(manifest, null, 2));
 
-  if (config.includeHema) {
-    addFolderFiles(
-      zip.folder("hema"),
-      exportHemaFiles(stage, config, safeBase),
-      manifest.files.hema,
-    );
-  }
-
+  // ── Tool-specific bundles — kept until interop validation prunes them ─
   if (config.includeGarmin) {
     addFolderFiles(
-      zip.folder("garmin"),
+      zip.folder("Garmin"),
       exportGarminFiles(stage, config, safeBase),
-      manifest.files.garmin,
     );
   }
-
-  if (config.includeRallyNav) {
+  if (config.includeHema) {
     addFolderFiles(
-      zip.folder("rallynav"),
-      {
-        [`${safeBase}_rallynav_track.gpx`]: exportUniversalTrackGpx(
-          stage,
-          config,
-        ),
-        [`${safeBase}_rallynav_waypoints.gpx`]: exportUniversalWaypointsGpx(
-          stage,
-          config,
-        ),
-      },
-      manifest.files.rallynav,
+      zip.folder("Hema"),
+      exportHemaFiles(stage, config, safeBase),
     );
   }
-
-  if (config.includeGoogleEarth) {
-    addFolderFiles(
-      zip.folder("google-earth"),
-      exportGoogleEarthKml(stage, config, safeBase),
-      manifest.files.googleEarth,
-    );
-  }
-
   if (config.includeGaia) {
-    addFolderFiles(
-      zip.folder("gaia"),
-      exportGaiaFiles(stage, config, safeBase),
-      manifest.files.gaia,
-    );
+    addFolderFiles(zip.folder("Gaia"), exportGaiaFiles(stage, config, safeBase));
   }
-
-  zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-  zip.file("README.md", buildReadme(config));
 
   return zip.generateAsync({ type: "blob" });
 }
 
-function addFolderFiles(folder, files, manifestArray) {
+function addFolderFiles(folder, files) {
   Object.entries(files).forEach(([name, content]) => {
     folder.file(name, content);
-    manifestArray.push(`${folder.name}/${name}`);
   });
 }
 
@@ -242,17 +258,73 @@ async function renderRoadbookMap(stage, config) {
   return { dataUrl, bytes };
 }
 
-function buildReadme(config) {
-  return `# ${config.appName} Export Package
+function buildReadme(stageName, dateStr, config, roadbook) {
+  const lines = [
+    `ROUTEMAPPER STAGE EXPORT`,
+    `========================`,
+    ``,
+    `Stage:        ${stageName}`,
+    `Generated:    ${dateStr}`,
+    `App version:  ${config.appName} ${config.version}`,
+    ``,
+    `─────────────────────────────────────────────────────────`,
+    `OPEN ONE OF THESE FILES`,
+    `─────────────────────────────────────────────────────────`,
+    ``,
+    `Rally Navigator users`,
+    `   →  RallyNavigator/route.gpx     (waypoints + track)`,
+    ``,
+    `Garmin, Hema, Guru Maps, Gaia GPS users`,
+    `   →  Universal/route.gpx          (waypoints + track combined)`,
+    ``,
+    `Google Earth users`,
+    `   →  Universal/route.kml`,
+    ``,
+  ];
 
-This ZIP was generated by ${config.appName} ${config.version}.
+  if (roadbook) {
+    lines.push(
+      `Printing the roadbook`,
+      `   →  Printable/roadbook.html     (open in any browser, then print)`,
+      `   →  Printable/roadbook.docx     (edit first in Word or Pages)`,
+      `   →  Printable/roadbook.csv      (open in Excel / Numbers / Sheets)`,
+      ``,
+    );
+  }
 
-Core files:
-- stage JSON
-- universal track GPX
-- universal waypoints GPX
-- roadbook JSON/CSV when available
+  if (config.mapPdfBlob) {
+    lines.push(
+      `Printing the map`,
+      `   →  Printable/map.pdf`,
+      ``,
+    );
+  }
 
-Target folders may include Hema, Garmin, Rally Navigator, Google Earth, and Gaia GPS exports.
-`;
+  lines.push(
+    `Re-import to RouteMapper`,
+    `   →  Source/stage.json`,
+    ``,
+    `─────────────────────────────────────────────────────────`,
+    `MORE`,
+    `─────────────────────────────────────────────────────────`,
+    ``,
+    `Need help?  https://routemapper.net/guide`,
+    ``,
+    `Universal/ also includes alternative GPX layouts in case your`,
+    `tool prefers them:`,
+    `   route.gpx       — waypoints + track combined (recommended)`,
+    `   track.gpx       — track only`,
+    `   waypoints.gpx   — waypoints only`,
+    ``,
+    `Tool-specific folders (Garmin/, Hema/, Gaia/) hold bundles`,
+    `pre-organised for those products' native folder conventions.`,
+    ``,
+    `Source/ contains the full RouteMapper data:`,
+    `   stage.json      — importable back into RouteMapper`,
+    `   roadbook.json   — structured roadbook data`,
+    `   manifest.json   — export metadata`,
+    ``,
+  );
+
+  return lines.join("\n");
 }

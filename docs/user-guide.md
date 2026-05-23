@@ -66,8 +66,10 @@ Open the app. Sign in with your account, or tap **Continue as Guest**.
 Enter **Trip name**, **Day**, **Route**, and **Stage name** at the top.
 
 ### 3. Start recording
-Tap the green **Start Stage**. Allow location access when prompted.
-**Expected:** your position appears on the map; the GPS panel shows live coordinates.
+Tap the green **Start Stage**. Allow location access when prompted. This both starts recording and captures the current GPS position as the stage's start point.
+**Expected:** your position appears on the map; the **🟢 GPS** indicator turns green in the map controls row. If you tap Start Stage before GPS is ready, the start point is captured automatically the moment a valid fix arrives.
+
+If you realise the actual stage start was a little further on, tap **🚩 Update Start** (appears next to End Stage during an active stage) to reset the start position to your current location.
 
 ### 4. Record a short route
 Walk or drive a short loop — five to ten minutes is plenty. Watch a breadcrumb track build behind you on the map.
@@ -76,12 +78,11 @@ Walk or drive a short loop — five to ten minutes is plenty. Watch a breadcrumb
 
 The snap-first flow: **tap first, refine second**. GPS locks the moment you tap; you then have a short window to choose icon and notes.
 
-Try all four methods:
+Try the three methods:
 
 1. **Tap-then-refine** — Tap **Add Waypoint (Current GPS)**. A pending amber card appears with a countdown. Choose an icon (e.g. Hazard → Danger 2) and/or type a POI note. Tap **✓ Done** to commit early, **Discard** to cancel, or just let it auto-commit.
-2. **Voice dictation** — Tap **Add Waypoint**, then tap **Dictate**. Speak your note while the pending card is active; the spoken text fills the POI field before auto-commit.
+2. **Voice push-to-talk** — Tap **🎙 Record** in the Voice panel and speak your command, e.g. *"left onto Forbes Road"*. See [Features in Depth → Voice waypoints](#voice-waypoints-push-to-talk) below.
 3. **Different icon types** — try Navigation, Hazard, Control, Terrain, and Note icons. Your last-used type persists, so for a stream of same-type waypoints you just tap → let it commit.
-4. **Hands-Free voice** *(for solo drivers)* — see [Features in Depth → Hands-Free voice mapping](#hands-free-voice-mapping) below.
 
 **Expected:** while pending, a dashed amber circle on the map at the captured GPS position. On commit, it switches to a solid icon marker and appears in the Waypoints panel with type, icon, time, and distance from the previous waypoint.
 
@@ -89,13 +90,13 @@ Try all four methods:
 Tap the red **End Stage**. The app generates a roadbook, saves your data, and offers an export ZIP.
 
 ### 7. Check the export
-Open the ZIP. Inside you'll find:
-- GPX files (Rally Navigator, OpenRally, Garmin, universal, combined)
-- KML for Google Earth
-- CSVs for Hema and Gaia
-- HTML roadbook with tulip diagrams and CAP values
-- Map PDF (A4 landscape, ready to print)
-- Master JSON for re-import
+Open the ZIP and read the **`README.txt`** at the root — it tells you which file to use for which tool. The layout is:
+
+- **`Universal/`** — `route.gpx` and `route.kml` for any mapping tool (Garmin, Hema, Guru, Gaia, Google Earth)
+- **`RallyNavigator/`** — `route.gpx` bundled for Rally Navigator import
+- **`Printable/`** — `roadbook.html`, `roadbook.docx`, `roadbook.csv`, plus `map.pdf` when generated
+- **`Source/`** — `stage.json` to re-import back into RouteMapper
+- **`Garmin/`, `Hema/`, `Gaia/`** — tool-specific bundles for users who prefer pre-organised file conventions
 
 Open the HTML roadbook and the map PDF — both should render cleanly.
 
@@ -131,37 +132,67 @@ RouteMapper organises 29 icons into 5 types. Your last-used type persists betwee
 
 All 29 icons follow OpenRally and Garmin symbol standards. They render identically across the in-app map, generated roadbook tulips, and KML/GPX exports.
 
-### Hands-Free voice mapping
+### Voice waypoints (push-to-talk)
 
-Hands-Free mode locks GPS the instant the wake word "Tag" is recognised — **before you say anything else**. At speed, the recorded position is where you were when you called it, not where you ended up while speaking the command.
+Tap **🎙 Record** and speak — RouteMapper locks your GPS at the moment of the tap, captures your spoken command, and creates a waypoint at the locked position. No wake word, no continuous listening; one button, your voice.
+
+The button is the trigger because in real vehicles wake words fail too often — engine noise, wind, and headset compression all degrade speech recognition. A button tap is deterministic and works every time.
 
 **Flow:**
-1. Tap **Activate** in the Hands-Free panel — listening for the wake word.
-2. Say **"Tag"** — beep + the panel turns amber ("📍 GPS locked"). GPS is locked at this instant.
-3. Speak: *type + icon + dash + note*
+1. Tap **🎙 Record** in the Voice panel — beep + the panel turns amber (*"📍 GPS locked"*). GPS is locked at this instant.
+2. Speak your command: *type + icon + dash + note*.
+3. After a short silence (default 2.5 s), the waypoint commits to the locked GPS position.
+4. Say nothing for the snap window (default 5 s) and it auto-commits as a plain note.
+5. Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint. Or tap **⏹ Stop** on the button.
 
-   | You say | Result |
-   |---------|--------|
-   | *"Tag… hazard danger two — rocks on track"* | Hazard waypoint, Danger 2 icon, *"rocks on track"* note |
-   | *"Tag… left — onto gravel road"* | Nav waypoint, Left icon, *"onto gravel road"* note |
-   | *"Tag… terrain washout"* | Terrain waypoint, Washout icon, no note |
-   | *"Tag… bump"* | Terrain waypoint, Bump icon (type inferred) |
-   | *"Tag… control fuel — stop for fuel"* | Control waypoint, Fuel icon, *"stop for fuel"* note |
-   | *"Tag… note — fuel stop ahead"* | Note waypoint, *"fuel stop ahead"* |
-   | *"Tag… caution"* | Nav waypoint, Caution icon (type inferred) |
-   | *"Tag… keep left"* | Nav waypoint, Keep Left icon |
+**Example commands:**
 
-   You can omit the type if the icon name is unambiguous — *"Tag… left"* works as well as *"Tag… nav left"*.
-4. After a short silence, the waypoint commits to the locked GPS position.
-5. Say nothing for the voice snap window and it auto-commits with the last-used icon — useful for repeated waypoints of the same type.
-6. Say **"cancel"**, **"discard"**, or **"abort"** to drop the pending waypoint.
+| You say | Result |
+|---------|--------|
+| *"hazard danger two — rocks on track"* | Hazard waypoint, Danger 2 icon, *"rocks on track"* note |
+| *"left — onto gravel road"* | Nav waypoint, Left icon, *"onto gravel road"* note |
+| *"left onto Forbes Road"* | Nav waypoint, Left icon, *"onto Forbes Road"* note |
+| *"terrain washout"* | Terrain waypoint, Washout icon, no note |
+| *"bump"* | Terrain waypoint, Bump icon (type inferred) |
+| *"control fuel — stop for fuel"* | Control waypoint, Fuel icon, *"stop for fuel"* note |
+| *"note — fuel stop ahead"* | Note waypoint, *"fuel stop ahead"* |
+| *"caution"* | Nav waypoint, Caution icon (type inferred) |
+| *"keep left"* | Nav waypoint, Keep Left icon |
 
-**Three sliders** in the ⚙️ panel, all in one place:
+You can omit the type if the icon name is unambiguous — *"left"* works as well as *"nav left"*.
+
+**Three sliders** in the ⚙️ panel:
 - **Silence timeout** — pause after speaking before the command fires (1.5–5 s)
-- **Voice snap window** — how long after "Tag" before auto-commit (3–10 s)
-- **Snap window (edit after tap)** — for the manual tap flow, not Hands-Free (2–10 s)
+- **Voice snap window** — how long after tapping 🎙 Record before auto-commit (3–10 s)
+- **Snap window (edit after tap)** — for the manual tap flow, not Voice (2–10 s)
 
 A Bluetooth headset with mic significantly improves accuracy in noisy or windy conditions.
+
+#### External trigger (Bluetooth, foot pedal, presenter)
+
+You can fire the 🎙 Record button without tapping the iPad. Useful when the iPad is mounted out of reach, or when both your hands are on the wheel.
+
+**What works:**
+
+- **Bluetooth headsets** that send standard media key events (most AirPods, Plantronics/Poly, Jabra). A single press of the play/pause button fires Record.
+- **Bluetooth foot pedals** (AirTurn PED Pro, iKKEGOL, etc.) sending Page Up, Page Down, or media keys.
+- **Wireless presenter clickers** (Logitech R500/R800, Satechi) sending Page Up / Page Down.
+- **Bluetooth keyboards** — handy for testing the integration before buying specialised hardware. Press **Space**, **PageUp**, **PageDown**, or **F8**.
+
+**A second press while recording cancels** the snap and returns to idle.
+
+**Disabling the trigger:** in the ⚙️ Voice settings, uncheck **🎧 External trigger** if it ever fires accidentally. Default is on.
+
+**Works alongside other audio apps:** while a stage is recording, RouteMapper claims the active Bluetooth media session — so a single press of your headset's play/pause button fires 🎙 Record, even if Spotify or Apple Music was playing a moment earlier. Music resumes its hold of the media buttons when you end the stage.
+
+**Testing without specialised hardware:**
+
+1. Pair a Bluetooth keyboard to your iPad.
+2. Start a stage.
+3. Tap somewhere outside any text field on the main map area.
+4. Press **Space** — the 🎙 Record flow should fire as if you had tapped the button.
+
+When the trigger is active, a small **🎧** icon appears next to "Voice" in the panel header.
 
 ### Trip, Day, Route, Stage
 
@@ -208,21 +239,17 @@ The HTML roadbook generates automatically when you end a stage. Each waypoint ap
 
 Open the HTML roadbook in any browser. It's print-friendly and works on any device — no special software required.
 
-### 10+ export formats
+### Export package
 
-A single ZIP covers every format your participants might need:
-- **Rally Navigator CSV** (raw and driver modes)
-- **Garmin GPX**
-- **OpenRally GPX**
-- **Universal GPX**
-- **Combined GPX**
-- **Google Earth KML**
-- **Hema Maps**
-- **Guru Maps**
-- **Gaia GPS**
-- **Roadbook HTML** with tulips
-- **Map PDF** (A4 landscape)
-- **Master JSON** (full re-import)
+One ZIP per stage, organised by use case rather than by file type. A `README.txt` at the root tells you which file to pick:
+
+- **`Universal/`** — `route.gpx` (waypoints + track combined) and `route.kml`. Works in Garmin BaseCamp, Hema Maps, Guru Maps, Gaia GPS, Google Earth, and any modern GPX/KML viewer.
+- **`RallyNavigator/`** — `route.gpx` bundled for Rally Navigator. RN imports the polyline and waypoints cleanly.
+- **`Printable/`** — `roadbook.html` (open in any browser and print), `roadbook.docx` (edit in Word or Pages first), `roadbook.csv` (tabular view for Excel / Numbers / Sheets), and `map.pdf` when generated.
+- **`Source/`** — `stage.json` to re-import the full stage back into RouteMapper, plus `roadbook.json` and `manifest.json` for technical use.
+- **`Garmin/`, `Hema/`, `Gaia/`** — tool-specific bundles in those products' preferred folder conventions.
+
+`Universal/` also includes `track.gpx` and `waypoints.gpx` (separate variants of `route.gpx`) for any consumer that prefers them split rather than combined.
 
 ---
 
@@ -242,8 +269,8 @@ Current prices at [routemapper.net/#pricing](https://routemapper.net/#pricing). 
 ## Tips for the Field
 
 - **Charge your device** before recording — GPS drains battery quickly.
-- **Use a phone or tablet mount** if recording while driving — essential for Hands-Free mode.
-- **Hands-Free pacing** — pause briefly after "Tag" before your command. The dash separator (or a natural pause) splits the icon type from your note text.
+- **Mount the iPad close to the navigator** so the 🎙 Record button is one easy reach away.
+- **Voice pacing** — after tapping 🎙 Record, you have a short snap window to start speaking. Use a dash or natural pause to separate the icon from the note text.
 - **Tune the snap windows** — the ⚙️ cog has three sliders. On open terrain, 3–4 s for voice snap is plenty; in tricky navigation, 7–8 s gives you room to think.
 - **Bluetooth headset** — in a noisy vehicle or windy conditions, a headset mic dramatically improves voice accuracy.
 - **Stage History is read-only** — review past stages freely between live sessions; nothing gets overwritten.

@@ -13,19 +13,7 @@ export function exportUniversalTrackGpx(stage, config = {}) {
     .filter(
       (p) => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)),
     )
-    .map((p) => {
-      const lat = Number(p.lat);
-      const lon = Number(p.lon);
-      const time = p.time || p.timestamp || "";
-
-      return [
-        `    <trkpt lat="${lat}" lon="${lon}">`,
-        time ? `      <time>${xmlEscape(time)}</time>` : null,
-        `    </trkpt>`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-    })
+    .map(buildTrackpointXml)
     .join("\n");
 
   return [
@@ -56,7 +44,7 @@ export function exportUniversalWaypointsGpx(stage, config = {}) {
   return [gpxHeader(config.appName), allWaypoints, gpxFooter()].join("\n");
 }
 
-function buildStartWaypoint(startGPS) {
+export function buildStartWaypoint(startGPS) {
   if (
     !startGPS ||
     !Number.isFinite(Number(startGPS.lat)) ||
@@ -86,7 +74,7 @@ function buildStartWaypoint(startGPS) {
     .join("\n");
 }
 
-function buildWaypointXml(w, index) {
+export function buildWaypointXml(w, index) {
   const lat = Number(w.lat);
   const lon = Number(w.lon);
 
@@ -120,6 +108,20 @@ function buildWaypointXml(w, index) {
     `    <type>${orType}</type>`,
     time ? `    <time>${xmlEscape(time)}</time>` : null,
     `  </wpt>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildTrackpointXml(p) {
+  const lat = Number(p.lat);
+  const lon = Number(p.lon);
+  const time = p.time || p.timestamp || "";
+
+  return [
+    `    <trkpt lat="${lat}" lon="${lon}">`,
+    time ? `      <time>${xmlEscape(time)}</time>` : null,
+    `    </trkpt>`,
   ]
     .filter(Boolean)
     .join("\n");

@@ -1,3 +1,11 @@
+/**
+ * Build a small metadata blob for the export ZIP.
+ *
+ * The manifest is informational only — it captures what was exported and
+ * when, plus basic stats. The previous version listed file paths but they
+ * drifted as the ZIP layout evolved; file discovery now happens via the
+ * README.txt and the folder structure itself.
+ */
 export function buildManifest(stage, config, baseName, roadbook) {
   return {
     app: config.appName || "RouteMapper",
@@ -13,19 +21,5 @@ export function buildManifest(stage, config, baseName, roadbook) {
       waypoints: stage?.waypoints?.length || 0,
       roadbookRows: roadbook?.rows?.length || 0,
     },
-    files: {
-      core: [
-        `${baseName}_stage.json`,
-        `${baseName}_track.gpx`,
-        `${baseName}_waypoints.gpx`,
-        ...(roadbook ? [`${baseName}_roadbook.json`, `${baseName}_roadbook.csv`] : []),
-        ...(config.mapPdfBlob ? [`${baseName}_map.pdf`] : []),
-      ],
-      hema: [],
-      garmin: [],
-      rallynav: [],
-      googleEarth: [],
-      gaia: [],
-    },
-  }
+  };
 }

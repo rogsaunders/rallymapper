@@ -1,16 +1,14 @@
 // src/RouteMapperLayout.jsx
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
-import startflag from "/icons/start-flag.svg";
 import MapView from "./components/MapView";
 import {
   exportMapAsPdf,
   buildMapPdfBlob,
   computeBounds,
 } from "./export/exportMapPdf";
-import { ICONS } from "./icons/iconRegistry";
+import { ICONS, ICON_ORDER, ICON_CATEGORIES } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
-import { ICON_ORDER } from "./icons/iconRegistry";
 import { useAuth } from "./auth/AuthProvider";
 import {
   getLimits,
@@ -25,7 +23,7 @@ import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
-import { createWakeWordListener } from "./voice/wakeWordListener";
+import { createRecordTrigger } from "./voice/recordTrigger";
 import StageHistoryPanel from "./components/StageHistoryPanel";
 import AccountModal from "./components/AccountModal";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
@@ -165,9 +163,19 @@ function makeLocalId(meta) {
   return `${meta.tripDate}_d${meta.dayNumber}_r${meta.routeNumber}_s${meta.stageNumber}_${meta.endedAt}`;
 }
 
-function getSpeechRecognition() {
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-}
+// First-icon-in-each-category map, derived from the registry. Used as the
+// initial state for iconIdByCategory and as the reset value when a stage
+// starts. The registry is JSON-manifest-driven, so adding a new category
+// (or a new icon in an existing category) updates this automatically.
+const DEFAULT_ICON_BY_CATEGORY = (() => {
+  const out = {};
+  for (const cat of ICON_CATEGORIES) {
+    const key = cat.toLowerCase();
+    const variants = ICONS[key]?.variants || {};
+    out[key] = Object.keys(variants)[0] || null;
+  }
+  return out;
+})();
 
 function safeSlug(s) {
   return String(s || "")
@@ -560,23 +568,23 @@ export default function RouteMapperLayout() {
   const [waypointType, setWaypointType] = useState("note");
   const [poi, setPoi] = useState("");
   const [followMap, setFollowMap] = useState(true);
-  const [hazardIconId, setHazardIconId] = useState("danger_1");
-  const [navIconId, setNavIconId] = useState("straight");
-  const [controlIconId, setControlIconId] = useState("start");
-  const [terrainIconId, setTerrainIconId] = useState("bump");
-  const recognitionRef = useRef(null);
+  // One state object per category — auto-extends as the icon manifest
+  // grows. Replaces hazardIconId / navIconId / controlIconId / terrainIconId.
+  const [iconIdByCategory, setIconIdByCategory] = useState(
+    DEFAULT_ICON_BY_CATEGORY,
+  );
+  const setIconForCategory = (category, iconId) =>
+    setIconIdByCategory((prev) => ({ ...prev, [category]: iconId }));
   // const localOwner = getGuestOwnerId();
   // const user = null;
 
-  const [isListening, setIsListening] = useState(false);
-  const [_dictationDraft, setDictationDraft] = useState("");
-  const [handsFreeActive, setHandsFreeActive] = useState(false);
-  const [handsFreeMode, setHandsFreeMode] = useState("off"); // "off" | "standby" | "command"
-  const [_handsFreeListening, setHandsFreeListening] = useState(false);
-  const [handsFreeTranscript, setHandsFreeTranscript] = useState("");
-  const [handsFreeLastCommand, setHandsFreeLastCommand] = useState(null);
-  const [handsFreeShowSettings, setHandsFreeShowSettings] = useState(false);
-  const [handsFreeSilenceMs, setHandsFreeSilenceMs] = useState(
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [voiceMode, setVoiceMode] = useState("off"); // "off" | "snap" | "command"
+  const [_voiceListening, setVoiceListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceLastCommand, setVoiceLastCommand] = useState(null);
+  const [voiceShowSettings, setVoiceShowSettings] = useState(false);
+  const [voiceSilenceMs, setVoiceSilenceMs] = useState(
     () => Number(localStorage.getItem("rm_handsfree_silence_ms")) || 2500,
   );
   const [snapWindowMs, setSnapWindowMs] = useState(
@@ -586,15 +594,25 @@ export default function RouteMapperLayout() {
   const [pendingRemainingMs, setPendingRemainingMs] = useState(0);
   const pendingWaypointRef = useRef(null);
   const pendingTimerRef = useRef(null);
-  const [handsFreeToast, setHandsFreeToast] = useState(null); // { type, iconId, poi } for large toast
-  const handsFreeRef = useRef(null); // voice command handler
-  const wakeWordRef = useRef(null); // wake word listener
-  const handsFreeActiveRef = useRef(false); // mirrors handsFreeActive for async callbacks
+  const [voiceToast, setVoiceToast] = useState(null); // { type, iconId, poi } for large toast
+  const voiceRef = useRef(null); // voice command handler
+  const voiceActiveRef = useRef(false); // mirrors voiceActive for async callbacks
+  const recordTriggerRef = useRef(null); // external Bluetooth / pedal / keyboard trigger
+  const [externalTriggerEnabled, setExternalTriggerEnabled] = useState(() => {
+    const stored = localStorage.getItem("rm_external_trigger_enabled");
+    return stored === null ? true : stored === "true";
+  });
 
-  // ── Snap-on-wake state ────────────────────────────────────────────
-  // GPS is locked the instant "Tag" is heard; the user then has
-  // snapTimeoutSec seconds to say the waypoint type/icon before the
-  // pending waypoint is auto-committed with the current defaults.
+  // ── Waypoint edit / delete state ──────────────────────────────────
+  // editDraft  — open the edit modal with a working copy of one waypoint
+  // deleteId   — ask the confirm modal to delete this waypoint
+  const [editDraft, setEditDraft] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+
+  // ── Snap-on-tap state ─────────────────────────────────────────────
+  // GPS is locked the instant 🎙 Record is tapped; the user then has
+  // snapTimeoutSec seconds to speak a command before the pending
+  // waypoint auto-commits as a plain note.
   const [snapCountdown, setSnapCountdown] = useState(0);
   const [snapTimeoutSec, setSnapTimeoutSec] = useState(
     () => Number(localStorage.getItem("rm_handsfree_snap_sec")) || 5,
@@ -667,18 +685,9 @@ export default function RouteMapperLayout() {
 
   // Keep async-callback refs in sync with React state.
   useEffect(() => {
-    const iconId =
-      waypointType === "hazard"
-        ? hazardIconId
-        : waypointType === "nav"
-          ? navIconId
-          : waypointType === "control"
-            ? controlIconId
-            : waypointType === "terrain"
-              ? terrainIconId
-              : null;
+    const iconId = iconIdByCategory[waypointType] ?? null;
     currentDefaultsRef.current = { type: waypointType, iconId };
-  }, [waypointType, hazardIconId, navIconId, controlIconId, terrainIconId]);
+  }, [waypointType, iconIdByCategory]);
 
   useEffect(() => {
     snapTimeoutSecRef.current = snapTimeoutSec;
@@ -703,10 +712,7 @@ export default function RouteMapperLayout() {
       trackPoints,
       waypoints,
       waypointType,
-      hazardIconId,
-      navIconId,
-      controlIconId,
-      terrainIconId,
+      iconIdByCategory,
       poi,
     };
 
@@ -732,9 +738,7 @@ export default function RouteMapperLayout() {
     waypoints,
     trackPoints,
     waypointType,
-    hazardIconId,
-    navIconId,
-    controlIconId,
+    iconIdByCategory,
     poi,
   ]);
 
@@ -767,94 +771,90 @@ export default function RouteMapperLayout() {
       setWaypoints(Array.isArray(draft.waypoints) ? draft.waypoints : []);
       setTrackPoints(Array.isArray(draft.trackPoints) ? draft.trackPoints : []);
       setWaypointType(draft.waypointType ?? "note");
-      setHazardIconId(draft.hazardIconId ?? "danger_1");
-      setNavIconId(draft.navIconId ?? "straight");
-      setControlIconId(draft.controlIconId ?? "start");
-      setTerrainIconId(draft.terrainIconId ?? "bump");
+      // New-shape drafts have iconIdByCategory; legacy drafts have
+      // individual *IconId fields. Merge either onto the defaults so
+      // missing/added categories don't break the restore.
+      const restoredIcons = draft.iconIdByCategory
+        ? { ...DEFAULT_ICON_BY_CATEGORY, ...draft.iconIdByCategory }
+        : {
+            ...DEFAULT_ICON_BY_CATEGORY,
+            ...(draft.hazardIconId ? { hazard: draft.hazardIconId } : {}),
+            ...(draft.navIconId ? { nav: draft.navIconId } : {}),
+            ...(draft.controlIconId ? { control: draft.controlIconId } : {}),
+            ...(draft.terrainIconId ? { terrain: draft.terrainIconId } : {}),
+          };
+      setIconIdByCategory(restoredIcons);
       setPoi(draft.poi ?? "");
     } catch (e) {
       console.warn("Stage restore failed:", e);
     }
   }, []);
 
-  const startDictation = () => {
-    const SR = getSpeechRecognition();
-    if (!SR) {
-      alert("Speech recognition not available in this browser.");
-      return;
-    }
+  // ── Waypoint edit / delete helpers ────────────────────────────────
+  // openEditWaypoint  — populates the modal with a working copy of the
+  //                     selected waypoint; user can adjust type/icon/poi.
+  // saveEdit          — writes the modal's draft back into the waypoints
+  //                     array, preserving id, lat, lon, timestamp.
+  // requestDelete     — shows the confirm modal for a waypoint id.
+  // confirmDelete     — actually removes the waypoint from state.
+  // deleteWaypointsAfter(index) — exposed for a future "rewind N" feature
+  //                     (Medium → Large promotion path). Removes every
+  //                     non-START waypoint after the given index in the
+  //                     visible routePoints list.
 
-    // If already listening, ignore repeat tap
-    if (isListening) return;
-
-    // Create once
-    if (!recognitionRef.current) {
-      const rec = new SR();
-      rec.lang = "en-AU";
-      rec.continuous = false;
-      rec.interimResults = true;
-
-      rec.onstart = () => {
-        setIsListening(true);
-        setDictationDraft("");
-      };
-
-      rec.onresult = (event) => {
-        let finalText = "";
-        let interimText = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const res = event.results[i];
-          const transcript = res?.[0]?.transcript || "";
-          if (res.isFinal) finalText += transcript;
-          else interimText += transcript;
-        }
-
-        if (finalText.trim()) {
-          setPoi((prev) => (prev ? prev + " " : "") + finalText.trim());
-          setDictationDraft("");
-        } else {
-          setDictationDraft(interimText.trim());
-        }
-      };
-
-      rec.onerror = (e) => {
-        console.warn("Speech error:", e);
-        setIsListening(false);
-        setDictationDraft("");
-      };
-
-      rec.onend = () => {
-        setIsListening(false);
-        setDictationDraft("");
-      };
-
-      recognitionRef.current = rec;
-    }
-
-    try {
-      recognitionRef.current.start();
-    } catch (e) {
-      // Some browsers throw if called twice / too quickly
-      console.warn("Speech start failed:", e);
-    }
+  const openEditWaypoint = (wp) => {
+    setEditDraft({
+      id: wp.id,
+      type: wp.type || "note",
+      iconId: wp.iconId || null,
+      poi: wp.poi || "",
+    });
   };
 
-  const stopDictation = () => {
-    try {
-      recognitionRef.current?.stop?.();
-    } catch (e) {
-      console.warn("Speech stop failed:", e);
-    } finally {
-      setIsListening(false);
-      setDictationDraft("");
-    }
+  const saveEdit = () => {
+    if (!editDraft) return;
+    setWaypoints((prev) =>
+      prev.map((w) =>
+        w.id === editDraft.id
+          ? {
+              ...w,
+              type: editDraft.type,
+              iconId: editDraft.iconId,
+              poi: editDraft.poi.trim(),
+            }
+          : w,
+      ),
+    );
+    setEditDraft(null);
   };
 
-  // ── Hands-free voice command mode (Phase 2 — wake word) ────────────
+  const requestDelete = (wp) => setDeleteId(wp.id);
+
+  const confirmDelete = () => {
+    if (!deleteId) return;
+    setWaypoints((prev) => prev.filter((w) => w.id !== deleteId));
+    setDeleteId(null);
+  };
+
+  // Future "Delete last N" / rewind support — call this with the index
+  // (in routePoints terms) of the LAST waypoint you want to keep. Skips
+  // the START point and any null ids.
+  // eslint-disable-next-line no-unused-vars
+  const deleteWaypointsAfter = (keepThroughIndex) => {
+    const toDelete = routePoints
+      .slice(keepThroughIndex + 1)
+      .filter((p) => p.kind !== "start" && p.id)
+      .map((p) => p.id);
+    if (toDelete.length === 0) return;
+    setWaypoints((prev) => prev.filter((w) => !toDelete.includes(w.id)));
+  };
+
+  // ── Push-to-talk voice command mode ───────────────────────────────
   //
-  // Flow: Activate → Standby (listening for "Tag") → Command (recording)
-  //       → commit waypoint → back to Standby → … → Stop
+  // Flow: tap 🎙 Record → GPS snap + start recording → user speaks →
+  //       silence timeout → commit waypoint → back to off.
+  // No wake word; the button is the trigger. Phase B will add a
+  // Bluetooth/media-key trigger that emulates the button tap.
 
   // ── Pending waypoint (snap-first) helpers — manual "Add Waypoint" tap ─
 
@@ -893,10 +893,9 @@ export default function RouteMapperLayout() {
 
     // Sync UI type / icon selections to match the voice command in both paths.
     if (cmd.type) setWaypointType(cmd.type);
-    if (cmd.type === "hazard" && cmd.iconId) setHazardIconId(cmd.iconId);
-    else if (cmd.type === "nav" && cmd.iconId) setNavIconId(cmd.iconId);
-    else if (cmd.type === "control" && cmd.iconId) setControlIconId(cmd.iconId);
-    else if (cmd.type === "terrain" && cmd.iconId) setTerrainIconId(cmd.iconId);
+    if (cmd.type && cmd.iconId && cmd.type in iconIdByCategory) {
+      setIconForCategory(cmd.type, cmd.iconId);
+    }
     if (cmd.poi) setPoi(cmd.poi);
 
     if (gpsOverride) {
@@ -1066,126 +1065,46 @@ export default function RouteMapperLayout() {
     setPoi("");
   };
 
-  // Cancel a pending snap — discard the locked GPS position and return to
-  // standby without adding a waypoint.
-  const cancelSnap = () => {
+  // Stop the active recording cycle and return to off — used both as the
+  // explicit Stop button handler and as the in-progress Cancel handler.
+  const stopVoice = () => {
     clearInterval(snapTimerRef.current);
     snapTimerRef.current = null;
     setSnapCountdown(0);
-    handsFreeRef.current?.stop();
-    handsFreeRef.current = null;
-    setHandsFreeTranscript("");
-    setHandsFreeMode("standby");
-    if (handsFreeActiveRef.current) armWakeWord();
+    voiceRef.current?.stop();
+    voiceRef.current = null;
+    setVoiceActive(false);
+    voiceActiveRef.current = false;
+    setVoiceMode("off");
+    setVoiceListening(false);
+    setVoiceTranscript("");
   };
 
-  // Start wake word listening (Standby mode)
-  const armWakeWord = () => {
-    // Clean up any existing listener
-    wakeWordRef.current?.stop();
-
-    const listener = createWakeWordListener({
-      wakeWord: "tag",
-
-      onWake: () => {
-        // ── SNAP ── capture GPS and current type/icon at the instant
-        // "Tag" is recognised — before any command is spoken.
-        const snappedGps = currentGPSRef.current;
-        const snappedDefaults = { ...currentDefaultsRef.current };
-
-        playStartSound(); // distinct audio cue: GPS locked
-        setHandsFreeMode("snap");
-        setSnapCountdown(snapTimeoutSecRef.current);
-
-        // Countdown timer — auto-commits with defaults when it reaches 0.
-        // The remaining counter lives in a ref so onInterim (in the voice
-        // command handler) can reset it whenever speech is detected, which
-        // effectively pauses the timeout while the driver is still speaking.
-        clearInterval(snapTimerRef.current);
-        snapRemainingRef.current = snapTimeoutSecRef.current;
-        snapTimerRef.current = setInterval(() => {
-          snapRemainingRef.current -= 1;
-          setSnapCountdown(snapRemainingRef.current);
-          if (snapRemainingRef.current <= 0) {
-            clearInterval(snapTimerRef.current);
-            snapTimerRef.current = null;
-            setSnapCountdown(0);
-
-            if (!handsFreeActiveRef.current) return;
-
-            // Stop command listening (user didn't speak in time)
-            handsFreeRef.current?.stop();
-            handsFreeRef.current = null;
-
-            // Commit as a plain note when the countdown expires with no voice input.
-            // Using snappedDefaults here propagates the previous waypoint's type
-            // (e.g. KL → KL → KL…). A generic note is the safest fallback.
-            const cmd = {
-              type: "note",
-              iconId: null,
-              poi: "",
-            };
-            playStopSound();
-            commitVoiceWaypoint(cmd, snappedGps);
-            setHandsFreeLastCommand(cmd);
-            setHandsFreeToast(cmd);
-            setTimeout(() => setHandsFreeLastCommand(null), 4000);
-            setTimeout(() => setHandsFreeToast(null), 3000);
-
-            if (handsFreeActiveRef.current) armWakeWord();
-          }
-        }, 1000);
-
-        startCommandListening(snappedGps, snappedDefaults);
-      },
-
-      onListening: () => {
-        setHandsFreeMode("standby");
-      },
-
-      onStopped: () => {
-        // Only update if we're still in standby (not transitioning to command)
-      },
-
-      onError: (msg) => {
-        console.warn("Wake word error:", msg);
-      },
-    });
-
-    listener.start();
-    wakeWordRef.current = listener;
-  };
-
-  // Start command listening (after wake word detected).
-  // snappedGps     — GPS position locked at wake-word time (used for the waypoint).
-  // snappedDefaults — { type, iconId } captured at wake-word time (fallback if user
-  //                   doesn't speak within the timeout).
-  const startCommandListening = (snappedGps = null, snappedDefaults = null) => {
-    // Clean up any existing command handler
-    handsFreeRef.current?.stop();
+  // Speech recognition handler — armed by startVoice at the moment of
+  // the snap. Owns the silence-timeout commit path and the "cancel" voice
+  // command; the snap-timeout path is owned by startVoice's interval.
+  const startCommandListening = (snappedGps = null) => {
+    voiceRef.current?.stop();
 
     const handler = createVoiceCommandHandler({
-      silenceMs: handsFreeSilenceMs,
+      silenceMs: voiceSilenceMs,
       singleCommand: true,
 
       onListeningStart: () => {
-        setHandsFreeListening(true);
-        // Sound already played at snap — don't play again here.
+        setVoiceListening(true);
       },
 
       onListeningStop: () => {
-        setHandsFreeListening(false);
+        setVoiceListening(false);
       },
 
       onInterim: (text) => {
-        setHandsFreeTranscript(text);
+        setVoiceTranscript(text);
         // Transition to "command" state on first interim speech so the UI
         // shows the user is being heard.
-        setHandsFreeMode("command");
+        setVoiceMode("command");
         // Reset the snap countdown — the driver is clearly still speaking,
         // so the auto-commit-as-note fallback should not fire mid-sentence.
-        // The voice handler's silence-timeout decides when the command is
-        // actually complete; the countdown only resumes once speech stops.
         if (snapTimerRef.current) {
           snapRemainingRef.current = snapTimeoutSecRef.current;
           setSnapCountdown(snapRemainingRef.current);
@@ -1198,83 +1117,144 @@ export default function RouteMapperLayout() {
         snapTimerRef.current = null;
         setSnapCountdown(0);
 
-        setHandsFreeTranscript("");
+        setVoiceTranscript("");
 
-        // "cancel" / "discard" / "abort" — discard the snap, back to standby.
+        // "cancel" / "discard" / "abort" — discard the snap and return to off.
         if (cmd.type === "cancel") {
-          setHandsFreeMode("standby");
-          if (handsFreeActiveRef.current) armWakeWord();
+          setVoiceActive(false);
+          voiceActiveRef.current = false;
+          setVoiceMode("off");
           return;
         }
 
         playStopSound();
-        setHandsFreeLastCommand(cmd);
-        // Use the GPS position snapped at wake-word time, not the current fix.
+        setVoiceLastCommand(cmd);
+        // Commit at the GPS position locked when the user tapped Record.
         commitVoiceWaypoint(cmd, snappedGps);
 
-        // Show large driving toast
-        setHandsFreeToast(cmd);
-        setTimeout(() => setHandsFreeToast(null), 3000);
-        setTimeout(() => setHandsFreeLastCommand(null), 4000);
+        // Driving toast
+        setVoiceToast(cmd);
+        setTimeout(() => setVoiceToast(null), 3000);
+        setTimeout(() => setVoiceLastCommand(null), 4000);
+
+        // Return to off — push-to-talk is per-tap, not persistent.
+        setVoiceActive(false);
+        voiceActiveRef.current = false;
+        setVoiceMode("off");
       },
 
       onComplete: () => {
-        // Command cycle done — return to standby (re-arm wake word)
-        handsFreeRef.current = null;
-        if (handsFreeActiveRef.current) {
-          armWakeWord();
-        }
+        // Speech recognition session done — clean up the handler ref.
+        // Mode/active state transitions are owned by onCommand or the
+        // snap-timeout path in startVoice.
+        voiceRef.current = null;
       },
 
       onError: (msg) => {
-        console.warn("Hands-free command error:", msg);
-        // On error clear any pending snap state
+        console.warn("Voice command error:", msg);
         clearInterval(snapTimerRef.current);
         snapTimerRef.current = null;
         setSnapCountdown(0);
       },
 
       onReady: () => {
-        setHandsFreeTranscript("");
+        setVoiceTranscript("");
       },
     });
 
     handler.start();
-    handsFreeRef.current = handler;
+    voiceRef.current = handler;
   };
 
-  const startHandsFree = () => {
-    if (handsFreeActive) return;
-    // Stop manual dictation if running
-    stopDictation();
+  // 🎙 Record — tap to capture one waypoint via voice. GPS locks at the
+  // instant of the tap; user speaks within the snap window; silence
+  // timeout commits the command; if no speech, snap timer commits a
+  // plain note. Either path returns us to "off" — push-to-talk is
+  // per-tap, no persistent listening state.
+  const startVoice = () => {
+    if (voiceActive) return;
 
-    setHandsFreeActive(true);
-    handsFreeActiveRef.current = true;
-    setHandsFreeMode("standby");
-    armWakeWord();
-  };
+    // SNAP at the instant the button is tapped — before any speech.
+    const snappedGps = currentGPSRef.current;
 
-  const stopHandsFree = () => {
+    setVoiceActive(true);
+    voiceActiveRef.current = true;
+    setVoiceMode("snap");
+    playStartSound();
+    setSnapCountdown(snapTimeoutSecRef.current);
+
+    // Snap timer — auto-commits as a plain note when it expires with no
+    // speech. Reset by onInterim while the driver is speaking.
     clearInterval(snapTimerRef.current);
-    snapTimerRef.current = null;
-    setSnapCountdown(0);
-    wakeWordRef.current?.stop();
-    wakeWordRef.current = null;
-    handsFreeRef.current?.stop();
-    handsFreeRef.current = null;
-    setHandsFreeActive(false);
-    handsFreeActiveRef.current = false;
-    setHandsFreeMode("off");
-    setHandsFreeListening(false);
-    setHandsFreeTranscript("");
+    snapRemainingRef.current = snapTimeoutSecRef.current;
+    snapTimerRef.current = setInterval(() => {
+      snapRemainingRef.current -= 1;
+      setSnapCountdown(snapRemainingRef.current);
+      if (snapRemainingRef.current <= 0) {
+        clearInterval(snapTimerRef.current);
+        snapTimerRef.current = null;
+        setSnapCountdown(0);
+
+        if (!voiceActiveRef.current) return;
+
+        voiceRef.current?.stop();
+        voiceRef.current = null;
+
+        // Generic note is the safest fallback — avoids inheriting the
+        // previous waypoint's icon type when the user is silent.
+        const cmd = { type: "note", iconId: null, poi: "" };
+        playStopSound();
+        commitVoiceWaypoint(cmd, snappedGps);
+        setVoiceLastCommand(cmd);
+        setVoiceToast(cmd);
+        setTimeout(() => setVoiceLastCommand(null), 4000);
+        setTimeout(() => setVoiceToast(null), 3000);
+
+        // Return to off
+        setVoiceActive(false);
+        voiceActiveRef.current = false;
+        setVoiceMode("off");
+      }
+    }, 1000);
+
+    startCommandListening(snappedGps);
   };
 
-  // Clean up hands-free when stage ends
+  // Clean up active voice capture when stage ends
   useEffect(() => {
-    if (!stageActive && handsFreeActive) {
-      stopHandsFree();
+    if (!stageActive && voiceActive) {
+      stopVoice();
     }
   }, [stageActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // External trigger (Phase B) — Bluetooth headset / foot pedal /
+  // presenter clicker / Bluetooth keyboard fires the 🎙 Record button
+  // remotely. Active only while a stage is recording and the user
+  // hasn't disabled it. A second trigger while recording cancels.
+  useEffect(() => {
+    if (!stageActive || !externalTriggerEnabled) {
+      recordTriggerRef.current?.stop();
+      recordTriggerRef.current = null;
+      return;
+    }
+
+    const trigger = createRecordTrigger({
+      onTrigger: () => {
+        if (voiceActiveRef.current) {
+          stopVoice();
+        } else {
+          startVoice();
+        }
+      },
+    });
+    trigger.start();
+    recordTriggerRef.current = trigger;
+
+    return () => {
+      trigger.stop();
+      recordTriggerRef.current = null;
+    };
+  }, [stageActive, externalTriggerEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track recording config
   const TRACK_INTERVAL_MS = 5000; // minimum ms between recorded points
@@ -1386,11 +1366,6 @@ export default function RouteMapperLayout() {
     return () => geo.clearWatch(watchId);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startText = useMemo(() => {
-    if (!startGPS) return "Not set";
-    return `${startGPS.lat}, ${startGPS.lon}`;
-  }, [startGPS]);
-
   // const [stageStartedAt, setStageStartedAt] = useState(null);
 
   const canChangeMeta = !stageActive; // lock meta while stage is active (recommended)
@@ -1448,19 +1423,31 @@ export default function RouteMapperLayout() {
 
     // Clear stage-scoped data
     setWaypoints([]);
-    setStartGPS(null);
     setPoi("");
 
     setTrackPoints([]);
     trackLastRef.current = null;
     lastTrackTimeRef.current = 0; // reset time gate so first GPS fix records immediately
 
-    // Optional defaults
+    // Capture start GPS at the moment of the tap. If GPS isn't ready yet, the
+    // useEffect below will set it the instant a valid fix arrives.
+    if (
+      currentGPS &&
+      Number.isFinite(currentGPS.lat) &&
+      Number.isFinite(currentGPS.lon)
+    ) {
+      setStartGPS({
+        lat: currentGPS.lat,
+        lon: currentGPS.lon,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      setStartGPS(null);
+    }
+
+    // Reset all per-category icon selections to their first variant.
     // setWaypointType("note");
-    setHazardIconId("danger_1");
-    setNavIconId("straight");
-    setControlIconId("start");
-    setTerrainIconId("bump");
+    setIconIdByCategory(DEFAULT_ICON_BY_CATEGORY);
   };
 
   // Add this state near your other state hooks (once):
@@ -1714,9 +1701,7 @@ export default function RouteMapperLayout() {
     setWaypoints([]);
     setStartGPS(null);
     setPoi("");
-    setHazardIconId("danger_1");
-    setNavIconId("straight");
-    setControlIconId("start");
+    setIconIdByCategory(DEFAULT_ICON_BY_CATEGORY);
     setStageNumber((n) => n + 1);
     setTrackPoints([]);
     trackLastRef.current = null;
@@ -1767,7 +1752,10 @@ export default function RouteMapperLayout() {
     : trackPoints;
   const displayStartGPS = reviewStage ? reviewStage.startGPS : startGPS;
 
-  const handleSetStart = () => {
+  // Update the start position to the current GPS — used by the 🚩 Update
+  // Start auxiliary button when the user notices the stage actually starts
+  // a little further on than where they first tapped Start Stage.
+  const handleUpdateStart = () => {
     if (
       !Number.isFinite(currentGPS?.lat) ||
       !Number.isFinite(currentGPS?.lon)
@@ -1775,70 +1763,47 @@ export default function RouteMapperLayout() {
       return alert("GPS not ready yet — wait a moment and try again.");
     }
 
-    const ts = new Date().toISOString();
-
     setStartGPS({
       lat: currentGPS.lat,
       lon: currentGPS.lon,
-      timestamp: ts,
+      timestamp: new Date().toISOString(),
     });
 
-    // ✅ Option A: do NOT add a START waypoint to waypoints.
-    // The exporter will prepend startGPS automatically.
+    // The export pipeline prepends the START waypoint from startGPS — no
+    // need to add anything to the waypoints array here.
   };
 
+  // Auto-capture start GPS the moment a valid fix arrives, if the user
+  // tapped Start Stage before GPS was ready.
   useEffect(() => {
-    if (waypointType !== "hazard") return;
-
-    const variants = ICONS.hazard?.variants || {};
-    const hasCurrent = Boolean(variants[hazardIconId]);
-
-    if (!hasCurrent) {
-      // fallback to danger_1 or first variant
-      const fallback = variants.danger_1
-        ? "danger_1"
-        : Object.keys(variants)[0];
-      setHazardIconId(fallback || "danger_1");
+    if (!stageActive) return;
+    if (startGPS) return;
+    if (
+      currentGPS &&
+      Number.isFinite(currentGPS.lat) &&
+      Number.isFinite(currentGPS.lon)
+    ) {
+      setStartGPS({
+        lat: currentGPS.lat,
+        lon: currentGPS.lon,
+        timestamp: new Date().toISOString(),
+      });
     }
-  }, [waypointType, hazardIconId]);
+  }, [stageActive, startGPS, currentGPS]);
 
+  // When the current category's stored icon is missing from the manifest
+  // (e.g. the user upgraded and a previously-saved icon id was removed),
+  // fall back to the first variant for that category. Generic across all
+  // categories — no per-category branches required.
   useEffect(() => {
-    if (waypointType !== "nav") return;
-
-    const variants = ICONS.nav?.variants || {};
-    const hasCurrent = Boolean(variants[navIconId]);
-
-    if (!hasCurrent) {
-      const fallback = variants.straight
-        ? "straight"
-        : Object.keys(variants)[0];
-      setNavIconId(fallback || "straight");
+    const variants = ICONS[waypointType]?.variants || {};
+    if (Object.keys(variants).length === 0) return; // e.g. "note" has no variants
+    const currentId = iconIdByCategory[waypointType];
+    if (!variants[currentId]) {
+      const fallback = Object.keys(variants)[0];
+      if (fallback) setIconForCategory(waypointType, fallback);
     }
-  }, [waypointType, navIconId]);
-
-  useEffect(() => {
-    if (waypointType !== "control") return;
-
-    const variants = ICONS.control?.variants || {};
-    const hasCurrent = Boolean(variants[controlIconId]);
-
-    if (!hasCurrent) {
-      const fallback = variants.start ? "start" : Object.keys(variants)[0];
-      setControlIconId(fallback || "start");
-    }
-  }, [waypointType, controlIconId]);
-
-  useEffect(() => {
-    if (waypointType !== "terrain") return;
-
-    const variants = ICONS.terrain?.variants || {};
-    const hasCurrent = Boolean(variants[terrainIconId]);
-
-    if (!hasCurrent) {
-      const fallback = variants.bump ? "bump" : Object.keys(variants)[0];
-      setTerrainIconId(fallback || "bump");
-    }
-  }, [waypointType, terrainIconId]);
+  }, [waypointType, iconIdByCategory]);
 
   // While a waypoint is pending, apply user edits (type/icon/poi) to the
   // pending slot and reset the auto-commit timer so the user gets a fresh
@@ -1847,16 +1812,7 @@ export default function RouteMapperLayout() {
     const pending = pendingWaypointRef.current;
     if (!pending) return;
 
-    const iconId =
-      waypointType === "hazard"
-        ? hazardIconId
-        : waypointType === "nav"
-          ? navIconId
-          : waypointType === "control"
-            ? controlIconId
-            : waypointType === "terrain"
-              ? terrainIconId
-              : null;
+    const iconId = iconIdByCategory[waypointType] ?? null;
 
     const updated = {
       ...pending,
@@ -1869,15 +1825,7 @@ export default function RouteMapperLayout() {
     setPendingWaypoint(updated);
     startPendingTimer(snapWindowMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    waypointType,
-    hazardIconId,
-    navIconId,
-    controlIconId,
-    terrainIconId,
-    poi,
-    snapWindowMs,
-  ]);
+  }, [waypointType, iconIdByCategory, poi, snapWindowMs]);
 
   // Tick the countdown display while a waypoint is pending.
   useEffect(() => {
@@ -1959,15 +1907,7 @@ export default function RouteMapperLayout() {
 
     const typeToSave = typeOverride ?? waypointType;
     const iconId =
-      typeToSave === "hazard"
-        ? hazardIconId || "danger_1"
-        : typeToSave === "nav"
-          ? navIconId || "straight"
-          : typeToSave === "control"
-            ? controlIconId || "start"
-            : typeToSave === "terrain"
-              ? terrainIconId || "bump"
-              : null;
+      iconIdByCategory[typeToSave] ?? DEFAULT_ICON_BY_CATEGORY[typeToSave] ?? null;
 
     // If a typeOverride was passed, sync the UI selection so the panel
     // reflects the pending waypoint's type.
@@ -2549,7 +2489,11 @@ export default function RouteMapperLayout() {
                 }}
                 onClick={stageActive ? handleEndStage : handleStartStage}
                 disabled={isEndingStage}
-                title={stageActive ? "End current stage" : "Start a new stage"}
+                title={
+                  stageActive
+                    ? "End current stage"
+                    : "Start a new stage — captures current GPS as the start"
+                }
               >
                 {isEndingStage
                   ? "Ending..."
@@ -2557,6 +2501,16 @@ export default function RouteMapperLayout() {
                     ? "⏹ End Stage"
                     : "Start Stage"}
               </button>
+              {stageActive && (
+                <button
+                  type="button"
+                  onClick={handleUpdateStart}
+                  className="px-3 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white hover:bg-[#588233] hover:text-white whitespace-nowrap shrink-0 transition-colors"
+                  title="Capture the current GPS as the new start position for this stage"
+                >
+                  🚩 Update Start
+                </button>
+              )}
               {hasSavedStageOnScreen && (
                 <button
                   type="button"
@@ -2807,48 +2761,51 @@ export default function RouteMapperLayout() {
           >
             {exportingMapPdf ? "Exporting…" : "Export Map PDF"}
           </button>
+
+          {/* Right-side cluster: Follow Map toggle + GPS traffic light */}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFollowMap((v) => !v)}
+              className={`px-3 py-2 rounded-xl border text-sm font-medium ${
+                followMap
+                  ? "bg-[#588233] text-white border-[#588233]"
+                  : "bg-white text-gray-700"
+              }`}
+              title={
+                followMap
+                  ? "Map follows you — tap to stop auto-recentre"
+                  : "Map is free — tap to auto-recentre on your position"
+              }
+            >
+              🎯 Follow
+            </button>
+
+            {(() => {
+              const hasGpsFix =
+                currentGPS &&
+                Number.isFinite(Number(currentGPS.lat)) &&
+                Number.isFinite(Number(currentGPS.lon));
+              const gpsTitle = hasGpsFix
+                ? `GPS fix: ${Number(currentGPS.lat).toFixed(5)}, ${Number(currentGPS.lon).toFixed(5)}`
+                : "Waiting for GPS fix…";
+              return (
+                <div
+                  className={`text-sm px-3 py-1 rounded-full font-medium ${
+                    hasGpsFix ? "bg-green-500" : "bg-red-500"
+                  } bg-opacity-15`}
+                  title={gpsTitle}
+                >
+                  <span className="mr-1">{hasGpsFix ? "🟢" : "🔴"}</span>
+                  <span className="font-medium">GPS</span>
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* INPUT CONTROLS ROW (above the two columns) */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* GPS / Start */}
-          <div className="bg-white rounded-2xl shadow-sm border p-3">
-            <h2 className="font-semibold mb-2">GPS</h2>
-
-            <div className="text-sm">
-              Live:{" "}
-              {currentGPS
-                ? `${currentGPS.lat}, ${currentGPS.lon}`
-                : "Waiting for GPS…"}
-            </div>
-
-            <div className="text-sm mt-1">Start: {startText}</div>
-
-            <button
-              className="btn btn-primary mt-3 w-full"
-              disabled={!stageActive}
-              onClick={handleSetStart}
-            >
-              <img
-                src={startflag}
-                alt="Start Flag"
-                className="h-6 w-6 rounded"
-              />
-              Start Set (tap to update)
-            </button>
-
-            <label className="flex items-center gap-3 mt-3 select-none">
-              <input
-                type="checkbox"
-                checked={followMap}
-                onChange={(e) => setFollowMap(e.target.checked)}
-              />
-              <span className="text-sm font-medium">
-                Follow map (auto recenter)
-              </span>
-            </label>
-          </div>
-
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {showRoadbookPreview && (
             <section className="bg-white rounded-2xl shadow-sm border p-3">
               <div className="flex items-center justify-between mb-3">
@@ -3029,125 +2986,60 @@ export default function RouteMapperLayout() {
               ))}
             </div>
 
-            <select
-              disabled={!stageActive}
-              className="w-full p-2 rounded bg-gray-100"
-              value={waypointType}
-              onChange={(e) => setWaypointType(e.target.value)}
-            >
-              {Object.keys(ICONS).map((k) => (
-                <option key={k} value={k}>
-                  {ICONS[k].label}
-                </option>
-              ))}
-            </select>
-
-            {waypointType === "hazard" && ICONS.hazard?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Hazard level</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.hazard.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={hazardIconId === id}
-                      onClick={() => setHazardIconId(id)}
-                    />
-                  ))}
+            {/* Variant icons for the currently-selected category — generic
+                over all categories. Adding a new category to iconManifest.json
+                surfaces its variants here automatically. */}
+            {(() => {
+              const variants = ICONS[waypointType]?.variants;
+              if (!variants || Object.keys(variants).length === 0) return null;
+              return (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.entries(variants).map(([id, v]) => (
+                      <IconButton
+                        key={id}
+                        svg={v.svg}
+                        label={v.label}
+                        active={iconIdByCategory[waypointType] === id}
+                        onClick={() => setIconForCategory(waypointType, id)}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
-            {waypointType === "nav" && ICONS.nav?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Navigation</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.nav.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={navIconId === id}
-                      onClick={() => setNavIconId(id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {waypointType === "control" && ICONS.control?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Control</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.control.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={controlIconId === id}
-                      onClick={() => setControlIconId(id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {waypointType === "terrain" && ICONS.terrain?.variants && (
-              <div className="mt-3">
-                <div className="text-sm mb-2">Terrain</div>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.entries(ICONS.terrain.variants).map(([id, v]) => (
-                    <IconButton
-                      key={id}
-                      svg={v.svg}
-                      label={v.label}
-                      active={terrainIconId === id}
-                      onClick={() => setTerrainIconId(id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── Hands-Free Voice Mode ─────────────────────────── */}
+            {/* ── Voice (push-to-talk) ──────────────────────────── */}
             <div
               className="mt-3 border-2 rounded-xl p-2"
               style={{
                 borderColor:
-                  handsFreeMode === "command"
+                  voiceMode === "command"
                     ? "#dc2626"
-                    : handsFreeMode === "snap"
+                    : voiceMode === "snap"
                       ? "#f59e0b"
-                      : handsFreeMode === "standby"
-                        ? "#2563eb"
-                        : "#e5e7eb",
+                      : "#e5e7eb",
                 backgroundColor:
-                  handsFreeMode === "command"
+                  voiceMode === "command"
                     ? "#fef2f2"
-                    : handsFreeMode === "snap"
+                    : voiceMode === "snap"
                       ? "#fffbeb"
-                      : handsFreeMode === "standby"
-                        ? "#eff6ff"
-                        : "white",
+                      : "white",
               }}
             >
               {/* Header row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-gray-700 mt-1">Hands-Free</span>
-                  {handsFreeMode === "standby" && (
-                    <>
-                      <span
-                        className="inline-block w-3 h-3 rounded-full"
-                        style={{ backgroundColor: "#2563eb" }}
-                      />
-                      <span className="text-sm text-blue-600 font-medium">
-                        Say "Tag"
-                      </span>
-                    </>
+                  <span className="text-sm text-gray-700 mt-1">Voice</span>
+                  {externalTriggerEnabled && stageActive && (
+                    <span
+                      className="text-xs text-gray-400"
+                      title="External trigger ready (Bluetooth / pedal / presenter / keyboard)"
+                    >
+                      🎧
+                    </span>
                   )}
-                  {handsFreeMode === "snap" && (
+                  {voiceMode === "snap" && (
                     <>
                       <span
                         className="inline-block w-3 h-3 rounded-full animate-pulse"
@@ -3157,18 +3049,11 @@ export default function RouteMapperLayout() {
                         className="text-sm font-semibold"
                         style={{ color: "#b45309" }}
                       >
-                        📍 GPS locked — say type or wait {snapCountdown}s
+                        📍 GPS locked — speak or wait {snapCountdown}s
                       </span>
-                      <button
-                        type="button"
-                        onClick={cancelSnap}
-                        className="text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:bg-gray-100"
-                      >
-                        Cancel
-                      </button>
                     </>
                   )}
-                  {handsFreeMode === "command" && (
+                  {voiceMode === "command" && (
                     <>
                       <span
                         className="inline-block w-3 h-3 rounded-full animate-pulse"
@@ -3181,13 +3066,13 @@ export default function RouteMapperLayout() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Settings cog — only when idle or in standby */}
-                  {handsFreeMode !== "command" && handsFreeMode !== "snap" && (
+                  {/* Settings cog — only when idle */}
+                  {!voiceActive && (
                     <button
                       type="button"
-                      onClick={() => setHandsFreeShowSettings((v) => !v)}
+                      onClick={() => setVoiceShowSettings((v) => !v)}
                       className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                      title="Hands-free settings"
+                      title="Voice settings"
                     >
                       <svg
                         className="w-4 h-4"
@@ -3207,31 +3092,31 @@ export default function RouteMapperLayout() {
                   )}
                   <button
                     type="button"
-                    onClick={handsFreeActive ? stopHandsFree : startHandsFree}
+                    onClick={voiceActive ? stopVoice : startVoice}
                     onTouchEnd={(e) => {
                       e.preventDefault();
                       if (stageActive) {
-                        handsFreeActive ? stopHandsFree() : startHandsFree();
+                        voiceActive ? stopVoice() : startVoice();
                       }
                     }}
-                    className="px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors min-w-[90px]"
+                    className="px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors min-w-[110px]"
                     style={{
                       backgroundColor: !stageActive
                         ? "#9ca3af"
-                        : handsFreeActive
+                        : voiceActive
                           ? "#dc2626"
-                          : "#2563eb",
+                          : "#588233",
                       opacity: !stageActive ? 0.5 : 1,
                     }}
                     disabled={!stageActive}
                   >
-                    {handsFreeActive ? "Stop" : "Activate"}
+                    {voiceActive ? "⏹ Stop" : "🎙 Record"}
                   </button>
                 </div>
               </div>
 
               {/* Settings panel (collapsible) */}
-              {handsFreeShowSettings && (
+              {voiceShowSettings && (
                 <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -3239,7 +3124,7 @@ export default function RouteMapperLayout() {
                         Silence timeout
                       </label>
                       <span className="text-xs text-gray-500 tabular-nums">
-                        {(handsFreeSilenceMs / 1000).toFixed(1)}s
+                        {(voiceSilenceMs / 1000).toFixed(1)}s
                       </span>
                     </div>
                     <input
@@ -3247,10 +3132,10 @@ export default function RouteMapperLayout() {
                       min={1500}
                       max={5000}
                       step={250}
-                      value={handsFreeSilenceMs}
+                      value={voiceSilenceMs}
                       onChange={(e) => {
                         const val = Number(e.target.value);
-                        setHandsFreeSilenceMs(val);
+                        setVoiceSilenceMs(val);
                         localStorage.setItem("rm_handsfree_silence_ms", val);
                       }}
                       className="w-full accent-blue-600"
@@ -3314,8 +3199,33 @@ export default function RouteMapperLayout() {
                       <span>10s (relaxed)</span>
                     </div>
                     <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-                      How long after "Tag" to wait for a type/icon command
-                      before auto-committing with the last-used icon.
+                      How long after tapping 🎙 Record to wait for a voice
+                      command before auto-committing as a plain note.
+                    </p>
+                  </div>
+                  <div className="pt-3 border-t border-gray-200">
+                    <label className="flex items-center gap-2 select-none cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={externalTriggerEnabled}
+                        onChange={(e) => {
+                          setExternalTriggerEnabled(e.target.checked);
+                          localStorage.setItem(
+                            "rm_external_trigger_enabled",
+                            String(e.target.checked),
+                          );
+                        }}
+                        className="accent-[#588233]"
+                      />
+                      <span className="text-xs font-medium text-gray-600">
+                        🎧 External trigger
+                      </span>
+                    </label>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                      Let external hardware fire the 🎙 Record button:
+                      Bluetooth headset (Play/Pause), foot pedal, presenter
+                      clicker, or Bluetooth keyboard (Space, PageUp, PageDown,
+                      F8). A second press while recording cancels.
                     </p>
                   </div>
                   <div className="text-[11px] text-gray-400 leading-snug">
@@ -3326,52 +3236,42 @@ export default function RouteMapperLayout() {
               )}
 
               {/* Active state feedback */}
-              {handsFreeActive && (
+              {voiceActive && (
                 <div className="mt-3 space-y-1.5">
-                  {handsFreeTranscript && (
+                  {voiceTranscript && (
                     <div className="text-sm text-gray-700 italic bg-white/70 rounded-lg px-3 py-2 border border-gray-200">
-                      {handsFreeTranscript}
+                      {voiceTranscript}
                     </div>
                   )}
-                  {handsFreeLastCommand && (
+                  {voiceLastCommand && (
                     <div className="text-sm text-green-800 bg-green-50 rounded-lg px-3 py-2 border border-green-200 font-medium">
-                      Added: {handsFreeLastCommand.type}
-                      {handsFreeLastCommand.iconId
-                        ? ` (${handsFreeLastCommand.iconId})`
+                      Added: {voiceLastCommand.type}
+                      {voiceLastCommand.iconId
+                        ? ` (${voiceLastCommand.iconId})`
                         : ""}
-                      {handsFreeLastCommand.poi
-                        ? ` — ${handsFreeLastCommand.poi}`
+                      {voiceLastCommand.poi
+                        ? ` — ${voiceLastCommand.poi}`
                         : ""}
                     </div>
                   )}
-                  {!handsFreeTranscript &&
-                    !handsFreeLastCommand &&
-                    handsFreeMode !== "command" && (
+                  {!voiceTranscript &&
+                    !voiceLastCommand &&
+                    voiceMode !== "command" && (
                       <div className="text-xs text-gray-400">
-                        Say "Tag" then your command. E.g. "Tag" ...
-                        "hazard danger two — rocks on track"
+                        Speak your command, e.g. "hazard danger two — rocks
+                        on track" or "left onto Forbes Road".
                       </div>
                     )}
                 </div>
               )}
             </div>
 
-            {/* ── Dictate (free-text POI notes via voice) ─────────── */}
-            <div className="mt-3 flex gap-2 items-center">
-              <button
-                type="button"
-                onClick={isListening ? stopDictation : startDictation}
-                className="px-3 py-2 rounded text-white whitespace-nowrap transition-colors disabled:opacity-50"
-                style={{ backgroundColor: isListening ? "#dc2626" : "#588234" }}
-                disabled={!stageActive}
-              >
-                {isListening ? "🎙️ Listening…" : "🎙️ Dictate"}
-              </button>
-
+            {/* ── Optional typed POI for the manual Add Waypoint flow ── */}
+            <div className="mt-3">
               <textarea
                 disabled={!stageActive}
-                className="flex-1 p-2 rounded bg-gray-100 resize-none"
-                placeholder="Optional point of interest"
+                className="w-full p-2 rounded bg-gray-100 resize-none"
+                placeholder="Optional point of interest (typed)"
                 rows={1}
                 value={poi}
                 onChange={(e) => setPoi(e.target.value)}
@@ -3379,21 +3279,21 @@ export default function RouteMapperLayout() {
             </div>
 
             {/* ── Driving Toast (fixed overlay, visible at arm's length) ── */}
-            {handsFreeToast && (
+            {voiceToast && (
               <div
                 className="fixed inset-x-0 top-8 mx-auto z-50 pointer-events-none flex justify-center"
                 style={{ animation: "fadeInOut 3s ease-in-out forwards" }}
               >
                 <div className="bg-green-600 text-white rounded-2xl shadow-2xl px-6 py-4 max-w-md text-center">
                   <div className="text-lg font-bold tracking-wide">
-                    {handsFreeToast.type.toUpperCase()}
-                    {handsFreeToast.iconId
-                      ? ` — ${handsFreeToast.iconId.replace(/_/g, " ")}`
+                    {voiceToast.type.toUpperCase()}
+                    {voiceToast.iconId
+                      ? ` — ${voiceToast.iconId.replace(/_/g, " ")}`
                       : ""}
                   </div>
-                  {handsFreeToast.poi && (
+                  {voiceToast.poi && (
                     <div className="text-sm mt-1 opacity-90">
-                      {handsFreeToast.poi}
+                      {voiceToast.poi}
                     </div>
                   )}
                 </div>
@@ -3472,9 +3372,33 @@ export default function RouteMapperLayout() {
                         )}
                       </div>
 
-                      <div className="text-right text-[11px] text-gray-600 whitespace-nowrap">
-                        <div>seg {segKm} km</div>
-                        <div>tot {totKm} km</div>
+                      <div className="flex items-start gap-2 whitespace-nowrap">
+                        <div className="text-right text-[11px] text-gray-600">
+                          <div>seg {segKm} km</div>
+                          <div>tot {totKm} km</div>
+                        </div>
+                        {!isStart && wp.id && (
+                          <div className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openEditWaypoint(wp)}
+                              className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                              title={`Edit WP ${wpNumber}`}
+                              aria-label={`Edit waypoint ${wpNumber}`}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => requestDelete(wp)}
+                              className="p-1.5 rounded border border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+                              title={`Delete WP ${wpNumber}`}
+                              aria-label={`Delete waypoint ${wpNumber}`}
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -3552,6 +3476,161 @@ export default function RouteMapperLayout() {
           redirectToPortal(session).catch((e) => alert(e.message));
         }}
       />
+
+      {/* ── Waypoint Edit Modal ─────────────────────────────────────── */}
+      {editDraft &&
+        (() => {
+          const draftVariants = ICONS[editDraft.type]?.variants || {};
+          const setDraft = (patch) =>
+            setEditDraft((d) => ({ ...d, ...patch }));
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+              onClick={() => setEditDraft(null)}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-lg">Edit waypoint</h3>
+                  <button
+                    type="button"
+                    onClick={() => setEditDraft(null)}
+                    className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Type picker */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <div className="flex gap-2 flex-wrap">
+                    {ICON_ORDER.map((type) => (
+                      <IconButton
+                        key={type}
+                        svg={ICONS[type].svg}
+                        label={ICONS[type].label}
+                        active={editDraft.type === type}
+                        onClick={() => {
+                          const newVariants = ICONS[type]?.variants || {};
+                          setDraft({
+                            type,
+                            // Reset iconId to first variant when changing category
+                            iconId:
+                              newVariants[editDraft.iconId]
+                                ? editDraft.iconId
+                                : Object.keys(newVariants)[0] || null,
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Variant picker — only when category has variants */}
+                {Object.keys(draftVariants).length > 0 && (
+                  <div className="mb-3 pt-3 border-t border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Icon
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                      {Object.entries(draftVariants).map(([id, v]) => (
+                        <IconButton
+                          key={id}
+                          svg={v.svg}
+                          label={v.label}
+                          active={editDraft.iconId === id}
+                          onClick={() => setDraft({ iconId: id })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* POI text */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Point of interest (optional)
+                  </label>
+                  <textarea
+                    className="w-full p-2 rounded bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#588233]"
+                    rows={2}
+                    value={editDraft.poi}
+                    onChange={(e) => setDraft({ poi: e.target.value })}
+                    placeholder="e.g. onto Forbes Road"
+                  />
+                </div>
+
+                {/* Footer */}
+                <div className="flex gap-2 pt-3 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setEditDraft(null)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveEdit}
+                    className="ml-auto px-4 py-2 rounded-lg font-semibold text-white"
+                    style={{ backgroundColor: "#588233" }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+      {/* ── Delete Confirm Modal ────────────────────────────────────── */}
+      {deleteId &&
+        (() => {
+          const wp = waypoints.find((w) => w.id === deleteId);
+          const label =
+            (wp?.poi || "").trim() ||
+            (wp?.iconId ? wp.iconId.toUpperCase() : null) ||
+            (wp?.type ? wp.type.toUpperCase() : "this waypoint");
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+              onClick={() => setDeleteId(null)}
+            >
+              <div
+                className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="font-semibold text-lg mb-2">Delete waypoint?</h3>
+                <p className="text-sm text-gray-700 mb-4">
+                  Delete <strong>{label}</strong>? This can't be undone — but
+                  the GPS track is unaffected.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteId(null)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDelete}
+                    className="ml-auto px-4 py-2 rounded-lg font-semibold text-white bg-red-600 hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

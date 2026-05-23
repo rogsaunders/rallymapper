@@ -1,10 +1,14 @@
 /**
  * Icon registry — built from iconManifest.json + src/icons/svg/*.svg
  *
- * To add a new icon:
+ * To add a new icon (or a whole new category):
  *   1. Drop <id>.svg into src/icons/svg/
  *   2. Add one entry to iconManifest.json  { id, label, category, file }
- *   Done — no other files need editing.
+ *
+ * Done — no other files need editing. RouteMapperLayout iterates
+ * ICON_CATEGORIES dynamically, so new categories surface as type-picker
+ * buttons AND their variant icons render automatically. (Promise made
+ * true by the iconIdByCategory refactor.)
  */
 
 import manifest from "./iconManifest.json";

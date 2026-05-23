@@ -1,73 +1,11 @@
 [
   {
-    "id": "note",
-    "label": "Note",
-    "category": "Note",
-    "file": "note.svg"
-  },
-  {
-    "id": "danger_1",
-    "label": "Danger 1",
-    "category": "Hazard",
-    "file": "danger_1.svg"
-  },
-  {
-    "id": "danger_2",
-    "label": "Danger 2",
-    "category": "Hazard",
-    "file": "danger_2.svg"
-  },
-  {
-    "id": "danger_3",
-    "label": "Danger 3",
-    "category": "Hazard",
-    "file": "danger_3.svg"
-  },
-  {
-    "id": "bump",
-    "label": "Bump",
-    "category": "Terrain",
-    "file": "bump.svg"
-  },
-  {
-    "id": "bumps",
-    "label": "Bumps",
-    "category": "Terrain",
-    "file": "bumps.svg"
-  },
-  {
-    "id": "dip",
-    "label": "Dip",
-    "category": "Terrain",
-    "file": "dip.svg"
-  },
-
-  {
-    "id": "twisty",
-    "label": "twisty",
-    "category": "Terrain",
-    "file": "twisty.svg"
-  },
-
-  {
-    "id": "ruts",
-    "label": "Ruts",
-    "category": "Terrain",
-    "file": "ruts.svg"
-  },
-  {
-    "id": "washout",
-    "label": "Washout",
-    "category": "Terrain",
-    "file": "washout.svg"
-  },
-
-  {
     "id": "left",
     "label": "Left",
     "category": "Nav",
     "file": "left.svg"
   },
+
   {
     "id": "right",
     "label": "Right",
@@ -80,17 +18,33 @@
     "category": "Nav",
     "file": "keep_l.svg"
   },
+
   {
     "id": "keep_r",
     "label": "Keep Right",
     "category": "Nav",
     "file": "keep_r.svg"
   },
+
   {
     "id": "straight",
     "label": "Straight",
     "category": "Nav",
     "file": "straight.svg"
+  },
+
+  {
+    "id": "on_left",
+    "label": "On Left",
+    "category": "Nav",
+    "file": "on_left.svg"
+  },
+
+  {
+    "id": "on_right",
+    "label": "On Right",
+    "category": "Nav",
+    "file": "on_right.svg"
   },
 
   {
@@ -126,6 +80,65 @@
     "label": "Caution",
     "category": "Nav",
     "file": "caution.svg"
+  },
+
+  {
+    "id": "bump",
+    "label": "Bump",
+    "category": "Terrain",
+    "file": "bump.svg"
+  },
+  {
+    "id": "bumps",
+    "label": "Bumps",
+    "category": "Terrain",
+    "file": "bumps.svg"
+  },
+
+  {
+    "id": "dip",
+    "label": "Dip",
+    "category": "Terrain",
+    "file": "dip.svg"
+  },
+
+  {
+    "id": "twisty",
+    "label": "twisty",
+    "category": "Terrain",
+    "file": "twisty.svg"
+  },
+
+  {
+    "id": "ruts",
+    "label": "Ruts",
+    "category": "Terrain",
+    "file": "ruts.svg"
+  },
+  {
+    "id": "washout",
+    "label": "Washout",
+    "category": "Terrain",
+    "file": "washout.svg"
+  },
+
+  {
+    "id": "danger_1",
+    "label": "Danger 1",
+    "category": "Hazard",
+    "file": "danger_1.svg"
+  },
+  {
+    "id": "danger_2",
+    "label": "Danger 2",
+    "category": "Hazard",
+    "file": "danger_2.svg"
+  },
+  {
+    "id": "danger_3",
+    "label": "Danger 3",
+    "category": "Hazard",
+    "file": "danger_3.svg"
   },
 
   {
@@ -185,5 +198,61 @@
     "label": "down_hill",
     "category": "Terrain",
     "file": "down_hill.svg"
+  },
+
+  {
+    "id": "speed_25",
+    "label": "speed_25",
+    "category": "Speed",
+    "file": "speed_25.svg"
+  },
+
+  {
+    "id": "speed_40",
+    "label": "speed_40",
+    "category": "Speed",
+    "file": "speed_40.svg"
+  },
+
+  {
+    "id": "speed_50",
+    "label": "speed_50",
+    "category": "Speed",
+    "file": "speed_50.svg"
+  },
+
+  {
+    "id": "speed_60",
+    "label": "speed_60",
+    "category": "Speed",
+    "file": "speed_60.svg"
+  },
+
+  {
+    "id": "speed_80",
+    "label": "speed_80",
+    "category": "Speed",
+    "file": "speed_80.svg"
+  },
+
+  {
+    "id": "speed_100",
+    "label": "speed_100",
+    "category": "Speed",
+    "file": "speed_100.svg"
+  },
+
+  {
+    "id": "speed_110",
+    "label": "speed_110",
+    "category": "Speed",
+    "file": "speed_110.svg"
+  },
+
+  {
+    "id": "note",
+    "label": "Note",
+    "category": "Note",
+    "file": "note.svg"
   }
 ]
