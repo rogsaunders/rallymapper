@@ -22,9 +22,16 @@ export function exportCombinedGpx(stage, config = {}) {
   // Waypoints — start point (if present) followed by user-added waypoints
   const startWaypoint = buildStartWaypoint(stage?.startGPS);
 
+  // Exclude any kind:"start" entry from the regular-waypoint list — the
+  // synthetic START emitted by buildStartWaypoint(stage.startGPS) already
+  // covers it.  See exportUniversalGpx.js for the longer rationale.
   const regularWaypoints = (stage.waypoints || [])
     .filter(
-      (w) => Number.isFinite(Number(w.lat)) && Number.isFinite(Number(w.lon)),
+      (w) =>
+        w.kind !== "start" &&
+        w.poi !== "START" &&
+        Number.isFinite(Number(w.lat)) &&
+        Number.isFinite(Number(w.lon)),
     )
     .map((w, index) => buildWaypointXml(w, index));
 

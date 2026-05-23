@@ -143,6 +143,54 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+// Return a new waypoints array containing exactly one kind:"start" entry at
+// the supplied GPS, removing any pre-existing start entry first.  Used to
+// keep the start waypoint in sync with `startGPS` whenever the latter
+// changes (Start Stage tap, auto-capture after GPS-arrived-late, or the
+// manual Update Start button).
+//
+// The start waypoint is shaped to flow naturally through every downstream
+// consumer:
+//   • Map markers — `kind:"start"` triggers the blue-circle Start marker in
+//     both the live map (MapView) and the static map renderer (PDF +
+//     roadbook embed).  `numberWaypoints()` skips it, so the next
+//     user-added waypoint becomes WP 1.
+//   • Roadbook engine — `iconId:"start"` maps to event type "start" via
+//     iconMappings, giving row 1 the proper Start tulip and "Start" note.
+//   • GPX export — filtered out of the regular-waypoint list because the
+//     exporters already build a synthetic START entry from `startGPS`.
+//
+// Passing a null/invalid `gps` returns the array with any existing start
+// removed — used by handleEndStage / handleStartNewStage paths where the
+// stage-scoped state is being cleared.
+function upsertStartWaypoint(prevWaypoints, gps) {
+  const filtered = (prevWaypoints || []).filter(
+    (w) => w.kind !== "start" && w.poi !== "START",
+  );
+  if (
+    !gps ||
+    !Number.isFinite(Number(gps.lat)) ||
+    !Number.isFinite(Number(gps.lon))
+  ) {
+    return filtered;
+  }
+  const startWp = {
+    id:
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `wp-start-${Date.now()}`,
+    lat: Number(gps.lat),
+    lon: Number(gps.lon),
+    timestamp: gps.timestamp || new Date().toISOString(),
+    kind: "start",
+    poi: "START",
+    type: "control",
+    iconId: "start",
+    distanceFromStartM: 0,
+  };
+  return [startWp, ...filtered];
+}
+
 function dynamicMinMoveMeters(gps) {
   const baseMeters = 6; // meters, beats normal GPS jitter
   const factor = 0.8;
@@ -1430,17 +1478,23 @@ export default function RouteMapperLayout() {
     lastTrackTimeRef.current = 0; // reset time gate so first GPS fix records immediately
 
     // Capture start GPS at the moment of the tap. If GPS isn't ready yet, the
-    // useEffect below will set it the instant a valid fix arrives.
+    // useEffect below will set it the instant a valid fix arrives.  Mirror
+    // the start into the waypoints array as a kind:"start" entry so it
+    // becomes the canonical row 1 of the roadbook (and any waypoints the
+    // user adds immediately after are WP 2, WP 3, … — preventing the bug
+    // where a Bump tapped at the same location became row 1 itself).
     if (
       currentGPS &&
       Number.isFinite(currentGPS.lat) &&
       Number.isFinite(currentGPS.lon)
     ) {
-      setStartGPS({
+      const startGps = {
         lat: currentGPS.lat,
         lon: currentGPS.lon,
         timestamp: new Date().toISOString(),
-      });
+      };
+      setStartGPS(startGps);
+      setWaypoints((prev) => upsertStartWaypoint(prev, startGps));
     } else {
       setStartGPS(null);
     }
@@ -1763,14 +1817,15 @@ export default function RouteMapperLayout() {
       return alert("GPS not ready yet — wait a moment and try again.");
     }
 
-    setStartGPS({
+    const startGps = {
       lat: currentGPS.lat,
       lon: currentGPS.lon,
       timestamp: new Date().toISOString(),
-    });
-
-    // The export pipeline prepends the START waypoint from startGPS — no
-    // need to add anything to the waypoints array here.
+    };
+    setStartGPS(startGps);
+    // Keep the kind:"start" entry in the waypoints array in sync so the
+    // roadbook + map markers reflect the new start position.
+    setWaypoints((prev) => upsertStartWaypoint(prev, startGps));
   };
 
   // Auto-capture start GPS the moment a valid fix arrives, if the user
@@ -1783,11 +1838,14 @@ export default function RouteMapperLayout() {
       Number.isFinite(currentGPS.lat) &&
       Number.isFinite(currentGPS.lon)
     ) {
-      setStartGPS({
+      const startGps = {
         lat: currentGPS.lat,
         lon: currentGPS.lon,
         timestamp: new Date().toISOString(),
-      });
+      };
+      setStartGPS(startGps);
+      // Mirror into the waypoints array — see upsertStartWaypoint.
+      setWaypoints((prev) => upsertStartWaypoint(prev, startGps));
     }
   }, [stageActive, startGPS, currentGPS]);
 

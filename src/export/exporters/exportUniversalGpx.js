@@ -31,9 +31,18 @@ export function exportUniversalTrackGpx(stage, config = {}) {
 export function exportUniversalWaypointsGpx(stage, config = {}) {
   const startWaypoint = buildStartWaypoint(stage?.startGPS);
 
+  // Exclude any kind:"start" entry from the regular-waypoint list — the
+  // synthetic START emitted by buildStartWaypoint(startGPS) above already
+  // covers it.  Without this filter, the GPX would carry two START entries
+  // since RouteMapperLayout now keeps a kind:"start" row in stage.waypoints
+  // as the canonical row 1 of the roadbook.
   const regularWaypoints = (stage.waypoints || [])
     .filter(
-      (w) => Number.isFinite(Number(w.lat)) && Number.isFinite(Number(w.lon)),
+      (w) =>
+        w.kind !== "start" &&
+        w.poi !== "START" &&
+        Number.isFinite(Number(w.lat)) &&
+        Number.isFinite(Number(w.lon)),
     )
     .map((w, index) => buildWaypointXml(w, index));
 
