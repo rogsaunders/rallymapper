@@ -611,11 +611,6 @@ export default function RouteMapperLayout() {
   const [showMap, setShowMap] = useState(true);
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
-  // We only need the setter — the live `leafletMap` instance is no longer
-  // consumed anywhere now that the Map PDF renders from scratch instead of
-  // screenshotting the live map.  MapView still calls `onMapReady`, so we
-  // keep the setter wired to avoid changing MapView's contract.
-  const [, setLeafletMap] = useState(null);
   const [exportingMapPdf, setExportingMapPdf] = useState(false);
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
   const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
@@ -2678,7 +2673,6 @@ export default function RouteMapperLayout() {
               mapMode={mapMode}
               mapSource={mapSource}
               resizeKey={showMap ? 1 : 0}
-              onMapReady={setLeafletMap}
             />
           </div>
         ) : (
@@ -2699,7 +2693,6 @@ export default function RouteMapperLayout() {
                 mapMode={mapMode}
                 mapSource={mapSource}
                 resizeKey={showMap ? 1 : 0}
-                onMapReady={setLeafletMap}
               />
             </div>
           </section>
