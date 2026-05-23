@@ -183,6 +183,8 @@ You can fire the 🎙 Record button without tapping the iPad. Useful when the iP
 
 **Disabling the trigger:** in the ⚙️ Voice settings, uncheck **🎧 External trigger** if it ever fires accidentally. Default is on.
 
+**Works alongside other audio apps:** while a stage is recording, RouteMapper claims the active Bluetooth media session — so a single press of your headset's play/pause button fires 🎙 Record, even if Spotify or Apple Music was playing a moment earlier. Music resumes its hold of the media buttons when you end the stage.
+
 **Testing without specialised hardware:**
 
 1. Pair a Bluetooth keyboard to your iPad.
