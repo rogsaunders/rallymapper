@@ -13,6 +13,11 @@ import { exportCombinedGpx } from "./exporters/exportCombinedGpx";
 import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv";
 import { exportRoadbookHtml } from ".././roadbook/roadbookHtmlExport";
 import { exportRoadbookDocx } from "./exporters/exportRoadbookDocx";
+import {
+  renderMapToCanvas,
+  computeBounds,
+  numberWaypoints,
+} from "./staticMapRenderer";
 
 /**
  * Assemble a stage export ZIP organised by use case rather than by file type.
@@ -101,7 +106,28 @@ export async function buildRoutePackage(stage, options = {}) {
   let printable = null;
   if (roadbook) {
     printable = zip.folder("Printable");
-    const exportOpts = { author: config.author || null };
+
+    // Pre-render the stage-overview map ONCE and hand the same image to
+    // both roadbook exporters.  Keeps HTML and DOCX visually identical and
+    // amortises ~30 OSM tile fetches across both files.  Best-effort: any
+    // failure (offline, blocked tile server, insufficient track data) is
+    // logged and the roadbook ships without the embedded map rather than
+    // failing the whole package.
+    let mapImage = null;
+    try {
+      mapImage = await renderRoadbookMap(stage, config);
+    } catch (e) {
+      console.warn(
+        "buildRoutePackage: roadbook map render failed — embedding skipped",
+        e,
+      );
+    }
+
+    const exportOpts = {
+      author: config.author || null,
+      mapImageDataUrl: mapImage?.dataUrl ?? null,
+      mapImageBytes:   mapImage?.bytes   ?? null,
+    };
     printable.file("roadbook.html", await exportRoadbookHtml(stage, exportOpts));
     printable.file("roadbook.docx", await exportRoadbookDocx(stage, exportOpts));
     // Tabular roadbook view — useful for Excel/Numbers analysis. Note:
@@ -166,6 +192,70 @@ function sanitize(value) {
     .replace(/[^a-zA-Z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "");
+}
+
+/**
+ * Render the stage's overview map for embedding in the roadbook (HTML + DOCX).
+ * Returns `{ dataUrl, bytes }`:
+ *   - `dataUrl`: base64 PNG data URL, ready to drop into `<img src="…">`
+ *   - `bytes`:   Uint8Array of the same PNG, for docx's `ImageRun`
+ *
+ * Returns `null` if there isn't enough data to draw a meaningful map
+ * (no start, no track points, no waypoints).
+ */
+async function renderRoadbookMap(stage, config) {
+  const trackPoints = Array.isArray(stage.trackPoints) ? stage.trackPoints : [];
+  const waypoints   = Array.isArray(stage.waypoints)   ? stage.waypoints   : [];
+
+  // routePositions: start (first track point or explicit start) + track only.
+  // Waypoints become markers, not vertices in the polyline.
+  const routePts = [];
+  trackPoints.forEach((p) => {
+    const lat = Number(p?.lat);
+    const lon = Number(p?.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      routePts.push([lat, lon]);
+    }
+  });
+
+  // bounds covers everything the map should fit (track + waypoints).
+  const allPts = [...routePts];
+  waypoints.forEach((w) => {
+    const lat = Number(w?.lat);
+    const lon = Number(w?.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      allPts.push([lat, lon]);
+    }
+  });
+  const bounds = computeBounds(allPts);
+  if (!bounds || routePts.length < 2) return null;
+
+  // Stage saves don't currently retain the user's last tileSource pick;
+  // for the roadbook we default to OSM (most legible in print) and accept
+  // an override via config.mapTileSource if a caller wants Esri/OpenTopo.
+  const tileSource = config.mapTileSource || "osm";
+
+  const canvas = await renderMapToCanvas({
+    routePositions: routePts,
+    waypoints:      numberWaypoints(waypoints),
+    bounds,
+    tileSource,
+    width:   1600,
+    height:  1000,
+    padding: 40,
+  });
+
+  const dataUrl = canvas.toDataURL("image/png");
+
+  // docx's ImageRun wants raw bytes (Uint8Array).  Cheapest path is to
+  // decode the base64 portion of the data URL we already have, rather than
+  // round-tripping through Blob/arrayBuffer.
+  const b64 = dataUrl.split(",", 2)[1] || "";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+  return { dataUrl, bytes };
 }
 
 function buildReadme(stageName, dateStr, config, roadbook) {

@@ -118,6 +118,11 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 .rm-ep-label { font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #006b6b; margin-bottom: 4px; }
 .rm-ep-gps { font-size: 12px; font-weight: 700; line-height: 1.5; }
 
+/* ── Stage overview map ── */
+.rm-map-wrap { border: 2px solid #000; margin-bottom: 8px; background: #fff; padding: 0; }
+.rm-map-img  { display: block; width: 100%; height: auto; }
+@media print { .rm-map-wrap { break-inside: avoid; } }
+
 /* ── Warning block ── */
 .rm-warning { border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; background: #fff; }
 .rm-warning-title { font-size: 13px; font-weight: 900; text-align: center; letter-spacing: 0.08em; margin-bottom: 6px; }
@@ -189,6 +194,7 @@ ${buildIconPaletteHtml()}
 </script>
 <div class="page">
   ${buildRmHeader(stage, rows, logoSrc, opts.author)}
+  ${opts.mapImageDataUrl ? `<div class="rm-map-wrap"><img class="rm-map-img" alt="Stage overview map" src="${opts.mapImageDataUrl}"></div>` : ""}
   <div class="rm-warning">
     <div class="rm-warning-title">WARNING</div>
     <div class="rm-warning-body">

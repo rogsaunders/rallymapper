@@ -76,6 +76,14 @@ export async function exportRoadbookDocx(stage, opts = {}) {
   const roadbookTable = buildRoadbookTable(rows, flaggedRows, meta, title);
   const appendixTable = buildIconAppendix();
 
+  // Stage-overview map, embedded between the header and the warning.  Caller
+  // (buildRoutePackage) pre-renders the canvas once and hands us the PNG
+  // bytes so HTML and DOCX exports share the identical image.  Null/missing
+  // means there wasn't enough data to draw it — section just gets skipped.
+  const mapParagraph = opts.mapImageBytes
+    ? buildDocxMapParagraph(opts.mapImageBytes)
+    : null;
+
   const doc = new Document({
     creator: "RouteMapper",
     title,
@@ -89,6 +97,7 @@ export async function exportRoadbookDocx(stage, opts = {}) {
         },
         children: [
           ...headerTables,
+          ...(mapParagraph ? [mapParagraph] : []),
           warningTable,
           new Paragraph({ spacing: { before: 120 }, children: [] }),
           roadbookTable,
@@ -205,6 +214,33 @@ function buildDocxHeader(rows, meta, logoPngData, author) {
   });
 
   return [brandTable, statsGpsTable];
+}
+
+// ─── Stage-overview map ───────────────────────────────────────────────────────
+
+// Source canvas is 1600×1000 (16:10).  docx-js's `transformation` is in
+// pixels-at-96-DPI: 720 px ≈ 190 mm wide, matching the A4 content area.
+// Height follows the source aspect ratio (450 px ≈ 119 mm) so we don't
+// distort the map.
+const MAP_DISPLAY_W = 720;
+const MAP_DISPLAY_H = 450;
+
+function buildDocxMapParagraph(pngBytes) {
+  const mapImg = new ImageRun({
+    type: "png",
+    data: pngBytes,
+    transformation: { width: MAP_DISPLAY_W, height: MAP_DISPLAY_H },
+    altText: {
+      title: "Stage overview map",
+      description: "Route overview with waypoints",
+      name: "Stage map",
+    },
+  });
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 120, after: 120 },
+    children: [mapImg],
+  });
 }
 
 // ─── Warning block ────────────────────────────────────────────────────────────

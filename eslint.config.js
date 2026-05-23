@@ -6,10 +6,25 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 export default [
   { ignores: ['dist'] },
   {
+    // Node-environment config files
+    files: ['vite.config.js', '*.config.js', '*.config.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: globals.node,
+    },
+  },
+  {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: {
+        ...globals.browser,
+        // Vite `define` injections — see vite.config.js
+        __APP_VERSION__: 'readonly',
+        __COMMIT_SHA__: 'readonly',
+        __BUILD_CONTEXT__: 'readonly',
+      },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },

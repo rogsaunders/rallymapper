@@ -2,6 +2,11 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import MapView from "./components/MapView";
+import {
+  exportMapAsPdf,
+  buildMapPdfBlob,
+  computeBounds,
+} from "./export/exportMapPdf";
 import { ICONS, ICON_ORDER, ICON_CATEGORIES } from "./icons/iconRegistry";
 import IconButton from "./components/IconButton";
 import { useAuth } from "./auth/AuthProvider";
@@ -624,7 +629,7 @@ export default function RouteMapperLayout() {
   const [showMap, setShowMap] = useState(true);
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
-  const [leafletMap, setLeafletMap] = useState(null);
+  const [exportingMapPdf, setExportingMapPdf] = useState(false);
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
   const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
 
@@ -1293,6 +1298,22 @@ export default function RouteMapperLayout() {
         if (!stageActiveRef.current) return;
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
+        // Discard fixes with very poor accuracy — these are usually network-
+        // location guesses (Wi-Fi / cell tower) that iOS returns before GPS
+        // satellites are fully acquired. Such fixes can be hundreds of metres
+        // to kilometres off the true position and create phantom lines on
+        // the map and in the PDF that don't follow any road.
+        // 80 m covers good GPS (5–15 m), GPS in light forest (30–50 m), and
+        // marginal satellite fixes (50–80 m) while rejecting network-only
+        // location estimates (typically >100 m, often >>200 m).
+        const TRACK_MAX_ACCURACY_M = 80;
+        if (
+          Number.isFinite(accuracy) &&
+          accuracy > TRACK_MAX_ACCURACY_M
+        ) {
+          return;
+        }
+
         const now = Date.now();
         if (now - lastTrackTimeRef.current < TRACK_INTERVAL_MS) return; // time gate
 
@@ -1519,6 +1540,68 @@ export default function RouteMapperLayout() {
       try {
         const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
 
+        // Render the printable map PDF BEFORE the ZIP is built.  The new
+        // pipeline (staticMapRenderer) draws tiles + polyline + markers from
+        // scratch onto a canvas — no Leaflet map instance required, so this
+        // runs even if the user has Hide Map active.  Best-effort: any
+        // failure (network blip, blocked tile server) drops the PDF and
+        // ships the rest of the ZIP.
+        let mapPdfBlob = null;
+        try {
+          const lastTrackPt = stageWithRoadbook.trackPoints?.at(-1);
+          const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
+
+          const stageWaypoints = stageWithRoadbook.waypoints || [];
+          const wpCount = stageWaypoints.filter(
+            (w) => w.kind !== "start" && w.poi !== "START",
+          ).length;
+
+          // routePositions: start + track points only.  Waypoints are drawn
+          // as markers, NOT joined into the polyline.
+          const routePts = [];
+          if (startGPS?.lat && startGPS?.lon) {
+            routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+          }
+          (stageWithRoadbook.trackPoints || []).forEach((p) => {
+            if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+              routePts.push([Number(p.lat), Number(p.lon)]);
+            }
+          });
+
+          // bounds: every point that should be visible — start + track +
+          // waypoints — so fitBounds covers the whole stage.
+          const allPts = [...routePts];
+          stageWaypoints.forEach((p) => {
+            if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+              allPts.push([Number(p.lat), Number(p.lon)]);
+            }
+          });
+          const bounds = computeBounds(allPts);
+
+          const baseTitle =
+            `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+
+          if (bounds && routePts.length >= 2) {
+            const result = await buildMapPdfBlob({
+              title: baseTitle,
+              date: new Date(),
+              totalDistanceKm: totalKm,
+              waypointCount: wpCount,
+              tileSource: mapSource,
+              routePositions: routePts,
+              waypoints: stageWaypoints,
+              bounds,
+              filename: baseTitle || "routemapper-map",
+            });
+            mapPdfBlob = result?.blob ?? null;
+          }
+        } catch (mapErr) {
+          console.warn(
+            "Map PDF render failed — continuing with ZIP without it",
+            mapErr,
+          );
+        }
+
         // Free / guest: core GPX files only. Paid plans get the full package.
         const fullExport = planLimits.fullExport;
         const blob = await buildRoutePackage(stageWithRoadbook, {
@@ -1529,6 +1612,7 @@ export default function RouteMapperLayout() {
           includeGaia: fullExport,
           includePdf: false,
           author: profile?.full_name || null,
+          mapPdfBlob,
         });
 
         downloadBlob(`${base}.zip`, blob);
@@ -2258,6 +2342,27 @@ export default function RouteMapperLayout() {
                 Sign out
               </button>
             )}
+
+            {/* Build stamp — short commit SHA + deploy context.  Lets a
+                non-technical user confirm at a glance which build they're
+                on, e.g. when a Netlify deploy preview has updated but the
+                iPad PWA service worker is still serving the prior bundle.
+                Defined by Vite at build time (see __COMMIT_SHA__ in
+                vite.config.js). */}
+            <span
+              className="text-[10px] font-mono text-gray-400 select-all"
+              title={`v${
+                typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "?"
+              } · ${
+                typeof __BUILD_CONTEXT__ !== "undefined"
+                  ? __BUILD_CONTEXT__
+                  : "dev"
+              } · commit ${
+                typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "?"
+              }`}
+            >
+              {typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "dev"}
+            </span>
           </div>
         </div>
       </header>
@@ -2522,7 +2627,6 @@ export default function RouteMapperLayout() {
               mapMode={mapMode}
               mapSource={mapSource}
               resizeKey={showMap ? 1 : 0}
-              onMapReady={setLeafletMap}
             />
           </div>
         ) : (
@@ -2543,7 +2647,6 @@ export default function RouteMapperLayout() {
                 mapMode={mapMode}
                 mapSource={mapSource}
                 resizeKey={showMap ? 1 : 0}
-                onMapReady={setLeafletMap}
               />
             </div>
           </section>
@@ -2586,6 +2689,77 @@ export default function RouteMapperLayout() {
             title="Show generated roadbook preview"
           >
             {showRoadbookPreview ? "Hide Roadbook" : "Roadbook Preview"}
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl border bg-white text-gray-900 disabled:opacity-50"
+            disabled={exportingMapPdf || !startGPS}
+            title="Export the route + waypoints recorded so far as a printable PDF.  Renders the map from scratch (tiles fetched, polyline + markers drawn) — no Leaflet screenshot, so it works even with the map hidden."
+            onClick={async () => {
+              setExportingMapPdf(true);
+              try {
+                const lastTrackPt = trackPoints?.[trackPoints.length - 1];
+                const totalKm = (lastTrackPt?.distanceFromStartM ?? 0) / 1000;
+
+                // routePositions: start + track points only.  Waypoints are
+                // drawn as markers, NOT joined into the polyline.
+                const routePts = [];
+                if (startGPS?.lat && startGPS?.lon) {
+                  routePts.push([Number(startGPS.lat), Number(startGPS.lon)]);
+                }
+                (trackPoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    routePts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+
+                // bounds: every point we want visible (start + track + every
+                // waypoint), so the rendered map fits the whole stage.
+                // v1 always fit-bounds; mid-stage "honour current zoom" is a
+                // potential follow-up.
+                const allPts = [...routePts];
+                (waypoints || []).forEach((p) => {
+                  if (Number.isFinite(+p.lat) && Number.isFinite(+p.lon)) {
+                    allPts.push([Number(p.lat), Number(p.lon)]);
+                  }
+                });
+                const bounds = computeBounds(allPts);
+
+                const baseTitle =
+                  `${tripName || ""} ${routeName || `Route ${routeNumber}`} Stage ${stageNumber}`.trim();
+
+                if (!bounds || routePts.length < 2) {
+                  alert(
+                    "Not enough recorded data yet to render a map — start a stage and record at least one track point first.",
+                  );
+                  return;
+                }
+
+                await exportMapAsPdf({
+                  title: baseTitle,
+                  date: new Date(),
+                  totalDistanceKm: totalKm,
+                  waypointCount: (waypoints || []).filter(
+                    (w) => w.kind !== "start" && w.poi !== "START",
+                  ).length,
+                  tileSource: mapSource,
+                  routePositions: routePts,
+                  waypoints: waypoints || [],
+                  bounds,
+                  filename: baseTitle || "routemapper-map",
+                });
+              } catch (err) {
+                console.error("Export Map PDF failed", err);
+                alert(
+                  `Could not export map PDF.\n\n${err?.message || err}\n\nIf you're using satellite or topo tiles, try switching to OSM and exporting again.`,
+                );
+              } finally {
+                setExportingMapPdf(false);
+              }
+            }}
+          >
+            {exportingMapPdf ? "Exporting…" : "Export Map PDF"}
           </button>
 
           {/* Right-side cluster: Follow Map toggle + GPS traffic light */}
