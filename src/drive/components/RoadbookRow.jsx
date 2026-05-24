@@ -1,16 +1,13 @@
 // src/drive/components/RoadbookRow.jsx
 //
-// One row of the scrolling roadbook. M1 renders all rows in the
-// "above" / "current" / "below" states; M2 wires up which one is
-// current based on live GPS.
+// One row of the scrolling roadbook.
+//
+// M2 changes:
+//   - Tappable: tapping jumps the current-row marker to this row.
+//   - Accepts a ref so RoadbookView can scrollIntoView the current row.
 
-import React, { useMemo } from "react";
+import React, { forwardRef, useMemo } from "react";
 import { tulipFor } from "../lib/tulipAdapter";
-
-function fmtKm(meters) {
-  if (meters == null || !Number.isFinite(Number(meters))) return "—";
-  return (Number(meters) / 1000).toFixed(2);
-}
 
 function fmtKmFromKm(km) {
   if (km == null || !Number.isFinite(Number(km))) return "—";
@@ -23,14 +20,15 @@ function fmtCap(bearing) {
   return `${Math.round(b)}°`;
 }
 
-export default function RoadbookRow({ row, position }) {
-  // position: "above" | "current" | "below"
+const RoadbookRow = forwardRef(function RoadbookRow(
+  { row, position, onTap },
+  ref,
+) {
+  // position: "above" | "current" | "below" | "neutral"
   const tulipSvg = useMemo(() => tulipFor(row, { size: 96 }), [row]);
 
   const isCurrent = position === "current";
 
-  // Styling — neutral now (M1 has no "current" GPS yet), but the
-  // visual treatment is wired so M2 only flips a prop.
   const containerCls = isCurrent
     ? "bg-amber-50 border-l-4 border-amber-500 pl-3"
     : position === "above"
@@ -38,22 +36,22 @@ export default function RoadbookRow({ row, position }) {
       : "";
 
   return (
-    <div
-      className={`flex items-start gap-3 py-3 border-b border-gray-100 ${containerCls}`}
+    <button
+      ref={ref}
+      type="button"
+      onClick={() => onTap?.(row)}
+      className={`block w-full text-left flex items-start gap-3 py-3 border-b border-gray-100 hover:bg-gray-50 ${containerCls}`}
     >
-      {/* Row number */}
       <div className="text-xs font-semibold text-gray-500 w-10 pt-1 text-right tabular-nums">
         {row.index ?? "—"}
       </div>
 
-      {/* Tulip */}
       <div
         className="shrink-0 w-24 h-24 flex items-center justify-center bg-white rounded border border-gray-200"
         dangerouslySetInnerHTML={{ __html: tulipSvg }}
         aria-hidden="true"
       />
 
-      {/* Notes + meta */}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-gray-900 break-words">
           {row.notes || row.eventType || "—"}
@@ -65,7 +63,6 @@ export default function RoadbookRow({ row, position }) {
         )}
       </div>
 
-      {/* Distance + CAP */}
       <div className="text-right text-xs text-gray-600 whitespace-nowrap tabular-nums">
         <div className="font-semibold text-gray-900">
           {fmtKmFromKm(row.kmPartial)} km
@@ -73,9 +70,8 @@ export default function RoadbookRow({ row, position }) {
         <div>tot {fmtKmFromKm(row.kmTotal)} km</div>
         <div className="mt-1">CAP {fmtCap(row.bearingOut)}</div>
       </div>
-    </div>
+    </button>
   );
-}
+});
 
-// Re-export the formatter for FooterBar to reuse in M3
-export { fmtKm };
+export default RoadbookRow;
