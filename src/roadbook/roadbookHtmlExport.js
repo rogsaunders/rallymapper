@@ -76,6 +76,16 @@ export async function exportRoadbookHtml(stage, opts = {}) {
 
   /* Slightly smaller note text so it fits the narrower print column */
   .note-main { font-size: 14px !important; }
+
+  /* Collapse the two-column on-screen layout back to linear for paper.
+     Map gets the full content width on the cover page, then a page
+     break, then the roadbook table flows full-width on subsequent
+     pages.  More legible map + more legible table than squeezing both
+     into half-pages would give. */
+  .rb-layout    { display: block !important; }
+  .rb-map-col   { position: static !important; width: 100% !important; page-break-after: always; }
+  .rb-table-col { width: 100% !important; }
+  .rb-map-col img { position: static !important; }
 }
 
 /* ── Base ── */
@@ -118,10 +128,43 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 .rm-ep-label { font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #006b6b; margin-bottom: 4px; }
 .rm-ep-gps { font-size: 12px; font-weight: 700; line-height: 1.5; }
 
-/* ── Stage overview map ── */
-.rm-map-wrap { border: 2px solid #000; margin-bottom: 8px; background: #fff; padding: 0; }
+/* ── Stage overview map ──
+   On screen: the map lives in the left column of a two-column layout
+   beneath the header/warning, and the column scrolls.  The image is
+   pinned with position:sticky so it stays visible while the navigator
+   reads down the roadbook in the right column.
+   On print: the two-column layout collapses to linear (see @media print
+   block at the top of this stylesheet) — map full width on the cover
+   page, table full width on subsequent pages. */
+.rm-map-wrap { border: 2px solid #000; background: #fff; padding: 0; }
 .rm-map-img  { display: block; width: 100%; height: auto; }
 @media print { .rm-map-wrap { break-inside: avoid; } }
+
+/* ── Two-column screen layout ──
+   1fr : 2fr keeps the map at roughly one-third of the page, leaving
+   two-thirds for the roadbook table — enough column width for the
+   tulip, CAP and notes cells without crowding.  Sticky position keeps
+   the map pinned to the viewport while the right column scrolls. */
+.rb-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px;
+  align-items: start;
+}
+.rb-map-col {
+  position: sticky;
+  top: 8px;
+  align-self: start;
+}
+.rb-table-col { min-width: 0; }   /* enables table to shrink for grid sizing */
+
+/* Mobile / narrow viewport: collapse to single column so iPad in
+   portrait isn't squeezed.  No sticky map below this breakpoint —
+   the map just sits above the table as a banner. */
+@media (max-width: 720px) {
+  .rb-layout { grid-template-columns: 1fr; }
+  .rb-map-col { position: static; }
+}
 
 /* ── Warning block ── */
 .rm-warning { border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; background: #fff; }
@@ -194,7 +237,6 @@ ${buildIconPaletteHtml()}
 </script>
 <div class="page">
   ${buildRmHeader(stage, rows, logoSrc, opts.author)}
-  ${opts.mapImageDataUrl ? `<div class="rm-map-wrap"><img class="rm-map-img" alt="Stage overview map" src="${opts.mapImageDataUrl}"></div>` : ""}
   <div class="rm-warning">
     <div class="rm-warning-title">WARNING</div>
     <div class="rm-warning-body">
@@ -206,20 +248,25 @@ ${buildIconPaletteHtml()}
     </div>
   </div>
   <div class="filter-note no-print">${flaggedRows.size > 0 ? `⚠ ${flaggedRows.size} row(s) highlighted (possible U-turn). ` : ""}Drag icons from the palette onto any tulip cell · double-click a dropped icon to remove it · click any Note cell to edit text</div>
-  <table class="roadbook">
-    <thead>
-      <tr>
-        <th class="col-total">Total</th>
-        <th class="col-partial">Partial</th>
-        <th class="col-rowno">#</th>
-        <th class="col-tulip">Tulip</th>
-        <th class="col-cap">CAP</th>
-        <th class="col-note">Note — click to edit</th>
-        <th class="col-gps">GPS</th>
-      </tr>
-    </thead>
-    <tbody>${rowHtml}</tbody>
-  </table>
+  <div class="rb-layout">
+    ${opts.mapImageDataUrl ? `<div class="rb-map-col"><div class="rm-map-wrap"><img class="rm-map-img" alt="Stage overview map" src="${opts.mapImageDataUrl}"></div></div>` : ""}
+    <div class="rb-table-col">
+      <table class="roadbook">
+        <thead>
+          <tr>
+            <th class="col-total">Total</th>
+            <th class="col-partial">Partial</th>
+            <th class="col-rowno">#</th>
+            <th class="col-tulip">Tulip</th>
+            <th class="col-cap">CAP</th>
+            <th class="col-note">Note — click to edit</th>
+            <th class="col-gps">GPS</th>
+          </tr>
+        </thead>
+        <tbody>${rowHtml}</tbody>
+      </table>
+    </div>
+  </div>
 </div>
 ${buildDragDropJs()}
 </body>

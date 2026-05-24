@@ -2,8 +2,10 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  Header,
   HeightRule,
   ImageRun,
+  PageOrientation,
   Packer,
   Paragraph,
   ShadingType,
@@ -32,20 +34,27 @@ const FALLBACK_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQV
 const FALLBACK_PNG = Uint8Array.from(atob(FALLBACK_PNG_B64), c => c.charCodeAt(0));
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
-// A4 portrait: 11906 × 16838 DXA. Margins 10 mm = 567 DXA. Content width 10772 DXA.
-const MARGIN = 567;
-const PAGE_W = 11906;
-const CW     = PAGE_W - MARGIN * 2; // 10772
+// A4 landscape: 16838 × 11906 DXA (page is rotated). Margins 10 mm = 567 DXA.
+// Content width 15704 DXA (~277 mm) — significantly wider than portrait's
+// 10772 DXA (~190 mm).  The roadbook is the EDITABLE artefact, so landscape
+// gives the navigator more room for note-editing without wrapping.
+const MARGIN     = 567;
+const PAGE_LONG  = 16838; // 297 mm
+const PAGE_SHORT = 11906; // 210 mm
+const PAGE_W     = PAGE_LONG;  // page is laid out long-edge horizontal
+const CW         = PAGE_W - MARGIN * 2; // 15704
 
+// Column widths scaled to the new content width, keeping the original
+// portrait proportions.  Scale factor ≈ 15704 / 10772 ≈ 1.4578.
 const COL = {
-  total:    900,  // ~0.63"
-  partial:  900,  // ~0.63"
-  rowno:    440,  // ~0.31"
-  tulip:   2160,  // ~1.50" — wider for clear tulip diagrams
-  cap:      540,  // ~0.38"
-  notes:   4312,  // ~3.00" — editorial column
-  gps:     1520,  // ~1.06"
-}; // 900+900+440+2160+540+4312+1520 = 10772 ✓
+  total:   1312,  // was 900
+  partial: 1312,  // was 900
+  rowno:    642,  // was 440
+  tulip:   3149,  // was 2160
+  cap:      787,  // was 540
+  notes:   6287,  // was 4312 — editorial column, gets the biggest gain
+  gps:     2215,  // was 1520
+}; // 1312+1312+642+3149+787+6287+2215 = 15704 ✓
 
 const BD       = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
 const BORDERS  = { top: BD, bottom: BD, left: BD, right: BD };
@@ -76,40 +85,47 @@ export async function exportRoadbookDocx(stage, opts = {}) {
   const roadbookTable = buildRoadbookTable(rows, flaggedRows, meta, title);
   const appendixTable = buildIconAppendix();
 
-  // Stage-overview map, embedded between the header and the warning.  Caller
-  // (buildRoutePackage) pre-renders the canvas once and hands us the PNG
-  // bytes so HTML and DOCX exports share the identical image.  Null/missing
-  // means there wasn't enough data to draw it — section just gets skipped.
-  const mapParagraph = opts.mapImageBytes
-    ? buildDocxMapParagraph(opts.mapImageBytes)
-    : null;
+  // Stage-overview map.  Caller (buildRoutePackage) pre-renders the canvas
+  // once and hands us the PNG bytes so HTML and DOCX exports share the
+  // identical image.  In the landscape DOCX the map lives in the page
+  // Header so it repeats on every page — the "static" reference the
+  // navigator can see while reading down the rows.
+  const mapHeader = buildDocxMapHeader(opts.mapImageBytes);
+
+  // Landscape page config shared by both sections (roadbook + icon
+  // appendix).  Long edge horizontal; PageOrientation.LANDSCAPE is the
+  // docx-js semantic flag, with the explicit width/height in case any
+  // consumer renders without honouring the orientation hint.
+  const landscapePage = {
+    size: {
+      width:  PAGE_LONG,
+      height: PAGE_SHORT,
+      orientation: PageOrientation.LANDSCAPE,
+    },
+    margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
+  };
 
   const doc = new Document({
     creator: "RouteMapper",
     title,
     sections: [
       {
-        properties: {
-          page: {
-            size: { width: PAGE_W, height: 16838 },
-            margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
-          },
-        },
+        properties: { page: landscapePage },
+        // Page header repeats on every page.  Body content (warning +
+        // roadbook table) flows beneath, paginating naturally as the
+        // table grows past one page.
+        ...(mapHeader ? { headers: { default: mapHeader } } : {}),
         children: [
           ...headerTables,
-          ...(mapParagraph ? [mapParagraph] : []),
           warningTable,
           new Paragraph({ spacing: { before: 120 }, children: [] }),
           roadbookTable,
         ],
       },
       {
-        properties: {
-          page: {
-            size: { width: PAGE_W, height: 16838 },
-            margin: { top: MARGIN, right: MARGIN, bottom: MARGIN, left: MARGIN },
-          },
-        },
+        properties: { page: landscapePage },
+        // No map header in the icon appendix — the appendix is reference
+        // material, not part of the navigated route.
         children: [
           new Paragraph({
             spacing: { after: 80 },
@@ -216,16 +232,26 @@ function buildDocxHeader(rows, meta, logoPngData, author) {
   return [brandTable, statsGpsTable];
 }
 
-// ─── Stage-overview map ───────────────────────────────────────────────────────
-
+// ─── Stage-overview map header ────────────────────────────────────────────────
+//
+// The map lives in the page Header so it appears on every page of the
+// landscape roadbook — the "static while you scroll/page" experience
+// Roger asked for, translated to the DOCX print model.  Word renders the
+// header above the body content on every page and auto-pushes the body
+// area down to accommodate the header's height.
+//
 // Source canvas is 1600×1000 (16:10).  docx-js's `transformation` is in
-// pixels-at-96-DPI: 720 px ≈ 190 mm wide, matching the A4 content area.
-// Height follows the source aspect ratio (450 px ≈ 119 mm) so we don't
-// distort the map.
-const MAP_DISPLAY_W = 720;
-const MAP_DISPLAY_H = 450;
+// pixels-at-96-DPI.  We size the banner to ~140 mm wide × 88 mm tall:
+//   140 mm × 96 / 25.4 ≈ 530 px wide
+//    88 mm × 96 / 25.4 ≈ 333 px tall
+// That's ~50 % of the landscape content width and ~46 % of the page
+// height — visible enough to orient against, leaving roughly half the
+// page for the roadbook table beneath.
+const MAP_DISPLAY_W = 530;
+const MAP_DISPLAY_H = 333;
 
-function buildDocxMapParagraph(pngBytes) {
+function buildDocxMapHeader(pngBytes) {
+  if (!pngBytes) return null;
   const mapImg = new ImageRun({
     type: "png",
     data: pngBytes,
@@ -236,10 +262,14 @@ function buildDocxMapParagraph(pngBytes) {
       name: "Stage map",
     },
   });
-  return new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 120, after: 120 },
-    children: [mapImg],
+  return new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 60 },
+        children: [mapImg],
+      }),
+    ],
   });
 }
 
