@@ -1,12 +1,17 @@
 // src/drive/components/HeaderBar.jsx
 //
-// Top chrome for Drive Mode. Shows stage name on the left and an
-// Exit button on the right. M2+ will add ⏸ pause, 🔊 voice toggle,
-// and a ⋯ menu for settings.
+// Top chrome for Drive Mode.
+//
+// M3 adds a ⚙️ settings cog that opens the settings overlay.
 
 import React from "react";
 
-export default function HeaderBar({ stageMeta, onExit, rowCount }) {
+export default function HeaderBar({
+  stageMeta,
+  onExit,
+  rowCount,
+  onOpenSettings,
+}) {
   const stageName = stageMeta?.stageName || "Drive Mode";
   const subtitle =
     stageMeta &&
@@ -33,6 +38,15 @@ export default function HeaderBar({ stageMeta, onExit, rowCount }) {
         <div className="text-xs text-gray-500 whitespace-nowrap">
           {rowCount} row{rowCount === 1 ? "" : "s"}
         </div>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="p-2 rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50"
+          title="Drive Mode settings"
+          aria-label="Open settings"
+        >
+          ⚙️
+        </button>
         <button
           type="button"
           onClick={onExit}

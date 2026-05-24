@@ -41,18 +41,24 @@ function normalise(parsed) {
   //   (a) full stage.json: { meta, waypoints, trackPoints, roadbook, ... }
   //   (b) bare roadbook:   { rows, views?, ... }
   //   (c) wrapped:         { stage: { ... }, roadbook: { ... } }
+  //
+  // trackPoints is M3+: along-track distance computation needs the
+  // recorded GPS track. Bare-roadbook input has no track → along-track
+  // gracefully degrades to straight-line.
   if (parsed?.roadbook?.rows) {
     return {
       roadbook: parsed.roadbook,
+      trackPoints: parsed.trackPoints || parsed.stage?.trackPoints || [],
       stageMeta: parsed.meta || parsed.stage?.meta || null,
     };
   }
   if (parsed?.rows) {
-    return { roadbook: parsed, stageMeta: null };
+    return { roadbook: parsed, trackPoints: [], stageMeta: null };
   }
   if (parsed?.stage?.roadbook?.rows) {
     return {
       roadbook: parsed.stage.roadbook,
+      trackPoints: parsed.stage.trackPoints || [],
       stageMeta: parsed.stage.meta || null,
     };
   }
@@ -63,6 +69,7 @@ function normalise(parsed) {
 
 export function useRoadbook() {
   const [roadbook, setRoadbook] = useState(null);
+  const [trackPoints, setTrackPoints] = useState([]);
   const [stageMeta, setStageMeta] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,13 +101,16 @@ export function useRoadbook() {
         );
       }
 
-      const { roadbook: rb, stageMeta: meta } = normalise(parsed);
+      const { roadbook: rb, trackPoints: tp, stageMeta: meta } =
+        normalise(parsed);
       setRoadbook(rb);
+      setTrackPoints(Array.isArray(tp) ? tp : []);
       setStageMeta(meta);
     } catch (e) {
       console.warn("useRoadbook: load failed", e);
       setError(e?.message || String(e));
       setRoadbook(null);
+      setTrackPoints([]);
       setStageMeta(null);
     } finally {
       setIsLoading(false);
@@ -109,9 +119,18 @@ export function useRoadbook() {
 
   function clear() {
     setRoadbook(null);
+    setTrackPoints([]);
     setStageMeta(null);
     setError(null);
   }
 
-  return { roadbook, stageMeta, error, isLoading, loadFile, clear };
+  return {
+    roadbook,
+    trackPoints,
+    stageMeta,
+    error,
+    isLoading,
+    loadFile,
+    clear,
+  };
 }
