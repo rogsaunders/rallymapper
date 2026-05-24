@@ -1,0 +1,67 @@
+// src/drive/components/SourcePicker.jsx
+//
+// M1: load a roadbook from disk (ZIP or JSON). M2 will add a
+// "saved stages" list for logged-in users.
+
+import React, { useRef } from "react";
+
+export default function SourcePicker({ onPick, error, isLoading }) {
+  const inputRef = useRef(null);
+
+  const onFileSelected = (e) => {
+    const file = e.target.files?.[0];
+    if (file) onPick(file);
+    // Reset so re-selecting the same file fires onChange again
+    e.target.value = "";
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border max-w-md w-full p-6">
+        <h1 className="text-xl font-bold text-gray-900 mb-2">
+          🚗 Drive Mode
+        </h1>
+        <p className="text-sm text-gray-600 mb-6">
+          Load a roadbook to drive. RouteMapper export ZIP, or a
+          standalone <code>stage.json</code>.
+        </p>
+
+        <button
+          type="button"
+          disabled={isLoading}
+          onClick={() => inputRef.current?.click()}
+          className="w-full px-4 py-3 rounded-xl text-white font-semibold disabled:opacity-50"
+          style={{ backgroundColor: "#588233" }}
+        >
+          {isLoading ? "Loading…" : "📂 Load roadbook (ZIP or JSON)"}
+        </button>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".zip,.json,application/zip,application/json"
+          onChange={onFileSelected}
+          className="hidden"
+        />
+
+        {error && (
+          <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-500 leading-relaxed">
+          <p className="mb-1">
+            <strong>M1 skeleton:</strong> static roadbook display only.
+            GPS auto-advance and voice readout arrive in M2–M4.
+          </p>
+          <p>
+            <a href="/" className="text-[#588233] underline">
+              ← Back to the recording app
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -6,6 +6,7 @@ import { useAuth } from "./auth/AuthProvider";
 import RouteMapperLayout from "./RouteMapperLayout";
 import SignIn from "./auth/SignIn";
 import ResetPassword from "./auth/ResetPassword";
+import DriveMode from "./drive/DriveMode";
 
 function GuestOnly({ children }) {
   const { user, loading, guestMode } = useAuth();
@@ -48,6 +49,17 @@ export default function App() {
         element={
           <RequireAuth>
             <RouteMapperLayout />
+          </RequireAuth>
+        }
+      />
+
+      {/* Drive Mode (Phase 2). Logged-in users and guest mode both
+          allowed; auth gate matches the recording side. */}
+      <Route
+        path="/drive"
+        element={
+          <RequireAuth>
+            <DriveMode />
           </RequireAuth>
         }
       />

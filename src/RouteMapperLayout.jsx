@@ -2301,6 +2301,15 @@ export default function RouteMapperLayout() {
 
           {/* Right: cloud badge + plan badge + account */}
           <div className="flex items-center gap-3">
+            {/* Drive Mode launcher (Phase 2) */}
+            <a
+              href="/drive"
+              className="text-sm px-3 py-1 rounded-full font-medium bg-[#588233] text-white hover:bg-[#476a29]"
+              title="Open Drive Mode — load a roadbook to drive"
+            >
+              🚗 Drive
+            </a>
+
             <div
               className={`text-sm px-3 py-1 rounded-full font-medium
                 ${cloud.color} bg-opacity-15 text-green-700`}
