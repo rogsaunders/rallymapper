@@ -36,6 +36,48 @@ function findStageJsonEntry(zip) {
   return null;
 }
 
+// Match the row-selection behaviour of the HTML/DOCX exporters
+// (roadbookHtmlExport.js and exportRoadbookDocx.js). Both prefer the
+// pre-filtered "driver" view that hides most auto-detected turns,
+// keeping the rows a navigator actually needs to call out. Falling
+// back to the raw .rows array would show every bend in the road —
+// confusing and not what users see in their printed roadbook.
+function selectDisplayRows(roadbook) {
+  return roadbook?.views?.driver || roadbook?.rows || [];
+}
+
+// Mirror of ensureStartRow() in roadbookHtmlExport.js — prepends a
+// synthetic START row when the first row isn't at km 0. Drive Mode
+// shows the same artefact as the printed roadbook for consistency.
+function ensureStartRow(rows) {
+  if (!rows.length) return rows;
+  if (Math.abs(rows[0].kmTotal || 0) < 0.01) return rows;
+  return [
+    {
+      index: 0,
+      kmTotal: 0,
+      kmPartial: 0,
+      icon: "start",
+      eventType: "straight",
+      angle: null,
+      notes: "Start",
+      lat: null,
+      lon: null,
+      confidence: 1,
+      source: "synthetic",
+    },
+    ...rows,
+  ];
+}
+
+// Build a Reader-ready roadbook object: same shape as the input but
+// with rows = the navigator's view (matches the HTML/DOCX exports).
+function buildReaderRoadbook(roadbook) {
+  if (!roadbook) return roadbook;
+  const displayRows = ensureStartRow(selectDisplayRows(roadbook));
+  return { ...roadbook, rows: displayRows };
+}
+
 function normalise(parsed) {
   // Accept three shapes:
   //   (a) full stage.json: { meta, waypoints, trackPoints, roadbook, ... }
@@ -45,19 +87,23 @@ function normalise(parsed) {
   // trackPoints is M3+: along-track distance computation needs the
   // recorded GPS track. Bare-roadbook input has no track → along-track
   // gracefully degrades to straight-line.
-  if (parsed?.roadbook?.rows) {
+  if (parsed?.roadbook?.rows || parsed?.roadbook?.views) {
     return {
-      roadbook: parsed.roadbook,
+      roadbook: buildReaderRoadbook(parsed.roadbook),
       trackPoints: parsed.trackPoints || parsed.stage?.trackPoints || [],
       stageMeta: parsed.meta || parsed.stage?.meta || null,
     };
   }
-  if (parsed?.rows) {
-    return { roadbook: parsed, trackPoints: [], stageMeta: null };
-  }
-  if (parsed?.stage?.roadbook?.rows) {
+  if (parsed?.rows || parsed?.views) {
     return {
-      roadbook: parsed.stage.roadbook,
+      roadbook: buildReaderRoadbook(parsed),
+      trackPoints: [],
+      stageMeta: null,
+    };
+  }
+  if (parsed?.stage?.roadbook?.rows || parsed?.stage?.roadbook?.views) {
+    return {
+      roadbook: buildReaderRoadbook(parsed.stage.roadbook),
       trackPoints: parsed.stage.trackPoints || [],
       stageMeta: parsed.stage.meta || null,
     };
