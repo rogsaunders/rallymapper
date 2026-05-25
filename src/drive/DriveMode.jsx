@@ -9,12 +9,16 @@
 //      proximity-zone auto-advance, pause toggle, manual override
 //      timer, settings panel (auto-advance / trigger radius /
 //      override duration).
-// M4+ — Voice readout, DOCX overlay.
+// M4 — Voice readout via Web Speech API speechSynthesis. Auto-
+//      announce on every currentIndex change. 🔊/🔇 quick toggle
+//      in the header. Voice on/off + test button in settings.
+// M5+ — DOCX overlay, iPhone polish.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRoadbook } from "./hooks/useRoadbook";
 import { useGpsStream } from "./hooks/useGpsStream";
 import { useDriveAdvance } from "./hooks/useDriveAdvance";
+import { useVoiceReadout } from "./hooks/useVoiceReadout";
 import { annotateRowsWithTrackIdx } from "./lib/alongTrack";
 import SourcePicker from "./components/SourcePicker";
 import HeaderBar from "./components/HeaderBar";
@@ -26,6 +30,7 @@ import SettingsPanel from "./components/SettingsPanel";
 const LS_AUTO_ADVANCE = "rm_drive_auto_advance";
 const LS_TRIGGER_RADIUS = "rm_drive_trigger_radius_m";
 const LS_OVERRIDE_MS = "rm_drive_override_ms";
+const LS_VOICE_ENABLED = "rm_drive_voice_enabled";
 
 function readBool(key, fallback) {
   const v = localStorage.getItem(key);
@@ -53,6 +58,9 @@ export default function DriveMode() {
   const [manualOverrideMs, setManualOverrideMs] = useState(() =>
     readNum(LS_OVERRIDE_MS, 30000),
   );
+  const [voiceEnabled, setVoiceEnabled] = useState(() =>
+    readBool(LS_VOICE_ENABLED, true),
+  );
 
   // Persist on change
   useEffect(() => {
@@ -64,6 +72,9 @@ export default function DriveMode() {
   useEffect(() => {
     localStorage.setItem(LS_OVERRIDE_MS, String(manualOverrideMs));
   }, [manualOverrideMs]);
+  useEffect(() => {
+    localStorage.setItem(LS_VOICE_ENABLED, String(voiceEnabled));
+  }, [voiceEnabled]);
 
   // Annotate rows with their nearest-track-index ONCE per roadbook
   // load. Without this, computeAlongTrackDistance can't find the
@@ -92,6 +103,30 @@ export default function DriveMode() {
     manualOverrideMs,
   });
 
+  const {
+    supported: voiceSupported,
+    speak: voiceSpeak,
+    stop: voiceStop,
+  } = useVoiceReadout({
+    enabled: voiceEnabled,
+    currentIndex,
+    rows: annotatedRows,
+  });
+
+  // Toggle wrapper that also primes iOS Safari's speech synth on
+  // enable (Safari requires the first speak() to be triggered from a
+  // user gesture; a row auto-advance later wouldn't qualify).
+  const toggleVoice = (next) => {
+    const target = typeof next === "boolean" ? next : !voiceEnabled;
+    setVoiceEnabled(target);
+    if (target && voiceSupported) {
+      // Inside the click handler → counts as a user gesture on iOS
+      voiceSpeak("Voice ready");
+    } else if (!target) {
+      voiceStop();
+    }
+  };
+
   // Snap-scroll trigger — increment to force RoadbookView's
   // scrollIntoView effect to re-fire even if currentIndex hasn't
   // changed (after manual scroll-away).
@@ -111,6 +146,9 @@ export default function DriveMode() {
         rowCount={annotatedRows.length}
         onExit={clear}
         onOpenSettings={() => setSettingsOpen(true)}
+        voiceEnabled={voiceEnabled}
+        voiceSupported={voiceSupported}
+        onToggleVoice={() => toggleVoice()}
       />
       <RoadbookView
         rows={annotatedRows}
@@ -140,6 +178,12 @@ export default function DriveMode() {
         setTriggerRadiusM={setTriggerRadiusM}
         manualOverrideMs={manualOverrideMs}
         setManualOverrideMs={setManualOverrideMs}
+        voiceEnabled={voiceEnabled}
+        setVoiceEnabled={toggleVoice}
+        voiceSupported={voiceSupported}
+        voiceTest={() =>
+          voiceSpeak("Voice readout test. Next row in 0.4 kilometres.")
+        }
       />
     </div>
   );

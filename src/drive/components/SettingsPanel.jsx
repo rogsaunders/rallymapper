@@ -2,12 +2,12 @@
 //
 // Collapsible bottom-sheet-style overlay for Drive Mode settings.
 //
-// M3 lives:
+// M3:
 //   - Auto-advance on/off
 //   - Trigger radius slider (5–100 m, default 30 m)
 //   - Manual override duration (10–120 s, default 30 s)
-//
-// M4 will add the 🔊 Voice readout toggle here.
+// M4:
+//   - Voice readout on/off + Test button
 
 import React from "react";
 
@@ -20,6 +20,10 @@ export default function SettingsPanel({
   setTriggerRadiusM,
   manualOverrideMs,
   setManualOverrideMs,
+  voiceEnabled,
+  setVoiceEnabled,
+  voiceSupported,
+  voiceTest,
 }) {
   if (!open) return null;
 
@@ -119,6 +123,36 @@ export default function SettingsPanel({
             When you tap a row or ◀ ▶, auto-advance pauses for this
             long so it doesn't immediately re-advance you.
           </p>
+        </div>
+
+        {/* Voice readout (M4) */}
+        <div className="mb-5 pt-4 border-t border-gray-200">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!!voiceEnabled}
+              disabled={!voiceSupported}
+              onChange={(e) => setVoiceEnabled?.(e.target.checked)}
+              className="w-5 h-5 accent-[#588233]"
+            />
+            <span className="font-medium text-gray-800">
+              🔊 Voice readout
+            </span>
+          </label>
+          <p className="text-xs text-gray-500 mt-1 ml-8 leading-snug">
+            {voiceSupported
+              ? "Announce each row as it becomes current. Format: instruction, your note, then distance to the next row."
+              : "Not supported in this browser. Try Safari on iOS / iPadOS, or Chrome on desktop / Android."}
+          </p>
+          {voiceSupported && (
+            <button
+              type="button"
+              onClick={voiceTest}
+              className="mt-2 ml-8 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              🔊 Test voice
+            </button>
+          )}
         </div>
 
         <button
