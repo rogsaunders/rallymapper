@@ -1,5 +1,11 @@
 // src/RouteMapperLayout.jsx
-import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import rrmLogo from "./assets/RRMLogo_64x64.png";
 import MapView from "./components/MapView";
 import {
@@ -455,7 +461,8 @@ function getCloudStatus({ online, userId, pendingCount }) {
 }
 
 export default function RouteMapperLayout() {
-  const { user, session, signOut, plan, profile, guestMode, refreshProfile } = useAuth();
+  const { user, session, signOut, plan, profile, guestMode, refreshProfile } =
+    useAuth();
   const localOwner = user?.id ?? getGuestOwnerId();
   const planLimits = getLimits(plan);
   const [pendingCount, setPendingCount] = useState(
@@ -643,6 +650,7 @@ export default function RouteMapperLayout() {
   const pendingWaypointRef = useRef(null);
   const pendingTimerRef = useRef(null);
   const [voiceToast, setVoiceToast] = useState(null); // { type, iconId, poi } for large toast
+  const [voiceError, setVoiceError] = useState(null); // friendly message when speech-rec startup fails
   const voiceRef = useRef(null); // voice command handler
   const voiceActiveRef = useRef(false); // mirrors voiceActive for async callbacks
   const recordTriggerRef = useRef(null); // external Bluetooth / pedal / keyboard trigger
@@ -1200,9 +1208,39 @@ export default function RouteMapperLayout() {
 
       onError: (msg) => {
         console.warn("Voice command error:", msg);
-        clearInterval(snapTimerRef.current);
-        snapTimerRef.current = null;
-        setSnapCountdown(0);
+
+        // Friendly translation of the most common iOS Safari errors so
+        // users understand WHY Record stopped working (rather than
+        // staring at a zombie "wait 0s" snap mode).
+        const lower = String(msg || "").toLowerCase();
+        let friendly = msg || "Voice capture failed.";
+        if (lower.includes("not-allowed") || lower.includes("denied")) {
+          friendly =
+            "Microphone permission denied. Tap the address-bar lock icon for app.routemapper.net and allow microphone access, then reload.";
+        } else if (lower.includes("not available") || lower.includes("no-speech-recognition")) {
+          friendly =
+            "Speech recognition isn't available in this browser. Use Safari on iOS / iPadOS, or Chrome on Android / desktop.";
+        } else if (lower.includes("could not start")) {
+          friendly =
+            "Couldn't start the microphone. Close any other tab using the mic, then try again.";
+        } else if (lower.includes("audio-capture")) {
+          friendly =
+            "No microphone detected. Check your headset connection or system audio settings.";
+        } else if (lower.includes("network")) {
+          friendly =
+            "Speech recognition needs an internet connection to start. Check your signal.";
+        }
+
+        setVoiceError(friendly);
+        // Surface for 8 s — long enough to read at a glance, short
+        // enough not to clutter the panel if the user fixes it and
+        // tries again.
+        setTimeout(() => setVoiceError(null), 8000);
+
+        // Full cleanup — the previous version only cleared the snap
+        // timer and left voiceMode === "snap" / voiceActive === true,
+        // producing a zombie UI stuck at "wait 0s".
+        stopVoice();
       },
 
       onReady: () => {
@@ -1355,10 +1393,7 @@ export default function RouteMapperLayout() {
         // marginal satellite fixes (50–80 m) while rejecting network-only
         // location estimates (typically >100 m, often >>200 m).
         const TRACK_MAX_ACCURACY_M = 80;
-        if (
-          Number.isFinite(accuracy) &&
-          accuracy > TRACK_MAX_ACCURACY_M
-        ) {
+        if (Number.isFinite(accuracy) && accuracy > TRACK_MAX_ACCURACY_M) {
           return;
         }
 
@@ -1965,7 +2000,9 @@ export default function RouteMapperLayout() {
 
     const typeToSave = typeOverride ?? waypointType;
     const iconId =
-      iconIdByCategory[typeToSave] ?? DEFAULT_ICON_BY_CATEGORY[typeToSave] ?? null;
+      iconIdByCategory[typeToSave] ??
+      DEFAULT_ICON_BY_CATEGORY[typeToSave] ??
+      null;
 
     // If a typeOverride was passed, sync the UI selection so the panel
     // reflects the pending waypoint's type.
@@ -2441,7 +2478,8 @@ export default function RouteMapperLayout() {
               Complete your profile
             </span>
             <span className="text-amber-700 hidden sm:inline">
-              Please add your full name and (optional) phone to finish setting up your account.
+              Please add your full name and (optional) phone to finish setting
+              up your account.
             </span>
             <button
               className="ml-auto px-3 py-1 rounded-lg font-semibold text-white"
@@ -3289,16 +3327,26 @@ export default function RouteMapperLayout() {
                       </span>
                     </label>
                     <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-                      Let external hardware fire the 🎙 Record button:
-                      Bluetooth headset (Play/Pause), foot pedal, presenter
-                      clicker, or Bluetooth keyboard (Space, PageUp, PageDown,
-                      F8). A second press while recording cancels.
+                      Let external hardware fire the 🎙 Record button: Bluetooth
+                      headset (Play/Pause), foot pedal, presenter clicker, or
+                      Bluetooth keyboard (Space, PageUp, PageDown, F8). A second
+                      press while recording cancels.
                     </p>
                   </div>
                   <div className="text-[11px] text-gray-400 leading-snug">
                     A Bluetooth headset with mic improves accuracy in noisy
                     environments.
                   </div>
+                </div>
+              )}
+
+              {/* Error feedback — shown even when not voiceActive, so the
+                  user sees WHY their Record tap failed (e.g. mic
+                  permission denied, browser unsupported). Auto-clears
+                  after a few seconds via setTimeout in onError. */}
+              {voiceError && (
+                <div className="mt-3 text-sm text-red-800 bg-red-50 rounded-lg px-3 py-2 border border-red-200 leading-snug">
+                  ⚠️ {voiceError}
                 </div>
               )}
 
@@ -3316,17 +3364,15 @@ export default function RouteMapperLayout() {
                       {voiceLastCommand.iconId
                         ? ` (${voiceLastCommand.iconId})`
                         : ""}
-                      {voiceLastCommand.poi
-                        ? ` — ${voiceLastCommand.poi}`
-                        : ""}
+                      {voiceLastCommand.poi ? ` — ${voiceLastCommand.poi}` : ""}
                     </div>
                   )}
                   {!voiceTranscript &&
                     !voiceLastCommand &&
                     voiceMode !== "command" && (
                       <div className="text-xs text-gray-400">
-                        Speak your command, e.g. "hazard danger two — rocks
-                        on track" or "left onto Forbes Road".
+                        Speak your command, e.g. "hazard danger two — rocks on
+                        track" or "left onto Forbes Road".
                       </div>
                     )}
                 </div>
@@ -3548,8 +3594,7 @@ export default function RouteMapperLayout() {
       {editDraft &&
         (() => {
           const draftVariants = ICONS[editDraft.type]?.variants || {};
-          const setDraft = (patch) =>
-            setEditDraft((d) => ({ ...d, ...patch }));
+          const setDraft = (patch) => setEditDraft((d) => ({ ...d, ...patch }));
           return (
             <div
               className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
@@ -3588,10 +3633,9 @@ export default function RouteMapperLayout() {
                           setDraft({
                             type,
                             // Reset iconId to first variant when changing category
-                            iconId:
-                              newVariants[editDraft.iconId]
-                                ? editDraft.iconId
-                                : Object.keys(newVariants)[0] || null,
+                            iconId: newVariants[editDraft.iconId]
+                              ? editDraft.iconId
+                              : Object.keys(newVariants)[0] || null,
                           });
                         }}
                       />
