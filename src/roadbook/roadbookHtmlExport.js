@@ -119,9 +119,34 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 .rm-ep-gps { font-size: 12px; font-weight: 700; line-height: 1.5; }
 
 /* ── Stage overview map ── */
-.rm-map-wrap { border: 2px solid #000; margin-bottom: 8px; background: #fff; padding: 0; }
-.rm-map-img  { display: block; width: 100%; height: auto; }
-@media print { .rm-map-wrap { break-inside: avoid; } }
+/* ── Stage overview map ──
+   On screen, the map wrapper sticks to the top of the viewport (just
+   below the fixed icon palette) while the roadbook table scrolls
+   underneath.  --palette-h is set by the same JS that sizes the
+   #palette-spacer, so the offset tracks the real palette height when
+   the user resizes the window or toggles the palette open/closed.
+   On print, sticky has no effect — the map falls back to normal flow,
+   appearing at the top of the cover page above the table (matches
+   today's printed output). */
+.rm-map-wrap {
+  position: sticky;
+  top: var(--palette-h, 100px);
+  z-index: 5;                /* below palette (z:1000), above table */
+  border: 2px solid #000;
+  margin-bottom: 8px;
+  background: #fff;          /* opaque so scrolling rows don't show through */
+  padding: 0;
+}
+.rm-map-img { display: block; width: 100%; height: auto; }
+
+/* Narrow viewports (iPad portrait, phones) don't have the vertical room
+   to spare a sticky map — it would crowd the table.  Below this width
+   the map sits as a normal banner that scrolls away with the rest. */
+@media (max-width: 720px) {
+  .rm-map-wrap { position: static; }
+}
+
+@media print { .rm-map-wrap { position: static; break-inside: avoid; } }
 
 /* ── Warning block ── */
 .rm-warning { border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; background: #fff; }
@@ -189,7 +214,13 @@ ${buildIconPaletteHtml()}
 (function(){
   var pal=document.getElementById('palette');
   var sp=document.getElementById('palette-spacer');
-  if(pal&&sp) sp.style.height=(pal.offsetHeight+6)+'px';
+  if(pal){
+    var h=pal.offsetHeight+6;
+    if(sp) sp.style.height=h+'px';
+    /* --palette-h is consumed by .rm-map-wrap's sticky top offset
+       so the map pins below the palette, not under it. */
+    document.documentElement.style.setProperty('--palette-h', h+'px');
+  }
 })();
 </script>
 <div class="page">
@@ -285,7 +316,12 @@ function saveHtml() {
 function updateBodyPadding() {
   const pal = document.getElementById('palette');
   const sp  = document.getElementById('palette-spacer');
-  if (pal && sp) sp.style.height = (pal.offsetHeight + 6) + 'px';
+  if (!pal) return;
+  const h = pal.offsetHeight + 6;
+  if (sp) sp.style.height = h + 'px';
+  // Keep the sticky-map's top offset in sync with the live palette height
+  // (icons re-wrap on viewport resize / palette toggle).
+  document.documentElement.style.setProperty('--palette-h', h + 'px');
 }
 window.addEventListener('resize', updateBodyPadding);
 
