@@ -1283,28 +1283,55 @@ export default function RouteMapperLayout() {
 
         if (!voiceActiveRef.current) return;
 
-        voiceRef.current?.stop();
-        voiceRef.current = null;
+        // Wrap the commit in try/finally so the off-state cleanup
+        // ALWAYS runs, even if playStopSound, commitVoiceWaypoint,
+        // or a downstream effect throws. The earlier version skipped
+        // the cleanup on throw, leaving the UI stuck in snap mode at
+        // "wait 0s" with no way out other than tapping Stop.
+        try {
+          voiceRef.current?.stop();
+          voiceRef.current = null;
 
-        // Generic note is the safest fallback — avoids inheriting the
-        // previous waypoint's icon type when the user is silent.
-        const cmd = { type: "note", iconId: null, poi: "" };
-        playStopSound();
-        commitVoiceWaypoint(cmd, snappedGps);
-        setVoiceLastCommand(cmd);
-        setVoiceToast(cmd);
-        setTimeout(() => setVoiceLastCommand(null), 4000);
-        setTimeout(() => setVoiceToast(null), 3000);
-
-        // Return to off
-        setVoiceActive(false);
-        voiceActiveRef.current = false;
-        setVoiceMode("off");
+          // Generic note is the safest fallback — avoids inheriting the
+          // previous waypoint's icon type when the user is silent.
+          const cmd = { type: "note", iconId: null, poi: "" };
+          playStopSound();
+          commitVoiceWaypoint(cmd, snappedGps);
+          setVoiceLastCommand(cmd);
+          setVoiceToast(cmd);
+          setTimeout(() => setVoiceLastCommand(null), 4000);
+          setTimeout(() => setVoiceToast(null), 3000);
+        } catch (e) {
+          console.warn("Voice snap-timeout commit failed:", e);
+        } finally {
+          // Return to off — guaranteed regardless of any throw above
+          setVoiceActive(false);
+          voiceActiveRef.current = false;
+          setVoiceMode("off");
+        }
       }
     }, 1000);
 
     startCommandListening(snappedGps);
   };
+
+  // Panic timeout — if voiceMode is stuck in "snap" for more than
+  // snapTimeoutSec + 10 s (i.e. well past when the snap timer SHOULD
+  // have fired and reset us), force a stop. This is a defensive
+  // backstop for any code path that leaves the UI in the zombie
+  // "wait 0s" state without a clean reset — the kind of bug that
+  // surfaces on a specific user's device but never in our own tests.
+  useEffect(() => {
+    if (voiceMode !== "snap") return;
+    const ceilingMs = (snapTimeoutSecRef.current + 10) * 1000;
+    const panicId = setTimeout(() => {
+      console.warn(
+        "Voice panel stuck in snap mode beyond expected window — forcing reset",
+      );
+      stopVoice();
+    }, ceilingMs);
+    return () => clearTimeout(panicId);
+  }, [voiceMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clean up active voice capture when stage ends
   useEffect(() => {
