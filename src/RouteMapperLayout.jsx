@@ -1228,7 +1228,10 @@ export default function RouteMapperLayout() {
             "No microphone detected. Check your headset connection or system audio settings.";
         } else if (lower.includes("network")) {
           friendly =
-            "Speech recognition needs an internet connection to start. Check your signal.";
+            "Speech recognition service unreachable. Common causes: an ad-blocking DNS (pi-hole, NextDNS, AdGuard, Cloudflare for Families) blocking Google or Apple speech endpoints, a browser extension intercepting the request, or a VPN. To confirm, try this Google test page in the same browser: google.com/intl/en/chrome/demos/speech.html — if that fails too, the block is at network or browser level, not in RouteMapper.";
+        } else if (lower.includes("service-not-allowed")) {
+          friendly =
+            "Speech recognition disabled by browser policy. Some browsers (Brave, Vivaldi, hardened Firefox) disable Web Speech for privacy. Try Safari (iOS / iPadOS / macOS) or Chrome / Edge.";
         }
 
         setVoiceError(friendly);
