@@ -1227,8 +1227,17 @@ export default function RouteMapperLayout() {
           friendly =
             "No microphone detected. Check your headset connection or system audio settings.";
         } else if (lower.includes("network")) {
-          friendly =
-            "Speech recognition service unreachable. Common causes: an ad-blocking DNS (pi-hole, NextDNS, AdGuard, Cloudflare for Families) blocking Google or Apple speech endpoints, a browser extension intercepting the request, or a VPN. To confirm, try this Google test page in the same browser: google.com/intl/en/chrome/demos/speech.html — if that fails too, the block is at network or browser level, not in RouteMapper.";
+          // Browser-specific guidance: Edge's speech-rec service
+          // (Microsoft's, not Google's) is notoriously flaky and
+          // produces this same "network" error even when Chrome
+          // works fine on the same machine. Call it out specifically
+          // so Edge users don't go hunting through their DNS settings.
+          const isEdge =
+            typeof navigator !== "undefined" &&
+            /Edg\//.test(navigator.userAgent || "");
+          friendly = isEdge
+            ? "Microsoft Edge's speech recognition service is failing. This is a known Edge issue and isn't caused by anything in RouteMapper — Chrome and Safari use different services and usually work. Try Chrome or Safari on this machine. (Or in Windows: Settings → Privacy & Security → Speech → turn on Online speech recognition.)"
+            : "Speech recognition service unreachable. Common causes: an ad-blocking DNS (pi-hole, NextDNS, AdGuard, Cloudflare for Families) blocking Google or Apple speech endpoints, a browser extension intercepting the request, or a VPN. To confirm, try this Google test page in the same browser: google.com/intl/en/chrome/demos/speech.html — if that fails too, the block is at network or browser level, not in RouteMapper.";
         } else if (lower.includes("service-not-allowed")) {
           friendly =
             "Speech recognition disabled by browser policy. Some browsers (Brave, Vivaldi, hardened Firefox) disable Web Speech for privacy. Try Safari (iOS / iPadOS / macOS) or Chrome / Edge.";
