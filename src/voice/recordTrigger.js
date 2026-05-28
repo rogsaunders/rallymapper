@@ -163,22 +163,58 @@ export function createRecordTrigger({ onTrigger }) {
     return () => fire("mediasession:" + name);
   }
 
+  // Hoisted state so isAudioPlaying() can report the live status to the
+  // UI without polling the audio element directly.
+  let silentLoopAttempted = false;
+  let silentLoopPlaying = false;
+
   function startSilentLoop() {
+    silentLoopAttempted = true;
+    silentLoopPlaying = false;
     try {
       const audio = new Audio(getSilentWavUrl());
       audio.loop = true;
       audio.volume = 0;
-      // iOS Safari requires audio.play() to be triggered by a user
-      // gesture. The trigger.start() call chain originates from the
-      // user tapping Start Stage, which qualifies. If iOS rejects
-      // anyway (different browsers, edge cases), the Promise rejects
-      // — we log and fall back gracefully to keyboard-only behaviour.
-      audio.play().catch((e) => {
-        console.warn(
-          "recordTrigger silent loop: audio.play() rejected — Bluetooth media-key events may route to other apps:",
-          e?.message || e,
-        );
+      // iOS Safari is stricter than Chrome about audio elements:
+      //   - They must be attached to the DOM (or at least referenced
+      //     by something React-rooted) for play() to behave reliably
+      //   - play() MUST originate from a user gesture
+      //   - The Audio constructor + play() chain must complete
+      //     synchronously inside that gesture
+      // We attach the audio element to <body> so iOS sees it as a real
+      // playable element. Caller is responsible for invoking start()
+      // from within a click handler (see RouteMapperLayout).
+      try {
+        audio.setAttribute("data-rm-trigger-loop", "1");
+        document.body.appendChild(audio);
+      } catch (_) {
+        // SSR or unusual document — ignore, in-memory element still works
+      }
+
+      // Track play/pause events so the UI indicator stays accurate
+      audio.addEventListener("playing", () => {
+        silentLoopPlaying = true;
       });
+      audio.addEventListener("pause", () => {
+        silentLoopPlaying = false;
+      });
+      audio.addEventListener("ended", () => {
+        silentLoopPlaying = false;
+      });
+
+      audio.play().then(
+        () => {
+          silentLoopPlaying = true;
+        },
+        (e) => {
+          silentLoopPlaying = false;
+          console.warn(
+            "recordTrigger silent loop: audio.play() rejected — Bluetooth media-key events will route to other apps:",
+            e?.message || e,
+          );
+        },
+      );
+
       silentAudio = audio;
     } catch (e) {
       console.warn("recordTrigger silent loop setup failed:", e);
@@ -191,10 +227,15 @@ export function createRecordTrigger({ onTrigger }) {
       silentAudio.pause();
       silentAudio.src = "";
       silentAudio.load(); // force release of the audio resource on iOS
+      if (silentAudio.parentNode) {
+        silentAudio.parentNode.removeChild(silentAudio);
+      }
     } catch (_) {
       // ignore
     }
     silentAudio = null;
+    silentLoopAttempted = false;
+    silentLoopPlaying = false;
   }
 
   function setMediaSessionMetadata(playing) {
@@ -279,6 +320,22 @@ export function createRecordTrigger({ onTrigger }) {
 
       stopSilentLoop();
       setMediaSessionMetadata(false);
+    },
+
+    /**
+     * Report the silent-audio-loop state so the UI can show whether
+     * Bluetooth media-key triggering will actually work.
+     *
+     *   "playing"   — loop is alive, BT triggers will route here
+     *   "rejected"  — loop was attempted but audio.play() failed
+     *                 (likely no user-gesture context); BT triggers
+     *                 will go to whatever other app owns the media
+     *                 session (Music, Spotify, etc.)
+     *   "idle"      — loop hasn't been attempted yet
+     */
+    audioStatus() {
+      if (!silentLoopAttempted) return "idle";
+      return silentLoopPlaying ? "playing" : "rejected";
     },
 
     isActive() {

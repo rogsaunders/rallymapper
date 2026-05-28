@@ -1343,15 +1343,17 @@ export default function RouteMapperLayout() {
 
   // External trigger (Phase B) — Bluetooth headset / foot pedal /
   // presenter clicker / Bluetooth keyboard fires the 🎙 Record button
-  // remotely. Active only while a stage is recording and the user
-  // hasn't disabled it. A second trigger while recording cancels.
-  useEffect(() => {
-    if (!stageActive || !externalTriggerEnabled) {
-      recordTriggerRef.current?.stop();
-      recordTriggerRef.current = null;
-      return;
-    }
-
+  // remotely.
+  //
+  // armRecordTrigger() MUST be called from within a user-gesture event
+  // handler (Start Stage tap, External-trigger checkbox toggle).
+  // iOS Safari requires the silent audio loop's audio.play() call to
+  // originate from a gesture, otherwise it's rejected and the iOS
+  // media session stays owned by whichever app was playing audio
+  // before (Music, Spotify) — meaning the user's Bluetooth button
+  // opens THAT app rather than firing our Record.
+  const armRecordTrigger = () => {
+    if (recordTriggerRef.current) return; // already armed
     const trigger = createRecordTrigger({
       onTrigger: () => {
         if (voiceActiveRef.current) {
@@ -1363,12 +1365,39 @@ export default function RouteMapperLayout() {
     });
     trigger.start();
     recordTriggerRef.current = trigger;
+  };
 
-    return () => {
-      trigger.stop();
-      recordTriggerRef.current = null;
+  const disarmRecordTrigger = () => {
+    recordTriggerRef.current?.stop();
+    recordTriggerRef.current = null;
+  };
+
+  // Cleanup-only effect — disarms when stage ends. Arming happens in
+  // handleStartStage (gesture context).
+  useEffect(() => {
+    if (!stageActive) disarmRecordTrigger();
+  }, [stageActive]);
+
+  // ── Silent-loop audio-status indicator ────────────────────────────
+  // Polls the trigger's audioStatus() so the Voice panel header can
+  // show "🎧 ✓" (loop playing — BT triggers will work) vs "🎧 ⚠️"
+  // (loop rejected — BT triggers will hit other apps). Diagnostic
+  // value: users don't have to swipe down to Control Center to know
+  // whether their setup is working.
+  const [triggerAudioStatus, setTriggerAudioStatus] = useState("idle");
+  useEffect(() => {
+    if (!stageActive || !externalTriggerEnabled) {
+      setTriggerAudioStatus("idle");
+      return;
+    }
+    const tick = () => {
+      const s = recordTriggerRef.current?.audioStatus?.() || "idle";
+      setTriggerAudioStatus(s);
     };
-  }, [stageActive, externalTriggerEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+    tick();
+    const id = setInterval(tick, 1500);
+    return () => clearInterval(id);
+  }, [stageActive, externalTriggerEnabled]);
 
   // Track recording config
   const TRACK_INTERVAL_MS = 5000; // minimum ms between recorded points
@@ -1565,6 +1594,17 @@ export default function RouteMapperLayout() {
     // Reset all per-category icon selections to their first variant.
     // setWaypointType("note");
     setIconIdByCategory(DEFAULT_ICON_BY_CATEGORY);
+
+    // Arm the external trigger HERE inside the click handler — this
+    // is the user-gesture context iOS Safari needs for the silent
+    // audio loop's audio.play() to succeed. Doing it from a useEffect
+    // later (after render) makes iOS reject the play() and the iOS
+    // media session stays owned by whatever was playing before (Music,
+    // Spotify), so the user's Bluetooth media button opens THAT app
+    // instead of firing 🎙 Record.
+    if (externalTriggerEnabled) {
+      armRecordTrigger();
+    }
   };
 
   // Add this state near your other state hooks (once):
@@ -3168,10 +3208,24 @@ export default function RouteMapperLayout() {
                   <span className="text-sm text-gray-700 mt-1">Voice</span>
                   {externalTriggerEnabled && stageActive && (
                     <span
-                      className="text-xs text-gray-400"
-                      title="External trigger ready (Bluetooth / pedal / presenter / keyboard)"
+                      className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        triggerAudioStatus === "playing"
+                          ? "bg-green-100 text-green-700"
+                          : triggerAudioStatus === "rejected"
+                            ? "bg-amber-100 text-amber-700"
+                            : "text-gray-400"
+                      }`}
+                      title={
+                        triggerAudioStatus === "playing"
+                          ? "External trigger armed and audio loop is playing — Bluetooth media buttons WILL route here. Now Playing on iOS Control Center should show 'RouteMapper'."
+                          : triggerAudioStatus === "rejected"
+                            ? "External trigger armed BUT silent audio loop was rejected by the browser. Bluetooth media buttons will route to whatever app last owned the iOS media session (Music, Spotify…). To fix: tap End Stage, then Start Stage again — the silent loop is started inside that tap's gesture context. If this persists, your iOS Settings → Privacy → Speech Recognition may need to be re-enabled."
+                            : "External trigger armed, silent audio loop initialising…"
+                      }
                     >
                       🎧
+                      {triggerAudioStatus === "playing" && " ✓"}
+                      {triggerAudioStatus === "rejected" && " ⚠️"}
                     </span>
                   )}
                   {voiceMode === "snap" && (
@@ -3344,11 +3398,21 @@ export default function RouteMapperLayout() {
                         type="checkbox"
                         checked={externalTriggerEnabled}
                         onChange={(e) => {
-                          setExternalTriggerEnabled(e.target.checked);
+                          const next = e.target.checked;
+                          setExternalTriggerEnabled(next);
                           localStorage.setItem(
                             "rm_external_trigger_enabled",
-                            String(e.target.checked),
+                            String(next),
                           );
+                          // Arm/disarm RIGHT HERE inside the click
+                          // gesture so iOS Safari accepts the silent
+                          // audio loop's audio.play(). Same reason
+                          // handleStartStage arms inline.
+                          if (next && stageActive) {
+                            armRecordTrigger();
+                          } else if (!next) {
+                            disarmRecordTrigger();
+                          }
                         }}
                         className="accent-[#588233]"
                       />
