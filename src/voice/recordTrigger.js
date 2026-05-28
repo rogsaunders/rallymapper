@@ -95,8 +95,19 @@ function buildSilentWavDataUrl() {
   view.setUint32(36, 0x64617461, false); // "data"
   view.setUint32(40, dataSize, true);
 
-  // 0x80 is the midpoint for unsigned 8-bit PCM — silence.
-  new Uint8Array(buf, 44, dataSize).fill(128);
+  // iOS Safari refuses to grant Now Playing status (and therefore
+  // Bluetooth media-key routing) to TRULY silent audio — true silence
+  // is flagged as an "I'm not really playing media" abuse signal.
+  // Workaround: alternate samples one LSB above/below the 0x80
+  // midpoint, producing an ~125 Hz square-wave at the lowest possible
+  // amplitude (-48 dB at full volume). Combined with the very low
+  // playback volume (0.001) in startSilentLoop, this is well below the
+  // human auditory floor on any normal-volume device but is detectable
+  // by iOS as "yes, audio is happening" and earns us Now Playing.
+  const samples = new Uint8Array(buf, 44, dataSize);
+  for (let i = 0; i < dataSize; i++) {
+    samples[i] = i % 2 === 0 ? 0x81 : 0x7f;
+  }
 
   // ArrayBuffer → base64
   let binary = "";
@@ -174,7 +185,12 @@ export function createRecordTrigger({ onTrigger }) {
     try {
       const audio = new Audio(getSilentWavUrl());
       audio.loop = true;
-      audio.volume = 0;
+      // NOT zero — iOS Safari treats volume=0 audio as "not playing"
+      // for media-session purposes and refuses to grant Now Playing
+      // status. 0.001 combined with the tiny-amplitude WAV samples is
+      // well below human hearing (effectively -88 dB) but registers
+      // as real audio output to iOS's audio session manager.
+      audio.volume = 0.001;
       // iOS Safari is stricter than Chrome about audio elements:
       //   - They must be attached to the DOM (or at least referenced
       //     by something React-rooted) for play() to behave reliably
