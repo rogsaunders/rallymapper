@@ -86,6 +86,8 @@ Try the three methods:
 
 **Expected:** while pending, a dashed amber circle on the map at the captured GPS position. On commit, it switches to a solid icon marker and appears in the Waypoints panel with type, icon, time, and distance from the previous waypoint.
 
+**Multiple waypoints at one spot:** rally control points often need several icons at the same GPS position (control + fuel + service). Just tap Add Waypoint as many times as you need — each tap creates a separate waypoint at your current position. Same applies to stationary captures at lights, gates, or while testing at the desk.
+
 ### 6. End the stage
 Tap the red **End Stage**. The app generates a roadbook, saves your data, and offers an export ZIP.
 
@@ -120,17 +122,29 @@ GPS locks the moment you tap **Add Waypoint** — no position drift while you ch
 
 ### Waypoint icons
 
-RouteMapper organises 29 icons into 5 types. Your last-used type persists between waypoints, so a sequence of same-type captures takes one tap each.
+RouteMapper organises icons into six types. Your last-used type persists between waypoints, so a sequence of same-type captures takes one tap each.
 
 | Type | Icons |
 |------|-------|
 | **Note** | Note (general purpose) |
 | **Hazard** | Danger 1 · Danger 2 · Danger 3 |
 | **Terrain** | Bump · Bumps · Dip · Twisty · Ruts · Washout · Up Hill · Down Hill |
-| **Nav** | Left · Right · Keep Left · Keep Right · Straight · Gate · Cattle Gate · Railroad · Give Way · Caution |
-| **Control** | Start · Finish · Stop · Checkpoint · Time Control · Fuel · Service |
+| **Nav** | Left · Right · Keep Left · Keep Right · Straight · On Left · On Right · Gate · Cattle Gate · Railroad · Give Way · Caution |
+| **Control** | Start · Finish · Stop / Restart · Checkpoint · Time Control · Fuel · Service |
+| **Speed** | 25 · 40 · 50 · 60 · 80 · 100 · 110 km/h |
 
-All 29 icons follow OpenRally and Garmin symbol standards. They render identically across the in-app map, generated roadbook tulips, and KML/GPX exports.
+Icons follow OpenRally and Garmin symbol standards. They render identically across the in-app map, generated roadbook tulips, and KML/GPX exports. Adding new icons is a single edit to `src/icons/iconManifest.json` plus a matching SVG file — the registry, type picker, and exports pick them up automatically.
+
+### Editing and deleting waypoints
+
+Every non-START row in the Waypoints panel has two small buttons on the right:
+
+- **✏️ Edit** — opens a modal with the waypoint's current type, icon, and POI text. Adjust any of them and tap **Save**. The change applies immediately; the waypoint's GPS position and timestamp are preserved.
+- **🗑 Delete** — opens a confirm dialog showing the waypoint's label. Tap **Delete** to remove it. The recorded GPS track is **not** affected — only the roadbook row vanishes.
+
+Both work during an active stage and during Stage History review. The START waypoint has no edit/delete buttons — it's controlled by the **🚩 Update Start** auxiliary button instead (which lets you reset the start position to your current GPS).
+
+**Wrong-turn recovery:** if you go down the wrong path and capture a few unwanted waypoints, tap 🗑 on each (most-recent first) and confirm. Five taps clears five waypoints in under twenty seconds. Cleaner than re-running the stage.
 
 ### Voice waypoints (push-to-talk)
 
@@ -219,6 +233,8 @@ Tap **Open** to load any past stage in review mode:
 
 History is read-only — opening a past stage doesn't affect your current session. The button is hidden while a stage is recording; it reappears when you end the stage.
 
+> **Re-export warning:** if the stage has a roadbook, tapping **↓ Re-export ZIP** shows a confirmation dialog. Re-export regenerates `roadbook.docx` fresh from the stored stage data — any edits you have made to your existing DOCX copy (typo fixes, custom prose, formatting) live only on your device and will NOT be in the new ZIP. Cancel if you want to preserve those edits. The Drive Mode reader can overlay an edited DOCX on top of the JSON — see [Drive Mode → DOCX overlay](#docx-overlay-edit-notes-in-word) below.
+
 ### Map PDF export
 
 Every completed stage's export ZIP includes a printable map PDF — A4 landscape, route line, waypoint markers, stage title, date, distance, and waypoint count.
@@ -253,6 +269,128 @@ One ZIP per stage, organised by use case rather than by file type. A `README.txt
 
 ---
 
+## Drive Mode (Roadbook Reader)
+
+Drive Mode is RouteMapper's in-vehicle roadbook reader. Load an exported stage (your own or one an event organiser has shared) and Drive Mode displays it as a scrolling roadbook that follows you down the road. The current row stays centred on screen, distance to the next instruction updates live, and you can optionally hear each row read aloud as you approach it.
+
+Designed for rally co-drivers, but equally useful for walkers, cyclists, and motorbike riders following a pre-mapped route.
+
+### Opening Drive Mode
+
+- Tap the **🚗 Drive** pill in the top-right of the recording app, or
+- Go directly to **[app.routemapper.net/drive](https://app.routemapper.net/drive)**
+
+You'll see the source picker — a single big **📂 Load roadbook (ZIP or JSON)** button.
+
+### Loading a roadbook
+
+Drive Mode accepts:
+
+- A **RouteMapper export ZIP** — the same ZIP that's generated when a stage ends. Drive Mode reads `Source/stage.json` for the roadbook structure, `trackPoints` for along-track distance, and (optionally) `Printable/roadbook.docx` for any text edits you've made (see below).
+- A **bare `stage.json`** — extracted from a ZIP, or shared as a single file.
+
+Older export layouts (with `*_stage.json` at the top level) also work — Drive Mode falls back automatically.
+
+### What you'll see
+
+```
+┌─────────────────────────────────────────┐
+│ Stage name · Day 1 · Stage 2     ⚙️  ✕  │  ← header
+├─────────────────────────────────────────┤
+│  11  ◯  Right                  0.42 km │
+│  12  ◯  Bridge — slow          0.31 km │  ← above (dimmed)
+│ ────────────────────────────────────── │  ← divider
+│ ┃13  ●  Keep Left              0.18 km │  ← CURRENT (amber bar)
+│ ┃    onto Forbes Road                  │
+│ ────────────────────────────────────── │
+│  14  ◯  Left at gate           0.65 km │  ← below
+│  15  ◯  Straight               1.20 km │
+├─────────────────────────────────────────┤
+│ 🟢 GPS   next: 0.34 km   ⏸  ◀ ↺ ▶     │  ← footer
+└─────────────────────────────────────────┘
+```
+
+The current row is highlighted in amber with a left rail. As you approach it, the **next: X km** distance counts down. The row auto-scrolls to stay centred even if you've manually scrolled away.
+
+### Auto-advance
+
+Drive Mode advances the current row automatically as you drive past each waypoint. The trigger is GPS proximity — when you enter the configured radius (default 30 m) of the next row's recorded position, it advances.
+
+- **Tap a row** to jump to it manually
+- **◀ ▶** to step one row back or forward
+- **↺** to snap-scroll back to the current row if you've scrolled away to peek
+- **⏸** to pause auto-advance entirely (resume with **▶**)
+
+Tapping ◀ ▶ or a row triggers a 30-second pause on auto-advance, so it doesn't immediately re-advance you after a manual correction. Tune the pause duration in ⚙️ Settings.
+
+### Distance display
+
+The **next: X km** number in the footer is **along-track distance** — it follows the recorded GPS path, not straight-line. This matches the **kmPartial** values in your printed roadbook, so a navigator's verbal call-outs ("0.4 to the next") align with what they see on the iPhone.
+
+If you drive off the recorded route by more than 100 m, the distance switches to straight-line and shows an **(off-track)** hint, so you know the number is approximate until you rejoin the route.
+
+### Voice readout
+
+Tap the **🔊** button in the header (green when on, grey when off) to toggle voice readout. When enabled, the device speaks each row as it becomes current:
+
+> *"Keep left. Onto Forbes Road. Then 0.4 to the next."*
+
+The announcement is composed from the icon/event word, your POI note (if it adds information beyond the icon), and the distance to the next row. Voice format defaults are tuned for rally navigation but the setting persists across sessions.
+
+**iOS Safari first-time setup:** the very first speech announcement after page load needs a user gesture. Tapping the 🔊 button (which plays a short *"Voice ready"* priming utterance) handles this — subsequent auto-advance announcements then play without further interaction.
+
+The same Settings panel toggle is also available under **⚙️ Voice readout** with a **🔊 Test voice** button.
+
+### DOCX overlay — edit notes in Word
+
+Want to polish row notes, fix typos, or add custom prose before driving? Drive Mode supports a **text-overlay** workflow:
+
+1. End your stage and download the export ZIP
+2. Extract the ZIP and open `Printable/roadbook.docx` in Word, Pages, or LibreOffice
+3. Edit row notes — fix typos, add commentary, expand abbreviations
+4. **Save the DOCX back in place** (in the Printable folder)
+5. **Re-zip the export folder**
+6. Load the new ZIP into Drive Mode
+
+If Drive Mode detects an edited DOCX inside the loaded ZIP, it overlays the edited text on top of the JSON and shows a **📝 N edits** badge in the header indicating how many rows were overridden. Voice readout will speak the edited text.
+
+**Scope and limits (replacement-only):**
+
+- ✅ Edited row notes replace the JSON's notes for that row
+- ✅ Voice readout uses the edited text
+- ❌ New rows you add in Word that don't exist in the JSON are **not** shown (Drive Mode's row set is authoritative)
+- ❌ Rows you delete from the DOCX are still shown in Drive Mode (deletion is not honoured)
+- ❌ Tulip diagrams, distances, and GPS coordinates can't be edited — those come from the geometry
+
+**Why this scope?** Edits to notes are safe and don't break the relationship between rows, distances, and tulips. Insertions and deletions would create rows the Drive Mode reader couldn't reconcile with the GPS-driven advancement. If you need to insert or remove rows, do it in RouteMapper itself (edit/delete waypoints) and re-export — but remember to re-do any DOCX text edits afterwards, since re-export starts from a fresh template.
+
+### Settings
+
+The **⚙️** button in the header opens the settings panel:
+
+- **Auto-advance** — toggle the GPS-proximity advancement
+- **Trigger radius** — 5–100 m (default 30 m). Larger values fire the advance earlier; smaller values fire later
+- **Manual override pause** — 10–120 s (default 30 s). After tapping ◀ ▶ or a row, auto-advance pauses for this long before resuming
+- **🔊 Voice readout** — on/off plus the **Test voice** button
+
+All settings persist across sessions in localStorage.
+
+### Plan gating
+
+- **Free** — Drive Mode works for one loaded roadbook at a time (same limit as the recording side)
+- **Solo / Pro** — unlimited loaded roadbooks, same as the recording side
+
+The on-screen 🚗 Drive button is visible to all logged-in users including Guest Mode.
+
+### Tips for using Drive Mode
+
+- **Mount the iPhone in portrait orientation** within easy reach of the navigator (or in eye-line if solo-driving with voice readout on)
+- **Test the trigger radius on your first stage** — 30 m default is good for typical recon driving, but on fast open roads 50–60 m gives more reading time
+- **Use 🔊 voice with Bluetooth audio** — speakerphone over engine noise gets lost; a headset or car audio system is far clearer
+- **Edit the DOCX before the event**, then save and re-zip ONCE. Re-exporting from RouteMapper Stage History wipes your DOCX edits
+
+---
+
 ## Plans
 
 You can use the full waypoint and roadbook workflow in Guest Mode and on the Free tier. Upgrade when you need:
@@ -268,22 +406,27 @@ Current prices at [routemapper.net/#pricing](https://routemapper.net/#pricing). 
 
 ## Tips for the Field
 
-- **Charge your device** before recording — GPS drains battery quickly.
+- **Charge your device** before recording or driving — GPS plus continuous display drains battery quickly.
 - **Mount the iPad close to the navigator** so the 🎙 Record button is one easy reach away.
 - **Voice pacing** — after tapping 🎙 Record, you have a short snap window to start speaking. Use a dash or natural pause to separate the icon from the note text.
 - **Tune the snap windows** — the ⚙️ cog has three sliders. On open terrain, 3–4 s for voice snap is plenty; in tricky navigation, 7–8 s gives you room to think.
-- **Bluetooth headset** — in a noisy vehicle or windy conditions, a headset mic dramatically improves voice accuracy.
+- **Bluetooth headset** — in a noisy vehicle or windy conditions, a headset mic dramatically improves voice accuracy. The same headset's play/pause button can also fire 🎙 Record — see [External trigger](#external-trigger-bluetooth-foot-pedal-presenter) above.
 - **Stage History is read-only** — review past stages freely between live sessions; nothing gets overwritten.
 - **Pre-load tiles** — pan around your area on a connection before going off-grid; cached map tiles render even when you lose signal.
+- **Drive Mode trigger radius** — default 30 m works for typical recon. On fast open roads, bump to 50–60 m so the row advances earlier and gives the navigator more reading time.
+- **Edit the DOCX once** — if you're polishing roadbook prose in Word/Pages, do it after the final recording and re-zip. Re-exporting from Stage History regenerates the DOCX and silently wipes your edits.
 
 ---
 
 ## Known Limitations
 
 - **iOS background tracking** — switching away from RouteMapper while recording may pause GPS on iOS. Keep the app in the foreground.
-- **Voice features** require a browser that supports the Web Speech API — best in Safari (iOS / iPad) and Chrome (Android / desktop).
+- **Voice features** require a browser that supports the Web Speech API — best in Safari (iOS / iPad / macOS) and Chrome (Android / desktop). **On iOS, both Settings → Safari → Microphone AND Settings → Privacy & Security → Speech Recognition must allow Safari.** A common voice-recognition failure mode is the second of those being off.
+- **Microsoft Edge speech recognition** is known to fail intermittently (it uses Microsoft's service rather than Google's). If 🎙 Record returns a "service unreachable" error in Edge, try Chrome or Safari on the same machine — they use different speech services and usually work.
+- **Ad-blocking DNS** (pi-hole, NextDNS, AdGuard, Cloudflare for Families) can block the Google or Apple speech endpoints, breaking voice features network-wide. The friendly error message in Record will tell you when this is the cause.
+- **Voice features need internet** — speech-to-text runs server-side at Google or Apple. The on-screen tap-based 🎙 Record button and manual Add Waypoint flow work fully offline; only the speech-to-text step requires connectivity.
 - **Very large stages** — recordings with 1000+ track points may save slowly on older devices.
-- **Offline cloud sync** — the app works fully offline; data syncs automatically when connectivity returns.
+- **Offline cloud sync** — waypoint and track recording works fully offline; data syncs automatically when connectivity returns.
 - **Android tablets** — supported in Chrome, but glove-friendly controls are tuned for iPad. Native Android tablet polish is on the roadmap.
 
 ---
