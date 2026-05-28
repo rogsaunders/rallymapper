@@ -145,10 +145,6 @@ function toUtcIso(d) {
     : new Date().toISOString();
 }
 
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
-
 // Return a new waypoints array containing exactly one kind:"start" entry at
 // the supplied GPS, removing any pre-existing start entry first.  Used to
 // keep the start waypoint in sync with `startGPS` whenever the latter
@@ -195,16 +191,6 @@ function upsertStartWaypoint(prevWaypoints, gps) {
     distanceFromStartM: 0,
   };
   return [startWp, ...filtered];
-}
-
-function dynamicMinMoveMeters(gps) {
-  const baseMeters = 6; // meters, beats normal GPS jitter
-  const factor = 0.8;
-  const maxMeters = 30;
-
-  const v = Number.isFinite(gps?.speed) ? gps.speed : 0; // m/s
-  const threshold = baseMeters + v * factor;
-  return clamp(threshold, baseMeters, maxMeters);
 }
 
 function fmtKmNumber(meters) {
@@ -2007,42 +1993,17 @@ export default function RouteMapperLayout() {
     }
 
     // Min-move guard — still useful to suppress accidental double-taps while
-    // stationary. Compare against the last *committed user* waypoint —
-    // explicitly skip the canonical kind:"start" waypoint created by
-    // Start Stage, otherwise the FIRST Add Waypoint tap of a new stage
-    // always silently bails (user hasn't moved since Start Stage was
-    // tapped, so distance to the start waypoint < min-move threshold).
-    const last =
-      [...waypoints]
-        .reverse()
-        .find(
-          (p) =>
-            p?.kind !== "start" &&
-            p?.poi !== "START" &&
-            Number.isFinite(Number(p?.lat)) &&
-            Number.isFinite(Number(p?.lon)),
-        ) || null;
-
-    const curFix = {
-      lat: Number(currentGPS.lat),
-      lon: Number(currentGPS.lon),
-    };
-
-    if (last) {
-      const lastFix = { lat: Number(last.lat), lon: Number(last.lon) };
-      if (Number.isFinite(lastFix.lat) && Number.isFinite(lastFix.lon)) {
-        const moved = haversineMeters(lastFix, curFix);
-        const minMove = dynamicMinMoveMeters(currentGPS);
-        if (
-          Number.isFinite(moved) &&
-          Number.isFinite(minMove) &&
-          moved < minMove
-        ) {
-          console.log("⏳ Ignored due to threshold");
-          return;
-        }
-      }
-    }
+    // Min-move guard REMOVED (was here as the "stationary" check).
+    // It blocked legitimate multi-waypoint scenarios where users want
+    // several icons at one GPS position:
+    //   - rally controls (control + fuel + service all at the same spot)
+    //   - trail intersections (danger + caution + note)
+    //   - testing at the desk
+    //   - stationary at lights flagging a hazard ahead
+    // Genuine accidental double-taps are already handled by the snap-
+    // first flow — the second tap commits the first pending and opens
+    // a new one with a Discard button. Users see both and can act,
+    // rather than wondering why their tap did nothing.
 
     const typeToSave = typeOverride ?? waypointType;
     const iconId =
