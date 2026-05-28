@@ -2,36 +2,48 @@
 //
 // Load a roadbook into Drive Mode from a user-selected file.
 //
-// Two supported inputs for M1:
-//   1. A RouteMapper export ZIP — we extract Source/stage.json
-//      (or, as a courtesy fallback, the legacy top-level _stage.json)
-//      and pull stage.roadbook from it.
-//   2. A bare JSON file — must be a stage.json shape (with .roadbook)
-//      or a raw roadbook (with .rows).
+// Supported inputs:
+//   1. A RouteMapper export ZIP — extracts Source/stage.json (or the
+//      legacy top-level *_stage.json). Also auto-detects an edited
+//      roadbook.docx inside the ZIP and applies its per-row note
+//      overrides on top of the JSON (M5 — see docxPatch.js).
+//   2. A bare JSON file — stage.json or raw roadbook shape.
 //
-// M5 will add DOCX patch loading on top. M2 will add a "saved stages"
-// picker for logged-in users.
-//
-// Returns: { roadbook, stageMeta, error, isLoading, loadFile, clear }.
+// Returns:
+//   {
+//     roadbook,         // normalised roadbook with rows[]
+//     trackPoints,      // recorded GPS track (M3+ along-track)
+//     stageMeta,        // { stageName, day, routeName, ... } | null
+//     docxPatchCount,   // M5 — number of notes overridden from DOCX
+//     error,
+//     isLoading,
+//     loadFile,
+//     clear,
+//   }
 
 import { useState } from "react";
 import JSZip from "jszip";
+import { extractDocxNotePatches, applyNotePatches } from "../lib/docxPatch";
 
-const STAGE_JSON_CANDIDATES = [
-  // Current layout
-  "Source/stage.json",
-  // Older layout (predates the use-case-folder reorganisation) — kept as
-  // a courtesy so users with old export ZIPs aren't shut out.
-  /_stage\.json$/,
-];
+const STAGE_JSON_LEGACY = /_stage\.json$/;
+// Where the DOCX lives inside the current export layout (see
+// buildRoutePackage.js — Printable/roadbook.docx). Legacy layouts
+// may have it at the top level as *_roadbook.docx, so we accept both.
+const DOCX_PATH_PRIMARY = "Printable/roadbook.docx";
+const DOCX_PATH_LEGACY = /_roadbook\.docx$/;
 
 function findStageJsonEntry(zip) {
-  // Try exact match first
   if (zip.files["Source/stage.json"]) return zip.files["Source/stage.json"];
-
-  // Then any *_stage.json at the top level
   for (const name of Object.keys(zip.files)) {
-    if (STAGE_JSON_CANDIDATES[1].test(name)) return zip.files[name];
+    if (STAGE_JSON_LEGACY.test(name)) return zip.files[name];
+  }
+  return null;
+}
+
+function findDocxEntry(zip) {
+  if (zip.files[DOCX_PATH_PRIMARY]) return zip.files[DOCX_PATH_PRIMARY];
+  for (const name of Object.keys(zip.files)) {
+    if (DOCX_PATH_LEGACY.test(name)) return zip.files[name];
   }
   return null;
 }
@@ -39,16 +51,13 @@ function findStageJsonEntry(zip) {
 // Match the row-selection behaviour of the HTML/DOCX exporters
 // (roadbookHtmlExport.js and exportRoadbookDocx.js). Both prefer the
 // pre-filtered "driver" view that hides most auto-detected turns,
-// keeping the rows a navigator actually needs to call out. Falling
-// back to the raw .rows array would show every bend in the road —
-// confusing and not what users see in their printed roadbook.
+// keeping the rows a navigator actually needs to call out.
 function selectDisplayRows(roadbook) {
   return roadbook?.views?.driver || roadbook?.rows || [];
 }
 
 // Mirror of ensureStartRow() in roadbookHtmlExport.js — prepends a
-// synthetic START row when the first row isn't at km 0. Drive Mode
-// shows the same artefact as the printed roadbook for consistency.
+// synthetic START row when the first row isn't at km 0.
 function ensureStartRow(rows) {
   if (!rows.length) return rows;
   if (Math.abs(rows[0].kmTotal || 0) < 0.01) return rows;
@@ -70,8 +79,6 @@ function ensureStartRow(rows) {
   ];
 }
 
-// Build a Reader-ready roadbook object: same shape as the input but
-// with rows = the navigator's view (matches the HTML/DOCX exports).
 function buildReaderRoadbook(roadbook) {
   if (!roadbook) return roadbook;
   const displayRows = ensureStartRow(selectDisplayRows(roadbook));
@@ -79,14 +86,6 @@ function buildReaderRoadbook(roadbook) {
 }
 
 function normalise(parsed) {
-  // Accept three shapes:
-  //   (a) full stage.json: { meta, waypoints, trackPoints, roadbook, ... }
-  //   (b) bare roadbook:   { rows, views?, ... }
-  //   (c) wrapped:         { stage: { ... }, roadbook: { ... } }
-  //
-  // trackPoints is M3+: along-track distance computation needs the
-  // recorded GPS track. Bare-roadbook input has no track → along-track
-  // gracefully degrades to straight-line.
   if (parsed?.roadbook?.rows || parsed?.roadbook?.views) {
     return {
       roadbook: buildReaderRoadbook(parsed.roadbook),
@@ -117,6 +116,7 @@ export function useRoadbook() {
   const [roadbook, setRoadbook] = useState(null);
   const [trackPoints, setTrackPoints] = useState([]);
   const [stageMeta, setStageMeta] = useState(null);
+  const [docxPatchCount, setDocxPatchCount] = useState(0);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -127,6 +127,7 @@ export function useRoadbook() {
     try {
       const lower = file.name.toLowerCase();
       let parsed;
+      let docxBlob = null;
 
       if (lower.endsWith(".zip")) {
         const zip = await JSZip.loadAsync(file);
@@ -138,6 +139,19 @@ export function useRoadbook() {
         }
         const text = await entry.async("string");
         parsed = JSON.parse(text);
+
+        // M5: look for an edited roadbook.docx inside the same ZIP.
+        // If present, we'll apply per-row note overrides after the
+        // base roadbook is normalised. Best-effort — any parse
+        // failure logs a warning and proceeds without overrides.
+        const docxEntry = findDocxEntry(zip);
+        if (docxEntry) {
+          try {
+            docxBlob = await docxEntry.async("blob");
+          } catch (e) {
+            console.warn("useRoadbook: failed to read DOCX from ZIP", e);
+          }
+        }
       } else if (lower.endsWith(".json")) {
         const text = await file.text();
         parsed = JSON.parse(text);
@@ -149,15 +163,36 @@ export function useRoadbook() {
 
       const { roadbook: rb, trackPoints: tp, stageMeta: meta } =
         normalise(parsed);
-      setRoadbook(rb);
+
+      // Apply DOCX overlay if we found one
+      let finalRoadbook = rb;
+      let patchCount = 0;
+      if (docxBlob && rb?.rows?.length) {
+        try {
+          const patches = await extractDocxNotePatches(docxBlob, rb.rows);
+          if (patches.size > 0) {
+            finalRoadbook = {
+              ...rb,
+              rows: applyNotePatches(rb.rows, patches),
+            };
+            patchCount = patches.size;
+          }
+        } catch (e) {
+          console.warn("useRoadbook: DOCX patch extraction failed", e);
+        }
+      }
+
+      setRoadbook(finalRoadbook);
       setTrackPoints(Array.isArray(tp) ? tp : []);
       setStageMeta(meta);
+      setDocxPatchCount(patchCount);
     } catch (e) {
       console.warn("useRoadbook: load failed", e);
       setError(e?.message || String(e));
       setRoadbook(null);
       setTrackPoints([]);
       setStageMeta(null);
+      setDocxPatchCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -167,6 +202,7 @@ export function useRoadbook() {
     setRoadbook(null);
     setTrackPoints([]);
     setStageMeta(null);
+    setDocxPatchCount(0);
     setError(null);
   }
 
@@ -174,6 +210,7 @@ export function useRoadbook() {
     roadbook,
     trackPoints,
     stageMeta,
+    docxPatchCount,
     error,
     isLoading,
     loadFile,

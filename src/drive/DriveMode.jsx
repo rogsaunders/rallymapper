@@ -43,8 +43,16 @@ function readNum(key, fallback) {
 }
 
 export default function DriveMode() {
-  const { roadbook, trackPoints, stageMeta, error, isLoading, loadFile, clear } =
-    useRoadbook();
+  const {
+    roadbook,
+    trackPoints,
+    stageMeta,
+    docxPatchCount,
+    error,
+    isLoading,
+    loadFile,
+    clear,
+  } = useRoadbook();
 
   const { gps, error: gpsError } = useGpsStream();
 
@@ -144,6 +152,7 @@ export default function DriveMode() {
       <HeaderBar
         stageMeta={stageMeta}
         rowCount={annotatedRows.length}
+        docxPatchCount={docxPatchCount}
         onExit={clear}
         onOpenSettings={() => setSettingsOpen(true)}
         voiceEnabled={voiceEnabled}

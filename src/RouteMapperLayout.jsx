@@ -1202,8 +1202,11 @@ export default function RouteMapperLayout() {
         let friendly = msg || "Voice capture failed.";
         if (lower.includes("not-allowed") || lower.includes("denied")) {
           friendly =
-            "Microphone permission denied. Tap the address-bar lock icon for app.routemapper.net and allow microphone access, then reload.";
-        } else if (lower.includes("not available") || lower.includes("no-speech-recognition")) {
+            "Microphone or speech recognition permission denied. On iPhone / iPad check BOTH: (a) Settings → Safari → Microphone is set to Ask or Allow, AND (b) Settings → Privacy & Security → Speech Recognition is ON and Safari is allowed. On Mac / PC: tap the address-bar lock icon for app.routemapper.net and allow microphone. Then reload.";
+        } else if (
+          lower.includes("not available") ||
+          lower.includes("no-speech-recognition")
+        ) {
           friendly =
             "Speech recognition isn't available in this browser. Use Safari on iOS / iPadOS, or Chrome on Android / desktop.";
         } else if (lower.includes("could not start")) {
@@ -1836,8 +1839,28 @@ export default function RouteMapperLayout() {
   };
 
   // Re-export the currently reviewed stage as a ZIP.
+  //
+  // Warns first when a roadbook is present — re-export regenerates
+  // roadbook.docx from stage.json, which silently discards any edits
+  // the user has made to their copy of the previous DOCX. The
+  // Drive Mode reader can overlay an edited DOCX (M5), but only the
+  // ZIP-internal copy; a re-export starts that overlay from a fresh
+  // unedited DOCX. Better to ask once than to surprise the user later.
   const handleReExportStage = async () => {
     if (!reviewStage) return;
+
+    if (reviewStage.roadbook) {
+      const ok = window.confirm(
+        "Re-export this stage?\n\n" +
+          "This regenerates roadbook.docx from the saved stage data. " +
+          "Any edits you have made to your existing copy of the DOCX " +
+          "(typo fixes, custom prose, formatting) will NOT be in the new ZIP — " +
+          "they live only in the file on your device.\n\n" +
+          "Continue?",
+      );
+      if (!ok) return;
+    }
+
     try {
       const blob = await buildRoutePackage(reviewStage, {
         includeHema: true,
@@ -2351,7 +2374,7 @@ export default function RouteMapperLayout() {
               className="text-sm px-3 py-1 rounded-full font-medium bg-[#588233] text-white hover:bg-[#476a29]"
               title="Open Drive Mode — load a roadbook to drive"
             >
-              🚗 Drive
+              Drive
             </a>
 
             <div

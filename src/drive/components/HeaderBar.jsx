@@ -11,6 +11,7 @@ export default function HeaderBar({
   stageMeta,
   onExit,
   rowCount,
+  docxPatchCount = 0,
   onOpenSettings,
   voiceEnabled,
   voiceSupported,
@@ -42,6 +43,16 @@ export default function HeaderBar({
         <div className="text-xs text-gray-500 whitespace-nowrap">
           {rowCount} row{rowCount === 1 ? "" : "s"}
         </div>
+        {docxPatchCount > 0 && (
+          <div
+            className="text-xs px-2 py-1 rounded-full font-medium bg-blue-500 bg-opacity-15 text-blue-800 whitespace-nowrap"
+            title={`${docxPatchCount} note${
+              docxPatchCount === 1 ? " was" : "s were"
+            } overridden from the edited roadbook.docx inside the ZIP`}
+          >
+            📝 {docxPatchCount} edit{docxPatchCount === 1 ? "" : "s"}
+          </div>
+        )}
 
         {/* Voice quick toggle — hidden if the browser has no
             speechSynthesis support at all */}
