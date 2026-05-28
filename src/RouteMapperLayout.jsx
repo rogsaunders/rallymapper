@@ -2007,13 +2007,20 @@ export default function RouteMapperLayout() {
     }
 
     // Min-move guard — still useful to suppress accidental double-taps while
-    // stationary. Compare against the last *committed* waypoint.
+    // stationary. Compare against the last *committed user* waypoint —
+    // explicitly skip the canonical kind:"start" waypoint created by
+    // Start Stage, otherwise the FIRST Add Waypoint tap of a new stage
+    // always silently bails (user hasn't moved since Start Stage was
+    // tapped, so distance to the start waypoint < min-move threshold).
     const last =
       [...waypoints]
         .reverse()
         .find(
           (p) =>
-            Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lon)),
+            p?.kind !== "start" &&
+            p?.poi !== "START" &&
+            Number.isFinite(Number(p?.lat)) &&
+            Number.isFinite(Number(p?.lon)),
         ) || null;
 
     const curFix = {
