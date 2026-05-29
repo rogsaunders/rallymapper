@@ -31,12 +31,40 @@ export function exportUniversalTrackGpx(stage, config = {}) {
 export function exportUniversalWaypointsGpx(stage, config = {}) {
   const startWaypoint = buildStartWaypoint(stage?.startGPS);
 
-  // Exclude any kind:"start" entry from the regular-waypoint list — the
-  // synthetic START emitted by buildStartWaypoint(startGPS) above already
-  // covers it.  Without this filter, the GPX would carry two START entries
-  // since RouteMapperLayout now keeps a kind:"start" row in stage.waypoints
-  // as the canonical row 1 of the roadbook.
-  const regularWaypoints = (stage.waypoints || [])
+  const regularWaypoints = getRegularWaypoints(stage).map((w, index) =>
+    buildWaypointXml(w, index),
+  );
+
+  const allWaypoints = [startWaypoint, ...regularWaypoints]
+    .filter(Boolean)
+    .join("\n");
+
+  return [gpxHeader(config.appName), allWaypoints, gpxFooter()].join("\n");
+}
+
+/**
+ * Filter, validate, and chronologically sort the user-added waypoints for
+ * GPX export. Shared by exportUniversalWaypointsGpx and exportCombinedGpx
+ * so both produce identical waypoint order.
+ *
+ * Filtering:
+ *   - Excludes any kind:"start" / poi:"START" entry — the synthetic START
+ *     emitted by buildStartWaypoint(stage.startGPS) covers that. Without
+ *     this filter, the GPX would carry two START entries since
+ *     RouteMapperLayout keeps a kind:"start" row in stage.waypoints as the
+ *     canonical row 1 of the roadbook.
+ *   - Drops anything without finite lat/lon.
+ *
+ * Sorting:
+ *   - By waypoint timestamp ascending, so consumers that draw straight
+ *     connectors between consecutive <wpt> entries (e.g. Rally Navigator's
+ *     free tier) render a sensible route rather than a zigzag when the
+ *     in-memory stage.waypoints array is out of time order. Waypoints
+ *     without a parseable timestamp sort to the end while preserving their
+ *     original relative order (Array.prototype.sort is stable).
+ */
+export function getRegularWaypoints(stage) {
+  return (stage.waypoints || [])
     .filter(
       (w) =>
         w.kind !== "start" &&
@@ -44,13 +72,12 @@ export function exportUniversalWaypointsGpx(stage, config = {}) {
         Number.isFinite(Number(w.lat)) &&
         Number.isFinite(Number(w.lon)),
     )
-    .map((w, index) => buildWaypointXml(w, index));
+    .sort((a, b) => waypointTimeMs(a) - waypointTimeMs(b));
+}
 
-  const allWaypoints = [startWaypoint, ...regularWaypoints]
-    .filter(Boolean)
-    .join("\n");
-
-  return [gpxHeader(config.appName), allWaypoints, gpxFooter()].join("\n");
+function waypointTimeMs(w) {
+  const t = Date.parse(w.timestamp || w.time || "");
+  return Number.isFinite(t) ? t : Infinity;
 }
 
 export function buildStartWaypoint(startGPS) {
