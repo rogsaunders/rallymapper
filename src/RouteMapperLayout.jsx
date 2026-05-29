@@ -1932,6 +1932,15 @@ export default function RouteMapperLayout() {
   // Update the start position to the current GPS — used by the 🚩 Update
   // Start auxiliary button when the user notices the stage actually starts
   // a little further on than where they first tapped Start Stage.
+  //
+  // Also offers to discard any non-start waypoints recorded BEFORE the new
+  // start time. Without this cleanup, voice-rec tests done immediately
+  // after the original Start Stage tap survive as orphaned 03:53-style
+  // waypoints in the saved stage. Rally Navigator's free-tier renderer
+  // then connects them with straight diagonals, producing a visible
+  // zigzag at the start of the route. Confirm-rather-than-silent so we
+  // don't surprise the user who deliberately added waypoints first and
+  // corrected the start position afterwards.
   const handleUpdateStart = () => {
     if (
       !Number.isFinite(currentGPS?.lat) ||
@@ -1945,10 +1954,35 @@ export default function RouteMapperLayout() {
       lon: currentGPS.lon,
       timestamp: new Date().toISOString(),
     };
+    const startMs = Date.parse(startGps.timestamp);
+
+    const isStale = (w) => {
+      if (w.kind === "start" || w.poi === "START") return false;
+      const t = Date.parse(w.timestamp || w.time || "");
+      return Number.isFinite(t) && t < startMs;
+    };
+
+    const staleCount = (waypoints || []).filter(isStale).length;
+    if (staleCount > 0) {
+      const ok = confirm(
+        `Update start to current position?\n\n` +
+          `This will remove ${staleCount} waypoint${
+            staleCount === 1 ? "" : "s"
+          } recorded before the new start time ` +
+          `(typically leftover voice tests).`,
+      );
+      if (!ok) return;
+    }
+
     setStartGPS(startGps);
-    // Keep the kind:"start" entry in the waypoints array in sync so the
-    // roadbook + map markers reflect the new start position.
-    setWaypoints((prev) => upsertStartWaypoint(prev, startGps));
+    // Keep the kind:"start" entry in the waypoints array in sync with the
+    // new start position, and drop any non-start entries that predate it.
+    setWaypoints((prev) =>
+      upsertStartWaypoint(
+        (prev || []).filter((w) => !isStale(w)),
+        startGps,
+      ),
+    );
   };
 
   // Auto-capture start GPS the moment a valid fix arrives, if the user
