@@ -3,6 +3,7 @@ import {
   buildStartWaypoint,
   buildTrackpointXml,
   buildWaypointXml,
+  getRegularWaypoints,
 } from "./exportUniversalGpx";
 
 /**
@@ -20,20 +21,13 @@ export function exportCombinedGpx(stage, config = {}) {
   const trackName = xmlEscape(stage?.meta?.stageName || "RouteMapper");
 
   // Waypoints — start point (if present) followed by user-added waypoints
+  // in chronological order. See getRegularWaypoints() in exportUniversalGpx
+  // for the filtering + sorting rules.
   const startWaypoint = buildStartWaypoint(stage?.startGPS);
 
-  // Exclude any kind:"start" entry from the regular-waypoint list — the
-  // synthetic START emitted by buildStartWaypoint(stage.startGPS) already
-  // covers it.  See exportUniversalGpx.js for the longer rationale.
-  const regularWaypoints = (stage.waypoints || [])
-    .filter(
-      (w) =>
-        w.kind !== "start" &&
-        w.poi !== "START" &&
-        Number.isFinite(Number(w.lat)) &&
-        Number.isFinite(Number(w.lon)),
-    )
-    .map((w, index) => buildWaypointXml(w, index));
+  const regularWaypoints = getRegularWaypoints(stage).map((w, index) =>
+    buildWaypointXml(w, index),
+  );
 
   const allWaypoints = [startWaypoint, ...regularWaypoints]
     .filter(Boolean)
