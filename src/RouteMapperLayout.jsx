@@ -606,7 +606,11 @@ export default function RouteMapperLayout() {
   const [_stageArchive, setStageArchive] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [reviewStage, setReviewStage] = useState(null); // full stage object when reviewing history
-  const [waypointType, setWaypointType] = useState("note");
+  // Default selected category is "nav" — navigation waypoints (turn left,
+  // turn right, keep left/right…) are by far the most common tap during a
+  // stage, so seeding the UI on Nav avoids an unnecessary category change
+  // for the first waypoint the user adds.
+  const [waypointType, setWaypointType] = useState("nav");
   const [poi, setPoi] = useState("");
   const [followMap, setFollowMap] = useState(true);
   // One state object per category — auto-extends as the icon manifest
@@ -812,7 +816,7 @@ export default function RouteMapperLayout() {
       setStartGPS(draft.startGPS ?? null);
       setWaypoints(Array.isArray(draft.waypoints) ? draft.waypoints : []);
       setTrackPoints(Array.isArray(draft.trackPoints) ? draft.trackPoints : []);
-      setWaypointType(draft.waypointType ?? "note");
+      setWaypointType(draft.waypointType ?? "nav");
       // New-shape drafts have iconIdByCategory; legacy drafts have
       // individual *IconId fields. Merge either onto the defaults so
       // missing/added categories don't break the restore.
@@ -3129,58 +3133,6 @@ export default function RouteMapperLayout() {
                 : "➕ Add Waypoint (Current GPS)"}
             </button>
 
-            {pendingWaypoint && (
-              <div
-                className="mt-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-3"
-                role="status"
-                aria-live="polite"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                    <span className="text-sm font-semibold text-amber-900">
-                      Pending waypoint
-                    </span>
-                  </div>
-                  <span className="text-xs tabular-nums text-amber-700">
-                    {(pendingRemainingMs / 1000).toFixed(1)}s
-                  </span>
-                </div>
-                <div className="h-1.5 w-full bg-amber-100 rounded-full overflow-hidden mb-2">
-                  <div
-                    className="h-full bg-amber-500 transition-[width] duration-100 ease-linear"
-                    style={{
-                      width: `${Math.min(100, (pendingRemainingMs / Math.max(1, snapWindowMs)) * 100)}%`,
-                    }}
-                  />
-                </div>
-                <div className="text-xs text-amber-800 mb-2">
-                  GPS snapped at{" "}
-                  <span className="tabular-nums">
-                    {Number(pendingWaypoint.lat).toFixed(5)},{" "}
-                    {Number(pendingWaypoint.lon).toFixed(5)}
-                  </span>
-                  . Refine icon / type / note below — commits automatically.
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={commitPendingWaypoint}
-                    className="flex-1 px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700"
-                  >
-                    ✓ Done
-                  </button>
-                  <button
-                    type="button"
-                    onClick={discardPendingWaypoint}
-                    className="flex-1 px-3 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-semibold hover:bg-gray-300"
-                  >
-                    ✕ Discard
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div className="mt-3 flex gap-2 flex-wrap mb-2">
               {ICON_ORDER.map((type) => (
                 <IconButton
@@ -3217,6 +3169,62 @@ export default function RouteMapperLayout() {
                 </div>
               );
             })()}
+
+            {/* Pending Waypoint dialogue — sits beneath the category +
+                variant rows so the user can review the snapped GPS and
+                refine icon/type immediately above the Voice panel,
+                without the dialogue obscuring the icon picker. */}
+            {pendingWaypoint && (
+              <div
+                className="mt-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-3"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-sm font-semibold text-amber-900">
+                      Pending waypoint
+                    </span>
+                  </div>
+                  <span className="text-xs tabular-nums text-amber-700">
+                    {(pendingRemainingMs / 1000).toFixed(1)}s
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-amber-100 rounded-full overflow-hidden mb-2">
+                  <div
+                    className="h-full bg-amber-500 transition-[width] duration-100 ease-linear"
+                    style={{
+                      width: `${Math.min(100, (pendingRemainingMs / Math.max(1, snapWindowMs)) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-amber-800 mb-2">
+                  GPS snapped at{" "}
+                  <span className="tabular-nums">
+                    {Number(pendingWaypoint.lat).toFixed(5)},{" "}
+                    {Number(pendingWaypoint.lon).toFixed(5)}
+                  </span>
+                  . Refine icon / type / note above — commits automatically.
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={commitPendingWaypoint}
+                    className="flex-1 px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700"
+                  >
+                    ✓ Done
+                  </button>
+                  <button
+                    type="button"
+                    onClick={discardPendingWaypoint}
+                    className="flex-1 px-3 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-semibold hover:bg-gray-300"
+                  >
+                    ✕ Discard
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* ── Voice (push-to-talk) ──────────────────────────── */}
             <div
@@ -3322,7 +3330,12 @@ export default function RouteMapperLayout() {
                         voiceActive ? stopVoice() : startVoice();
                       }
                     }}
-                    className="px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors min-w-[110px]"
+                    // Substantially larger touch target — under driving
+                    // conditions a small button is easy to miss / mis-tap.
+                    // flex-1 lets it expand to fill the row; the bigger
+                    // padding + text size keeps the label legible at arm's
+                    // length on a roll-bar-mounted iPad.
+                    className="flex-1 px-6 py-4 rounded-xl text-white text-lg font-bold transition-colors min-w-[200px] shadow-sm"
                     style={{
                       backgroundColor: !stageActive
                         ? "#9ca3af"
