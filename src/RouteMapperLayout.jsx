@@ -3244,8 +3244,14 @@ export default function RouteMapperLayout() {
                       : "white",
               }}
             >
-              {/* Header row */}
-              <div className="flex items-center justify-between">
+              {/* Header row.  Left cluster: "Voice" label, the external-
+                  trigger 🎧 status (when armed), any voice-mode indicator
+                  (📍 GPS locked / Listening), and the ⚙ settings cog —
+                  all sitting compactly side-by-side.  Right cluster: the
+                  green Record button, flex-1 so it fills the remaining
+                  row width to a generous touch target while its height
+                  matches the Add Waypoint button above. */}
+              <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-gray-700 mt-1">Voice</span>
                   {externalTriggerEnabled && stageActive && (
@@ -3295,9 +3301,9 @@ export default function RouteMapperLayout() {
                       </span>
                     </>
                   )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Settings cog — only when idle */}
+                  {/* Settings cog — only when idle.  Sits in the left
+                      cluster so the Record button can take all the
+                      remaining row width. */}
                   {!voiceActive && (
                     <button
                       type="button"
@@ -3321,34 +3327,35 @@ export default function RouteMapperLayout() {
                       </svg>
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={voiceActive ? stopVoice : startVoice}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      if (stageActive) {
-                        voiceActive ? stopVoice() : startVoice();
-                      }
-                    }}
-                    // Substantially larger touch target — under driving
-                    // conditions a small button is easy to miss / mis-tap.
-                    // flex-1 lets it expand to fill the row; the bigger
-                    // padding + text size keeps the label legible at arm's
-                    // length on a roll-bar-mounted iPad.
-                    className="flex-1 px-6 py-4 rounded-xl text-white text-lg font-bold transition-colors min-w-[200px] shadow-sm"
-                    style={{
-                      backgroundColor: !stageActive
-                        ? "#9ca3af"
-                        : voiceActive
-                          ? "#dc2626"
-                          : "#588233",
-                      opacity: !stageActive ? 0.5 : 1,
-                    }}
-                    disabled={!stageActive}
-                  >
-                    {voiceActive ? "⏹ Stop" : "🎙 Record"}
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={voiceActive ? stopVoice : startVoice}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    if (stageActive) {
+                      voiceActive ? stopVoice() : startVoice();
+                    }
+                  }}
+                  // Width: flex-1 so the button expands across the rest of
+                  // the row beside the compact Voice/🎧/⚙ cluster — easy
+                  // touch target.
+                  // Height: py-3 (12 px vertical padding) matches the Add
+                  // Waypoint button above, giving a consistent rhythm
+                  // down the Input Controls column.
+                  className="flex-1 px-5 py-3 rounded-xl text-white text-base font-semibold transition-colors min-w-[160px]"
+                  style={{
+                    backgroundColor: !stageActive
+                      ? "#9ca3af"
+                      : voiceActive
+                        ? "#dc2626"
+                        : "#588233",
+                    opacity: !stageActive ? 0.5 : 1,
+                  }}
+                  disabled={!stageActive}
+                >
+                  {voiceActive ? "⏹ Stop" : "🎙 Record"}
+                </button>
               </div>
 
               {/* Settings panel (collapsible) */}
