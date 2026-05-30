@@ -193,6 +193,74 @@ function upsertStartWaypoint(prevWaypoints, gps) {
   return [startWp, ...filtered];
 }
 
+// ── Capture-noise policy ────────────────────────────────────────────────
+//
+// Two patterns produce waypoints that pollute the GPX export and confuse
+// downstream renderers (Rally Navigator's free-tier inter-waypoint
+// connectors are particularly sensitive):
+//
+//   1. Empty-content notes — the user tapped Record but speech rec
+//      transcribed nothing (timed out, background noise, accidental tap).
+//      The pending-snap timer fires anyway and commits a waypoint with
+//      empty POI and the default note type/icon.
+//
+//   2. Refinement-on-second-attempt — the user tapped Record, started
+//      speaking, the snap window fired before they finished, then they
+//      tapped Record again and said the full thing. Both captures land
+//      as separate waypoints — e.g. "national" (kmTotal 6.031) and 20 s
+//      later "national wine centre on left" (kmTotal 6.114).
+//
+// applyCapturePolicy() filters both at the moment of commit. Existing
+// stages are unaffected — this only changes behaviour for new captures.
+//
+// Note types other than "note" (nav / control / hazard / terrain) always
+// survive even with empty POI — the icon itself encodes intent (e.g. a
+// "left" nav with no speech still means "left turn here").
+
+const REFINEMENT_WINDOW_MS = 30_000;
+
+function isEmptyContentNote(w) {
+  if (w.type !== "note") return false;
+  if ((w.poi || "").trim().length > 0) return false;
+  // Default iconId for a fresh note is null or "note" — neither signals
+  // user intent. Any other iconId means the user explicitly chose an
+  // icon and meant to capture something.
+  return !w.iconId || w.iconId === "note";
+}
+
+function shouldReplaceAsRefinement(prev, next) {
+  if (prev.kind !== "waypoint") return false; // never replace START / finish
+
+  const prevMs = Date.parse(prev.timestamp || "");
+  const nextMs = Date.parse(next.timestamp || "");
+  if (!Number.isFinite(prevMs) || !Number.isFinite(nextMs)) return false;
+  if (nextMs - prevMs > REFINEMENT_WINDOW_MS) return false;
+
+  const prevPoi = (prev.poi || "").trim().toLowerCase();
+  const nextPoi = (next.poi || "").trim().toLowerCase();
+
+  // Empty-previous → any non-empty next is a refinement
+  if (prevPoi.length === 0 && nextPoi.length > 0) return true;
+  // Non-empty-previous → next must extend it (prefix match)
+  return (
+    nextPoi.length > prevPoi.length && nextPoi.startsWith(prevPoi)
+  );
+}
+
+function applyCapturePolicy(prev, next) {
+  // A — drop empty-content note captures outright
+  if (isEmptyContentNote(next)) return prev;
+
+  // B — collapse refinements within the 30 s window onto the previous
+  // waypoint. We replace rather than merge so the new POI / icon /
+  // position (latest user intent) wins cleanly.
+  const last = prev[prev.length - 1];
+  if (last && shouldReplaceAsRefinement(last, next)) {
+    return [...prev.slice(0, -1), next];
+  }
+  return [...prev, next];
+}
+
 function fmtKmNumber(meters) {
   const km = Number(meters || 0) / 1000;
   return km.toFixed(2); // "3.10"
@@ -997,7 +1065,7 @@ export default function RouteMapperLayout() {
           distanceFromStartM,
         };
 
-        return [...prev, next];
+        return applyCapturePolicy(prev, next);
       });
       setPoi("");
       return;
@@ -1098,7 +1166,7 @@ export default function RouteMapperLayout() {
         distanceFromStartM,
       };
 
-      return [...prev, next];
+      return applyCapturePolicy(prev, next);
     });
 
     setPoi("");
