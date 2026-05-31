@@ -3244,89 +3244,16 @@ export default function RouteMapperLayout() {
                       : "white",
               }}
             >
-              {/* Header row.  Left cluster: persistent 🎧 external-trigger
-                  status (when armed) and ⚙ settings cog, pinned to the
-                  LHS so they always sit in the same place.  Any voice-mode
-                  indicator (📍 GPS locked / Listening) appears to their
-                  right.  Right cluster: the green Record Voice button,
-                  flex-1 so it fills the remaining row width to a generous
-                  touch target while its height matches the Add Waypoint
-                  button above. */}
+              {/* Header row.  LHS: the green Record Voice button, flex-1
+                  so it fills the available row width to a generous touch
+                  target while its height matches the Add Waypoint button
+                  above.  RHS: persistent 🎧 external-trigger status (when
+                  armed) and ⚙ settings cog, pinned to the right so they
+                  always sit in the same place.  Any voice-mode indicator
+                  (📍 GPS locked / Listening) sits between the button and
+                  the 🎧/⚙ cluster — visually closer to the button that
+                  caused it. */}
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {externalTriggerEnabled && stageActive && (
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                        triggerAudioStatus === "playing"
-                          ? "bg-green-100 text-green-700"
-                          : triggerAudioStatus === "rejected"
-                            ? "bg-amber-100 text-amber-700"
-                            : "text-gray-400"
-                      }`}
-                      title={
-                        triggerAudioStatus === "playing"
-                          ? "External trigger armed and audio loop is playing — Bluetooth media buttons WILL route here. Now Playing on iOS Control Center should show 'RouteMapper'."
-                          : triggerAudioStatus === "rejected"
-                            ? "External trigger armed BUT silent audio loop was rejected by the browser. Bluetooth media buttons will route to whatever app last owned the iOS media session (Music, Spotify…). To fix: tap End Stage, then Start Stage again — the silent loop is started inside that tap's gesture context. If this persists, your iOS Settings → Privacy → Speech Recognition may need to be re-enabled."
-                            : "External trigger armed, silent audio loop initialising…"
-                      }
-                    >
-                      🎧
-                      {triggerAudioStatus === "playing" && " ✓"}
-                      {triggerAudioStatus === "rejected" && " ⚠️"}
-                    </span>
-                  )}
-                  {/* Settings cog — only when idle.  Pinned next to 🎧 on
-                      the LHS so the persistent controls sit together. */}
-                  {!voiceActive && (
-                    <button
-                      type="button"
-                      onClick={() => setVoiceShowSettings((v) => !v)}
-                      className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                      title="Voice settings"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                        />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    </button>
-                  )}
-                  {voiceMode === "snap" && (
-                    <>
-                      <span
-                        className="inline-block w-3 h-3 rounded-full animate-pulse"
-                        style={{ backgroundColor: "#f59e0b" }}
-                      />
-                      <span
-                        className="text-sm font-semibold"
-                        style={{ color: "#b45309" }}
-                      >
-                        📍 GPS locked — speak or wait {snapCountdown}s
-                      </span>
-                    </>
-                  )}
-                  {voiceMode === "command" && (
-                    <>
-                      <span
-                        className="inline-block w-3 h-3 rounded-full animate-pulse"
-                        style={{ backgroundColor: "#dc2626" }}
-                      />
-                      <span className="text-sm text-red-600 font-medium">
-                        Listening...
-                      </span>
-                    </>
-                  )}
-                </div>
                 <button
                   type="button"
                   onClick={voiceActive ? stopVoice : startVoice}
@@ -3355,6 +3282,80 @@ export default function RouteMapperLayout() {
                 >
                   {voiceActive ? "⏹ Stop" : "🎙 Record Voice"}
                 </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {voiceMode === "snap" && (
+                    <>
+                      <span
+                        className="inline-block w-3 h-3 rounded-full animate-pulse"
+                        style={{ backgroundColor: "#f59e0b" }}
+                      />
+                      <span
+                        className="text-sm font-semibold"
+                        style={{ color: "#b45309" }}
+                      >
+                        📍 GPS locked — speak or wait {snapCountdown}s
+                      </span>
+                    </>
+                  )}
+                  {voiceMode === "command" && (
+                    <>
+                      <span
+                        className="inline-block w-3 h-3 rounded-full animate-pulse"
+                        style={{ backgroundColor: "#dc2626" }}
+                      />
+                      <span className="text-sm text-red-600 font-medium">
+                        Listening...
+                      </span>
+                    </>
+                  )}
+                  {externalTriggerEnabled && stageActive && (
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        triggerAudioStatus === "playing"
+                          ? "bg-green-100 text-green-700"
+                          : triggerAudioStatus === "rejected"
+                            ? "bg-amber-100 text-amber-700"
+                            : "text-gray-400"
+                      }`}
+                      title={
+                        triggerAudioStatus === "playing"
+                          ? "External trigger armed and audio loop is playing — Bluetooth media buttons WILL route here. Now Playing on iOS Control Center should show 'RouteMapper'."
+                          : triggerAudioStatus === "rejected"
+                            ? "External trigger armed BUT silent audio loop was rejected by the browser. Bluetooth media buttons will route to whatever app last owned the iOS media session (Music, Spotify…). To fix: tap End Stage, then Start Stage again — the silent loop is started inside that tap's gesture context. If this persists, your iOS Settings → Privacy → Speech Recognition may need to be re-enabled."
+                            : "External trigger armed, silent audio loop initialising…"
+                      }
+                    >
+                      🎧
+                      {triggerAudioStatus === "playing" && " ✓"}
+                      {triggerAudioStatus === "rejected" && " ⚠️"}
+                    </span>
+                  )}
+                  {/* Settings cog — only when idle.  Pinned next to 🎧 on
+                      the RHS so the persistent controls sit together. */}
+                  {!voiceActive && (
+                    <button
+                      type="button"
+                      onClick={() => setVoiceShowSettings((v) => !v)}
+                      className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                      title="Voice settings"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                        />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Settings panel (collapsible) */}
