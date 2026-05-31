@@ -163,8 +163,8 @@ function toUtcIso(d) {
 //     exporters already build a synthetic START entry from `startGPS`.
 //
 // Passing a null/invalid `gps` returns the array with any existing start
-// removed — used by handleEndStage / handleStartNewStage paths where the
-// stage-scoped state is being cleared.
+// removed — used by handleEndStage where the stage-scoped state is being
+// cleared.
 function upsertStartWaypoint(prevWaypoints, gps) {
   const filtered = (prevWaypoints || []).filter(
     (w) => w.kind !== "start" && w.poi !== "START",
@@ -1551,9 +1551,11 @@ export default function RouteMapperLayout() {
       }
     }
 
-    // If the previous (just-ended) stage is still on-screen — i.e. the user
-    // skipped "Start New Stage" and went straight to "Start Stage" — bump
-    // the stage counter so we don't overwrite the last stage's numbering.
+    // If the previous (just-ended) stage is still on-screen when the user
+    // taps Start Stage to begin the next one, bump the stage counter so we
+    // don't overwrite the last stage's numbering. Start Stage is now the
+    // single entry point — the explicit "Start New Stage" button was
+    // removed since this auto-bump covers the same case.
     const resumingAfterSavedStage =
       trackPoints?.length > 0 || waypoints?.length > 0 || Boolean(startGPS);
     if (resumingAfterSavedStage) {
@@ -1829,7 +1831,9 @@ export default function RouteMapperLayout() {
       // Stage is complete. We intentionally DO NOT clear the on-screen
       // state (trackPoints, waypoints, startGPS, roadbook, map view) here —
       // the user can still review the route on-screen after saving.
-      // Cleanup happens when they click "Start New Stage" or "Start Stage".
+      // Cleanup happens when they tap Start Stage to begin the next one
+      // (handleStartStage detects the leftover state and bumps the stage
+      // number before clearing).
       setStageActive(false);
       setStageStartedAt(null);
 
@@ -1841,32 +1845,6 @@ export default function RouteMapperLayout() {
 
       setIsEndingStage(false);
     }
-  };
-
-  // Tracks whether the last-ended stage is still on-screen (i.e. the user
-  // hasn't yet clicked "Start New Stage" or re-armed "Start Stage"). Used
-  // to show the reset button only when it's relevant.
-  const hasSavedStageOnScreen =
-    !stageActive &&
-    (trackPoints?.length > 0 || waypoints?.length > 0 || Boolean(startGPS));
-
-  // Explicit reset that the user triggers once they're done reviewing the
-  // completed stage. Clears the stage-scoped data and bumps the stage
-  // counter so the next recording slots in cleanly.
-  const handleStartNewStage = () => {
-    if (stageActive) {
-      alert("End the current stage before starting a new one.");
-      return;
-    }
-    discardPendingWaypoint();
-    setWaypoints([]);
-    setStartGPS(null);
-    setPoi("");
-    setIconIdByCategory(DEFAULT_ICON_BY_CATEGORY);
-    setStageNumber((n) => n + 1);
-    setTrackPoints([]);
-    trackLastRef.current = null;
-    setShowRoadbookPreview(false);
   };
 
   // ── Stage History ────────────────────────────────────────────────────────────
@@ -2722,16 +2700,6 @@ export default function RouteMapperLayout() {
                   title="Capture the current GPS as the new start position for this stage"
                 >
                   🚩 Update Start
-                </button>
-              )}
-              {hasSavedStageOnScreen && (
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded-xl border border-[#588233] text-[#588233] font-semibold bg-white whitespace-nowrap shrink-0"
-                  onClick={handleStartNewStage}
-                  title="Clear the last stage from the map and get ready for the next one"
-                >
-                  Start New Stage
                 </button>
               )}
               {/* History button — always visible when not recording */}
