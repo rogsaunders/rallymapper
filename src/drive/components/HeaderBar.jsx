@@ -4,8 +4,12 @@
 //
 // M3 adds a ⚙️ settings cog.
 // M4 adds a 🔊/🔇 quick toggle for voice readout.
+// 2026-06: RouteMapper branding lockup + stage identifier carried
+//          through from the export filename (see lib/stageNaming.js).
 
 import React from "react";
+import fullLogo from "../../assets/fullLogo_transparent.png";
+import { stageDisplayParts } from "../../lib/stageNaming";
 
 export default function HeaderBar({
   stageMeta,
@@ -17,28 +21,31 @@ export default function HeaderBar({
   voiceSupported,
   onToggleVoice,
 }) {
-  const stageName = stageMeta?.stageName || "Drive Mode";
-  const subtitle =
-    stageMeta &&
-    [
-      stageMeta.day != null ? `Day ${stageMeta.day}` : null,
-      stageMeta.routeName ||
-        (stageMeta.routeNumber != null ? `Route ${stageMeta.routeNumber}` : null),
-      stageMeta.stageNumber != null ? `Stage ${stageMeta.stageNumber}` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+  // Derive the same four-part identifier the ZIP filename uses so the
+  // navigator's eye lands on the label they used to find the file off
+  // disk.  Falls back gracefully when stageMeta is missing (e.g. the
+  // SourcePicker hasn't loaded anything yet, though in practice this
+  // header only mounts after a roadbook is loaded).
+  const { trip, day, route, stage } = stageDisplayParts(stageMeta || {});
+  const stageTitle = stage;
+  const subtitle = `${trip} · Day ${day} · ${route}`;
 
   return (
     <header className="sticky top-0 z-10 bg-white border-b shadow-sm">
-      <div className="px-4 py-3 flex items-center gap-2">
+      <div className="px-4 py-3 flex items-center gap-3">
+        {/* RouteMapper brand lockup — reuses the same transparent
+            full-logo asset as the roadbook header so the visual
+            language matches across the suite. */}
+        <img
+          src={fullLogo}
+          alt="RouteMapper"
+          className="h-9 w-auto shrink-0"
+        />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-gray-900 truncate">
-            {stageName}
+            {stageTitle}
           </div>
-          {subtitle && (
-            <div className="text-xs text-gray-500 truncate">{subtitle}</div>
-          )}
+          <div className="text-xs text-gray-500 truncate">{subtitle}</div>
         </div>
         <div className="text-xs text-gray-500 whitespace-nowrap">
           {rowCount} row{rowCount === 1 ? "" : "s"}
