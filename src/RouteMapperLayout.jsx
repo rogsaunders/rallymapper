@@ -33,6 +33,8 @@ import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
 import { createRecordTrigger } from "./voice/recordTrigger";
 import StageHistoryPanel from "./components/StageHistoryPanel";
 import AccountModal from "./components/AccountModal";
+import { getStorageStatus, formatBytes } from "./lib/storageCapacity";
+import { findTrackpointGaps, summariseGaps } from "./lib/trackpointGaps";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
 import startSoundUrl from "./assets/sounds/start.wav";
 import stopSoundUrl from "./assets/sounds/stop.wav";
@@ -1677,6 +1679,23 @@ export default function RouteMapperLayout() {
   // Add this state near your other state hooks (once):
   const [isEndingStage, setIsEndingStage] = useState(false);
 
+  // ── Storage capacity gauge ───────────────────────────────────────────
+  // Safari iOS silently drops localStorage writes once the ~5 MB
+  // per-origin cap is hit — including the autosave draft, which would
+  // mean an in-progress stage could be lost on a reload without warning.
+  // For a multi-day survey (Lachie's 24-day rally) the surveyor will
+  // accumulate dozens of saved stages, so we surface a banner once usage
+  // crosses 80% so they know to back up + clear old stages.
+  const [storageStatus, setStorageStatus] = useState(() => getStorageStatus());
+  useEffect(() => {
+    // Refresh on every stage end (largest single write) and once per
+    // minute while a stage is recording (autosave keeps growing).
+    const tick = () => setStorageStatus(getStorageStatus());
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [stageActive, isEndingStage]);
+
   const handleEndStage = async () => {
     if (isEndingStage) return;
     if (!stageActive) return;
@@ -1892,6 +1911,21 @@ export default function RouteMapperLayout() {
       }
 
       setStageArchive((prev) => [...prev, stageWithRoadbook]);
+
+      // Trackpoint-gap detector — surfaces recording pauses (iOS
+      // background-tab suspension, screen sleep) before the surveyor
+      // drives away from the site. Catches the one data-quality risk
+      // that Starlink/network reliability can't fix. Pure data check;
+      // does not block stage save.
+      try {
+        const gaps = findTrackpointGaps(stageWithRoadbook.trackPoints);
+        if (gaps.length > 0) {
+          const message = summariseGaps(gaps);
+          if (message) alert(message);
+        }
+      } catch (e) {
+        console.warn("trackpoint gap detection failed:", e);
+      }
     } finally {
       // Stage is complete. We intentionally DO NOT clear the on-screen
       // state (trackPoints, waypoints, startGPS, roadbook, map view) here —
@@ -2462,6 +2496,42 @@ export default function RouteMapperLayout() {
           {billingToast === "success"
             ? "✓ Payment successful — your plan has been upgraded!"
             : "Checkout cancelled — no payment was taken."}
+        </div>
+      )}
+
+      {/* ── Storage capacity warning ───────────────────────────────────────
+          Safari iOS silently drops localStorage writes once the per-origin
+          cap (~5 MB) is hit — including the autosave draft — so we surface
+          a banner as the user approaches the limit. Stays visible (no
+          dismiss) until usage actually falls below the threshold; the
+          intended action is to export and delete old saved stages from
+          History. */}
+      {storageStatus.isWarning && (
+        <div
+          className={`px-4 py-2 text-sm border-b ${
+            storageStatus.isCritical
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-amber-50 border-amber-200 text-amber-800"
+          }`}
+          role="alert"
+        >
+          <div className="mx-auto max-w-6xl flex items-start gap-2">
+            <span className="text-base leading-none mt-0.5">
+              {storageStatus.isCritical ? "🛑" : "⚠️"}
+            </span>
+            <div className="flex-1">
+              <div className="font-medium">
+                {storageStatus.isCritical
+                  ? `Device storage is almost full (${formatBytes(storageStatus.bytes)} of ~${formatBytes(storageStatus.limitBytes)}).`
+                  : `Device storage is filling up (${formatBytes(storageStatus.bytes)} of ~${formatBytes(storageStatus.limitBytes)} used).`}
+              </div>
+              <div className="text-xs mt-0.5 opacity-90">
+                {storageStatus.isCritical
+                  ? "New stages may fail to save. Open History, export any stages you want to keep, then delete them from this device."
+                  : "Open History and export + delete older stages once they're safe in the cloud, so the next stage has room to save."}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
