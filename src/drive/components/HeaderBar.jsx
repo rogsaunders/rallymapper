@@ -39,7 +39,11 @@ export default function HeaderBar({
         <img
           src={fullLogo}
           alt="RouteMapper"
-          className="h-9 w-auto shrink-0"
+          // h-14 (56 px) — chosen for visible brand presence at arm's
+          // length on an iPad without bloating the sticky header.
+          // The asset is 1280×1024 so there's plenty of headroom to
+          // scale further if Roger wants more prominence.
+          className="h-14 w-auto shrink-0"
         />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-gray-900 truncate">
