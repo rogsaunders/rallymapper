@@ -15,7 +15,7 @@
 // M5+ — DOCX overlay, iPhone polish.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useRoadbook } from "./hooks/useRoadbook";
+import { useRoadbook, pickStartCoords } from "./hooks/useRoadbook";
 import { useGpsStream } from "./hooks/useGpsStream";
 import { useDriveAdvance } from "./hooks/useDriveAdvance";
 import { useVoiceReadout } from "./hooks/useVoiceReadout";
@@ -25,6 +25,7 @@ import HeaderBar from "./components/HeaderBar";
 import FooterBar from "./components/FooterBar";
 import RoadbookView from "./components/RoadbookView";
 import SettingsPanel from "./components/SettingsPanel";
+import PreStart from "./components/PreStart";
 
 // localStorage keys — settings persist across sessions
 const LS_AUTO_ADVANCE = "rm_drive_auto_advance";
@@ -47,6 +48,7 @@ export default function DriveMode() {
     roadbook,
     trackPoints,
     stageMeta,
+    startCoords: stageStartCoords,
     docxPatchCount,
     error,
     isLoading,
@@ -141,9 +143,76 @@ export default function DriveMode() {
   const [scrollNonce, setScrollNonce] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // PreStart gate.  Loaded but not yet driving — show the "head to
+  // the start" screen with map + proximity indicator.  Resolved to
+  // null when there's no usable start coordinate anywhere in the
+  // loaded data (legacy stages); in that case we skip PreStart and
+  // drop straight into the Drive UI.  Cleared back to false whenever
+  // the source picker hands us a fresh roadbook.
+  const [hasStarted, setHasStarted] = useState(false);
+  const startCoords = useMemo(
+    () =>
+      pickStartCoords(stageStartCoords, roadbook?.rows, trackPoints),
+    [stageStartCoords, roadbook?.rows, trackPoints],
+  );
+
+  // Reset hasStarted whenever a new roadbook is loaded.  The roadbook
+  // reference itself is the stable "I'm a new stage" signal — every
+  // load creates a fresh object via setRoadbook in useRoadbook.
+  useEffect(() => {
+    setHasStarted(false);
+  }, [roadbook]);
+
   if (!roadbook) {
     return (
       <SourcePicker onPick={loadFile} error={error} isLoading={isLoading} />
+    );
+  }
+
+  // PreStart sits between SourcePicker and the running Drive UI.
+  // Shown whenever the loaded stage has a usable start coordinate AND
+  // the user hasn't yet tapped Begin.  Skipped entirely for legacy
+  // stages where pickStartCoords couldn't recover any coords.
+  if (startCoords && !hasStarted) {
+    return (
+      <div className="flex flex-col h-screen bg-gray-50">
+        <HeaderBar
+          stageMeta={stageMeta}
+          rowCount={annotatedRows.length}
+          docxPatchCount={docxPatchCount}
+          onExit={clear}
+          onOpenSettings={() => setSettingsOpen(true)}
+          voiceEnabled={voiceEnabled}
+          voiceSupported={voiceSupported}
+          onToggleVoice={() => toggleVoice()}
+        />
+        <PreStart
+          startCoords={startCoords}
+          gps={gps}
+          gpsError={gpsError}
+          triggerRadiusM={triggerRadiusM}
+          onBegin={() => setHasStarted(true)}
+          onCancel={clear}
+          voiceSpeak={voiceSpeak}
+          voiceEnabled={voiceEnabled && voiceSupported}
+        />
+        <SettingsPanel
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          autoAdvanceEnabled={autoAdvanceEnabled}
+          setAutoAdvanceEnabled={setAutoAdvanceEnabled}
+          triggerRadiusM={triggerRadiusM}
+          setTriggerRadiusM={setTriggerRadiusM}
+          manualOverrideMs={manualOverrideMs}
+          setManualOverrideMs={setManualOverrideMs}
+          voiceEnabled={voiceEnabled}
+          setVoiceEnabled={toggleVoice}
+          voiceSupported={voiceSupported}
+          voiceTest={() =>
+            voiceSpeak("Voice readout test. Next row in 0.4 kilometres.")
+          }
+        />
+      </div>
     );
   }
 
