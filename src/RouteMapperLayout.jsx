@@ -26,6 +26,7 @@ import { STRIPE_PRICES } from "./lib/stripePrices";
 import { redirectToCheckout, redirectToPortal } from "./lib/checkout";
 import { upsertStageExport, flushPendingQueue } from "./lib/stageSync";
 import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
+import { stageFilenameBase } from "./lib/stageNaming";
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
@@ -284,14 +285,6 @@ const DEFAULT_ICON_BY_CATEGORY = (() => {
   }
   return out;
 })();
-
-function safeSlug(s) {
-  return String(s || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 // --- Utilities ---
 function xmlEscape(s) {
@@ -1769,7 +1762,11 @@ export default function RouteMapperLayout() {
       saveStageLocal(localOwner, localId, stageWithRoadbook);
 
       try {
-        const base = `${safeSlug(stage.meta.tripName)}_day${stage.meta.dayNumber}_route${stage.meta.routeNumber}_stage${stage.meta.stageNumber}`;
+        // Filename format: TripName_DayN_RouteName_StageName.zip
+        // Falls back to Route{N} / Stage{N} when the user never typed a
+        // name.  Centralised in stageNaming.js so Drive can construct
+        // the same identifier from the loaded stage's meta.
+        const base = stageFilenameBase(stage.meta);
 
         // Render the printable map PDF BEFORE the ZIP is built.  The new
         // pipeline (staticMapRenderer) draws tiles + polyline + markers from
@@ -1961,8 +1958,8 @@ export default function RouteMapperLayout() {
         includePdf: false,
         author: profile?.full_name || null,
       });
-      const m = reviewStage.meta || {};
-      const base = `${safeSlug(m.tripName)}_day${m.dayNumber}_route${m.routeNumber}_stage${m.stageNumber}`;
+      // Same filename format as the stage-end export — see stageNaming.js
+      const base = stageFilenameBase(reviewStage.meta || {});
       downloadBlob(`${base}.zip`, blob);
     } catch (err) {
       console.error("Re-export failed", err);
