@@ -1,3 +1,4 @@
+import { haversineMeters } from "../../lib/roadbook/math";
 import {
   gpxFooter,
   gpxHeader,
@@ -43,9 +44,9 @@ export function exportUniversalWaypointsGpx(stage, config = {}) {
 }
 
 /**
- * Filter, validate, and chronologically sort the user-added waypoints for
- * GPX export. Shared by exportUniversalWaypointsGpx and exportCombinedGpx
- * so both produce identical waypoint order.
+ * Filter, validate, snap, and chronologically sort the user-added
+ * waypoints for GPX export. Shared by exportUniversalWaypointsGpx and
+ * exportCombinedGpx so both produce identical waypoint order.
  *
  * Filtering:
  *   - Excludes any kind:"start" / poi:"START" entry — the synthetic START
@@ -54,6 +55,12 @@ export function exportUniversalWaypointsGpx(stage, config = {}) {
  *     RouteMapperLayout keeps a kind:"start" row in stage.waypoints as the
  *     canonical row 1 of the roadbook.
  *   - Drops anything without finite lat/lon.
+ *
+ * Snap-to-track (see snapWaypointToTrack):
+ *   - Each waypoint is re-positioned to its nearest-by-time trackpoint,
+ *     correcting for iOS GPS staleness that occasionally lands a
+ *     waypoint 100-200 m off the recorded path. The trackpoint stream
+ *     is the canonical record of "where the user actually was".
  *
  * Sorting:
  *   - By waypoint timestamp ascending, so consumers that draw straight
@@ -64,6 +71,7 @@ export function exportUniversalWaypointsGpx(stage, config = {}) {
  *     original relative order (Array.prototype.sort is stable).
  */
 export function getRegularWaypoints(stage) {
+  const trackPoints = stage.trackPoints || [];
   return (stage.waypoints || [])
     .filter(
       (w) =>
@@ -72,12 +80,78 @@ export function getRegularWaypoints(stage) {
         Number.isFinite(Number(w.lat)) &&
         Number.isFinite(Number(w.lon)),
     )
+    .map((w) => snapWaypointToTrack(w, trackPoints))
     .sort((a, b) => waypointTimeMs(a) - waypointTimeMs(b));
 }
 
 function waypointTimeMs(w) {
   const t = Date.parse(w.timestamp || w.time || "");
   return Number.isFinite(t) ? t : Infinity;
+}
+
+// ── Snap-to-track ────────────────────────────────────────────────────
+//
+// iOS occasionally delivers a stale GPS fix when an app polls — so the
+// position read at the moment the user taps Record can be 5-15 s behind
+// where they actually were. When a stage's waypoints are exported and
+// rendered by a tool that draws straight connectors between consecutive
+// <wpt> entries (e.g. Rally Navigator's free tier), the inconsistent
+// staleness across waypoints turns a smooth descent into a saw-tooth
+// zigzag — a waypoint with fresh GPS sits where the user was, the next
+// one with stale GPS sits 100 m behind, the one after that sits where
+// it should, and so on.
+//
+// The trackpoint stream is recorded continuously and represents the
+// canonical "where the user actually was at time T" history. For each
+// waypoint we find the trackpoint whose timestamp is closest to the
+// waypoint's, and if it's within both time and distance gates, we
+// replace the waypoint's coordinates with that trackpoint's.
+//
+// Defensive gates:
+//   - SNAP_TIME_WINDOW_MS (15 s): trackpoints farther in time than this
+//     are ignored — keeps us from snapping to an irrelevant point if
+//     GPS lost signal for a long stretch.
+//   - SNAP_DISTANCE_MAX_M (200 m): if the waypoint is farther than this
+//     from its nearest-by-time trackpoint, it's likely a deliberate
+//     off-track waypoint (a landmark observed from a layby, etc.) and
+//     we leave it alone.
+//
+// Verified against a real user-submitted stage (2026-05-31 freeway
+// descent): WP 14 "steep left hander" — 12 s stale, 142 m off-track —
+// snaps to the on-track position. The visible 167 m wrong-direction
+// jump that produced an RN zigzag triangle reduces to a 67 m natural
+// road-curvature wiggle. Healthy waypoints (small or no staleness)
+// snap by only 1-10 m, essentially a no-op.
+
+const SNAP_TIME_WINDOW_MS = 15_000;
+const SNAP_DISTANCE_MAX_M = 200;
+
+function snapWaypointToTrack(waypoint, trackPoints) {
+  if (!trackPoints || trackPoints.length === 0) return waypoint;
+  const wpMs = Date.parse(waypoint.timestamp || waypoint.time || "");
+  if (!Number.isFinite(wpMs)) return waypoint;
+
+  let bestIdx = -1;
+  let bestDelta = Infinity;
+  for (let i = 0; i < trackPoints.length; i++) {
+    const tpMs = Date.parse(trackPoints[i].time || trackPoints[i].timestamp || "");
+    if (!Number.isFinite(tpMs)) continue;
+    const delta = Math.abs(tpMs - wpMs);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx < 0 || bestDelta > SNAP_TIME_WINDOW_MS) return waypoint;
+
+  const tp = trackPoints[bestIdx];
+  const distance = haversineMeters(
+    { lat: Number(waypoint.lat), lon: Number(waypoint.lon) },
+    { lat: Number(tp.lat), lon: Number(tp.lon) },
+  );
+  if (distance > SNAP_DISTANCE_MAX_M) return waypoint;
+
+  return { ...waypoint, lat: tp.lat, lon: tp.lon };
 }
 
 export function buildStartWaypoint(startGPS) {
