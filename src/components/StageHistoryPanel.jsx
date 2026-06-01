@@ -3,7 +3,11 @@
 // Slide-in panel that lists saved stages and lets the user open one for review.
 
 import React, { useEffect, useState, useCallback } from "react";
-import { listSavedStages, loadSavedStage } from "../lib/stageHistory.js";
+import {
+  listSavedStages,
+  loadSavedStage,
+  deleteLocalStage,
+} from "../lib/stageHistory.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,11 +60,12 @@ function stageSubline(meta) {
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
-function StageRow({ entry, onOpen, loading }) {
+function StageRow({ entry, onOpen, onDelete, loading, deleting }) {
   const { meta, savedAt } = entry;
 
   const distLabel = formatKm(meta?.totalDistanceM ?? null);
   const wpCount = meta?.waypointCount ?? null;
+  const busy = loading || deleting;
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
@@ -94,10 +99,38 @@ function StageRow({ entry, onOpen, loading }) {
       <button
         type="button"
         onClick={() => onOpen(entry)}
-        disabled={loading}
+        disabled={busy}
         className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-300 text-blue-600 bg-white hover:bg-blue-50 disabled:opacity-40 transition-colors"
       >
         {loading ? "Loading…" : "Open"}
+      </button>
+
+      {/* Delete-from-device button. Removes only the local copy; any
+          Supabase backup persists and the stage will still appear in
+          History next time the list loads (served from the cloud).
+          Use case: free up iPad localStorage during a multi-day survey
+          once stages are confirmed synced. */}
+      <button
+        type="button"
+        onClick={() => onDelete(entry)}
+        disabled={busy}
+        title="Remove this stage from the device (cloud copy is kept)"
+        aria-label="Remove from device"
+        className="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+          />
+        </svg>
       </button>
     </div>
   );
@@ -108,9 +141,12 @@ function StageRow({ entry, onOpen, loading }) {
 export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose }) {
   const [entries, setEntries] = useState(null); // null = loading
   const [loadingId, setLoadingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState(null);
+  // Bump to force a list reload after a delete.
+  const [reloadNonce, setReloadNonce] = useState(0);
 
-  // Load list on mount
+  // Load list on mount, and again after any delete.
   useEffect(() => {
     let cancelled = false;
     setEntries(null);
@@ -131,7 +167,7 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
     return () => {
       cancelled = true;
     };
-  }, [userId, owner]);
+  }, [userId, owner, reloadNonce]);
 
   const handleOpen = useCallback(
     async (entry) => {
@@ -151,6 +187,35 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
       }
     },
     [userId, owner, onOpenStage],
+  );
+
+  const handleDelete = useCallback(
+    (entry) => {
+      // The delete only removes the local copy. If the stage was synced
+      // to Supabase it will continue to appear in History (sourced from
+      // the cloud on next list load). For a "local"-source entry we
+      // can't tell whether a cloud backup exists, so we warn more
+      // strongly.
+      const isLocalOnly = entry.source === "local";
+      const name = stageSummary(entry.meta);
+      const confirmMsg = isLocalOnly
+        ? `Remove "${name}" from this device?\n\nThis stage has not been confirmed as synced to the cloud — if there is no cloud copy, the data will be lost permanently.`
+        : `Remove "${name}" from this device?\n\nThe cloud copy will be kept and the stage will still appear in History.`;
+
+      if (!window.confirm(confirmMsg)) return;
+
+      setDeletingId(entry.localId);
+      try {
+        deleteLocalStage(owner, entry.localId);
+        setReloadNonce((n) => n + 1);
+      } catch (err) {
+        console.error("StageHistoryPanel: delete failed", err);
+        setError("Failed to remove stage from device.");
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [owner],
   );
 
   return (
@@ -205,7 +270,9 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
               key={entry.localId}
               entry={entry}
               onOpen={handleOpen}
+              onDelete={handleDelete}
               loading={loadingId === entry.localId}
+              deleting={deletingId === entry.localId}
             />
           ))}
       </div>

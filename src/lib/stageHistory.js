@@ -164,3 +164,25 @@ export async function loadSavedStage(userId, owner, entry) {
   }
   return loadLocalStage(owner, entry.localId);
 }
+
+/**
+ * Remove a stage's local copy to free device storage. Intentionally does
+ * NOT touch the Supabase copy — for a multi-day survey the user wants
+ * to clear localStorage pressure without losing the cloud backup. If the
+ * stage was previously synced, it will continue to appear in History
+ * (served from Supabase the next time listSavedStages runs).
+ *
+ * Returns true if a local entry was found and removed.
+ */
+export function deleteLocalStage(owner, localId) {
+  if (!owner || !localId) return false;
+  const key = `${LOCAL_KEY_PREFIX}${owner}:${localId}`;
+  try {
+    if (localStorage.getItem(key) == null) return false;
+    localStorage.removeItem(key);
+    return true;
+  } catch (e) {
+    console.warn("stageHistory: deleteLocalStage failed", e);
+    return false;
+  }
+}
