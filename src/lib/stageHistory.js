@@ -19,6 +19,15 @@ import { supabase } from "./supabaseClient.js";
 
 const LOCAL_KEY_PREFIX = "rm_stage:";
 
+// Hard upper bound on the History list. 200 covers a multi-day survey
+// (Lachie's 24-day rally at 3-4 stages/day = ~75-80 stages, with
+// generous headroom). Each row is a few hundred bytes of metadata, so
+// the list scrolls fine; the Supabase query stays well under 100 KB.
+// If a user exceeds this, the panel footer will surface that there are
+// older stages not shown — at which point a Load More UI becomes the
+// right next step.
+export const STAGE_HISTORY_LIMIT = 200;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function metaSavedAt(meta) {
@@ -32,7 +41,7 @@ function metaSavedAt(meta) {
  * Selects only `local_id`, `meta`, and `created_at` — the heavy `payload`
  * column is excluded so the list loads quickly.
  */
-async function listSupabaseStages(userId, limit = 20) {
+async function listSupabaseStages(userId, limit = STAGE_HISTORY_LIMIT) {
   const { data, error } = await supabase
     .from("stage_exports")
     .select("local_id, meta, created_at")
@@ -110,7 +119,7 @@ function listLocalStages(owner) {
     return tb - ta;
   });
 
-  return results.slice(0, 20);
+  return results.slice(0, STAGE_HISTORY_LIMIT);
 }
 
 /**

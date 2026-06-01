@@ -7,6 +7,7 @@ import {
   listSavedStages,
   loadSavedStage,
   deleteLocalStage,
+  STAGE_HISTORY_LIMIT,
 } from "../lib/stageHistory.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -279,7 +280,9 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
 
       {entries !== null && entries.length > 0 && (
         <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-[10px] text-gray-400">
-          Showing up to 20 most recent stages
+          {entries.length >= STAGE_HISTORY_LIMIT
+            ? `Showing the ${STAGE_HISTORY_LIMIT} most recent stages — older stages are saved but not listed here`
+            : `Showing ${entries.length} stage${entries.length === 1 ? "" : "s"}`}
         </div>
       )}
     </div>
