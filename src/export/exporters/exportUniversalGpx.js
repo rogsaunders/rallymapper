@@ -72,6 +72,7 @@ export function exportUniversalWaypointsGpx(stage, config = {}) {
  */
 export function getRegularWaypoints(stage) {
   const trackPoints = stage.trackPoints || [];
+  const lookbackMs = readWaypointLookbackMs();
   return (stage.waypoints || [])
     .filter(
       (w) =>
@@ -80,8 +81,42 @@ export function getRegularWaypoints(stage) {
         Number.isFinite(Number(w.lat)) &&
         Number.isFinite(Number(w.lon)),
     )
-    .map((w) => snapWaypointToTrack(w, trackPoints))
+    .map((w) => snapWaypointToTrack(w, trackPoints, lookbackMs))
     .sort((a, b) => waypointTimeMs(a) - waypointTimeMs(b));
+}
+
+// ── Lookback offset ──────────────────────────────────────────────────
+//
+// After PR #43's interpolation snap, waypoints land at the user's
+// actual GPS position at the moment they tapped Record. If the user
+// taps right at a landmark, the pin lands at the landmark. If they
+// tap 1-2 s after passing it (typical human reaction: see landmark →
+// decide → look at iPad → tap), the pin lands 20-50 m past it.
+//
+// The lookback offset is a user-tunable setting that shifts the snap
+// target backwards in time by N seconds — effectively asking "where
+// was I N seconds before I tapped?". For a surveyor with a consistent
+// reaction-time gap, dialling in 1-1.5 s lands pins close to their
+// intended landmarks without changing how they tap.
+//
+// Default 0 preserves the strict PR #43 behaviour. Range capped at
+// 5 s to prevent absurd values; the slider in the UI is constrained to
+// 0-3 s.
+
+const WAYPOINT_LOOKBACK_KEY = "rm_waypoint_lookback_s";
+const WAYPOINT_LOOKBACK_MAX_MS = 5_000;
+
+function readWaypointLookbackMs() {
+  if (typeof localStorage === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(WAYPOINT_LOOKBACK_KEY);
+    if (raw == null) return 0;
+    const seconds = Number(raw);
+    if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+    return Math.min(seconds, WAYPOINT_LOOKBACK_MAX_MS / 1000) * 1000;
+  } catch {
+    return 0;
+  }
 }
 
 function waypointTimeMs(w) {
@@ -127,6 +162,12 @@ function waypointTimeMs(w) {
 //     case where 6+ s of iOS staleness can put a tap-time read ~250 m
 //     behind the true position.
 //
+// Lookback offset (lookbackMs): subtract from the waypoint timestamp
+// before interpolation, so the snap target is "where the user was N
+// seconds before they tapped". Compensates for human reaction time
+// between seeing a landmark and tapping Record. Default 0 preserves
+// strict PR #43 behaviour. See readWaypointLookbackMs.
+//
 // Verified against two real user-submitted stages:
 //   - 2026-05-31 (Lachie's freeway descent): the 167 m wrong-direction
 //     zigzag at WP 14 "steep left hander" reduces to a smooth curve.
@@ -138,10 +179,15 @@ function waypointTimeMs(w) {
 const SNAP_TIME_WINDOW_MS = 15_000;
 const SNAP_DISTANCE_MAX_M = 400;
 
-function snapWaypointToTrack(waypoint, trackPoints) {
+function snapWaypointToTrack(waypoint, trackPoints, lookbackMs = 0) {
   if (!trackPoints || trackPoints.length === 0) return waypoint;
-  const wpMs = Date.parse(waypoint.timestamp || waypoint.time || "");
-  if (!Number.isFinite(wpMs)) return waypoint;
+  const rawWpMs = Date.parse(waypoint.timestamp || waypoint.time || "");
+  if (!Number.isFinite(rawWpMs)) return waypoint;
+  // Target time is shifted backwards by the lookback amount, so the
+  // interpolation lands where the user was BEFORE they tapped (closer
+  // to where they saw the landmark, not where they ended up after
+  // reaction-time delay).
+  const wpMs = rawWpMs - Math.max(0, Number(lookbackMs) || 0);
 
   // Find the bracketing trackpoints: the latest one with time <= wpMs
   // and the earliest one with time >= wpMs. Most trackpoint streams
