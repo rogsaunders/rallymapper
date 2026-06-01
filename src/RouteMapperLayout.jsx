@@ -1696,6 +1696,31 @@ export default function RouteMapperLayout() {
     return () => clearInterval(id);
   }, [stageActive, isEndingStage]);
 
+  // ── Auto-Lock onboarding tip ─────────────────────────────────────────
+  // iPadOS Auto-Lock defaults to 2-5 min. When the screen sleeps mid-drive
+  // iOS suspends Safari and watchPosition stops firing — surveyors get
+  // long straight-line gaps in their GPS track. The trackpoint-gap
+  // detector at end-stage catches it after the fact; this banner heads
+  // it off by reminding the user once, on first load, to set Auto-Lock
+  // to Never while surveying. Dismissal persists across reloads.
+  const AUTOLOCK_TIP_KEY = "rm_autolock_tip_dismissed_v1";
+  const [autolockTipDismissed, setAutolockTipDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(AUTOLOCK_TIP_KEY) === "true";
+    } catch {
+      return true; // fail closed — don't pester users if storage is broken
+    }
+  });
+  const dismissAutolockTip = () => {
+    setAutolockTipDismissed(true);
+    try {
+      localStorage.setItem(AUTOLOCK_TIP_KEY, "true");
+    } catch {
+      // localStorage full or blocked — the in-memory dismiss still
+      // hides it for this session, which is enough.
+    }
+  };
+
   const handleEndStage = async () => {
     if (isEndingStage) return;
     if (!stageActive) return;
@@ -2496,6 +2521,39 @@ export default function RouteMapperLayout() {
           {billingToast === "success"
             ? "✓ Payment successful — your plan has been upgraded!"
             : "Checkout cancelled — no payment was taken."}
+        </div>
+      )}
+
+      {/* ── Auto-Lock onboarding tip (one-time) ────────────────────────────
+          iPadOS Auto-Lock defaults to 2-5 min; when the screen sleeps the
+          tab is suspended and GPS recording silently pauses. Dismissed
+          state persists in localStorage so the user only sees it once. */}
+      {!autolockTipDismissed && (
+        <div
+          className="px-4 py-2 text-sm border-b bg-blue-50 border-blue-200 text-blue-800"
+          role="note"
+        >
+          <div className="mx-auto max-w-6xl flex items-start gap-2">
+            <span className="text-base leading-none mt-0.5">💡</span>
+            <div className="flex-1">
+              <div className="font-medium">
+                Before you start surveying, turn off Auto-Lock
+              </div>
+              <div className="text-xs mt-0.5 opacity-90">
+                On the iPad: Settings → Display & Brightness → Auto-Lock →
+                Never. If the screen sleeps mid-drive, GPS recording pauses
+                until you wake it again.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={dismissAutolockTip}
+              className="shrink-0 px-3 py-1 rounded-lg text-xs font-semibold border border-blue-300 text-blue-700 bg-white hover:bg-blue-100 transition-colors"
+              aria-label="Dismiss Auto-Lock tip"
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
 
