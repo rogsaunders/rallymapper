@@ -101,57 +101,105 @@ function waypointTimeMs(w) {
 // one with stale GPS sits 100 m behind, the one after that sits where
 // it should, and so on.
 //
-// The trackpoint stream is recorded continuously and represents the
-// canonical "where the user actually was at time T" history. For each
-// waypoint we find the trackpoint whose timestamp is closest to the
-// waypoint's, and if it's within both time and distance gates, we
-// replace the waypoint's coordinates with that trackpoint's.
+// The trackpoint stream is recorded continuously via watchPosition and
+// represents the canonical "where the user actually was at time T"
+// history. We interpolate the user's position at the waypoint's
+// timestamp from the two trackpoints that bracket it in time, and
+// replace the waypoint's coords with that interpolated value.
+//
+// Interpolation (rather than the previous nearest-by-time snap) avoids
+// a subtle forward/backward bias: trackpoints sample every 5-10 s, so
+// the "nearest in time" trackpoint can be ~2-5 s after the waypoint,
+// which at highway speed places the snap target 40-100 m forward of
+// where the user actually was. The visible symptom is "waypoints appear
+// past their landmarks." Linear interpolation between bracketing points
+// gives the position at the exact waypoint timestamp, with no time-
+// direction bias.
 //
 // Defensive gates:
-//   - SNAP_TIME_WINDOW_MS (15 s): trackpoints farther in time than this
-//     are ignored — keeps us from snapping to an irrelevant point if
-//     GPS lost signal for a long stretch.
-//   - SNAP_DISTANCE_MAX_M (200 m): if the waypoint is farther than this
-//     from its nearest-by-time trackpoint, it's likely a deliberate
+//   - SNAP_TIME_WINDOW_MS (15 s): if the bracketing trackpoints span
+//     more than this, we treat it as a GPS dropout and leave the
+//     waypoint alone.
+//   - SNAP_DISTANCE_MAX_M (400 m): if the waypoint is farther than this
+//     from the interpolated track position, it's likely a deliberate
 //     off-track waypoint (a landmark observed from a layby, etc.) and
-//     we leave it alone.
+//     we leave it alone. Raised from 200 m to catch the freeway-speed
+//     case where 6+ s of iOS staleness can put a tap-time read ~250 m
+//     behind the true position.
 //
-// Verified against a real user-submitted stage (2026-05-31 freeway
-// descent): WP 14 "steep left hander" — 12 s stale, 142 m off-track —
-// snaps to the on-track position. The visible 167 m wrong-direction
-// jump that produced an RN zigzag triangle reduces to a 67 m natural
-// road-curvature wiggle. Healthy waypoints (small or no staleness)
-// snap by only 1-10 m, essentially a no-op.
+// Verified against two real user-submitted stages:
+//   - 2026-05-31 (Lachie's freeway descent): the 167 m wrong-direction
+//     zigzag at WP 14 "steep left hander" reduces to a smooth curve.
+//   - 2026-06-01 (Roger's 18 km Mylor→Bunnings): WP "css station" no
+//     longer overshoots forward; WP "speed 80 roadworks" (253 m off
+//     under the old 200 m gate) now snaps correctly to the recorded
+//     freeway track.
 
 const SNAP_TIME_WINDOW_MS = 15_000;
-const SNAP_DISTANCE_MAX_M = 200;
+const SNAP_DISTANCE_MAX_M = 400;
 
 function snapWaypointToTrack(waypoint, trackPoints) {
   if (!trackPoints || trackPoints.length === 0) return waypoint;
   const wpMs = Date.parse(waypoint.timestamp || waypoint.time || "");
   if (!Number.isFinite(wpMs)) return waypoint;
 
-  let bestIdx = -1;
-  let bestDelta = Infinity;
+  // Find the bracketing trackpoints: the latest one with time <= wpMs
+  // and the earliest one with time >= wpMs. Most trackpoint streams
+  // are time-monotonic, but we don't assume that — scan once.
+  let beforeIdx = -1;
+  let beforeMs = -Infinity;
+  let afterIdx = -1;
+  let afterMs = Infinity;
   for (let i = 0; i < trackPoints.length; i++) {
     const tpMs = Date.parse(trackPoints[i].time || trackPoints[i].timestamp || "");
     if (!Number.isFinite(tpMs)) continue;
-    const delta = Math.abs(tpMs - wpMs);
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      bestIdx = i;
+    if (tpMs <= wpMs && tpMs > beforeMs) {
+      beforeMs = tpMs;
+      beforeIdx = i;
+    }
+    if (tpMs >= wpMs && tpMs < afterMs) {
+      afterMs = tpMs;
+      afterIdx = i;
     }
   }
-  if (bestIdx < 0 || bestDelta > SNAP_TIME_WINDOW_MS) return waypoint;
 
-  const tp = trackPoints[bestIdx];
+  // Compute the interpolated position at the waypoint's timestamp.
+  // Edge cases:
+  //   - waypoint timestamp lies outside the trackpoint span (e.g. a
+  //     waypoint captured before the first trackpoint arrived): fall
+  //     back to the single available bracket if within the time window,
+  //     otherwise leave the waypoint alone.
+  let interpLat;
+  let interpLon;
+  if (beforeIdx >= 0 && afterIdx >= 0 && beforeIdx !== afterIdx) {
+    // Normal case: two distinct brackets.
+    if (afterMs - beforeMs > SNAP_TIME_WINDOW_MS) return waypoint;
+    const span = afterMs - beforeMs;
+    const frac = span > 0 ? (wpMs - beforeMs) / span : 0;
+    const before = trackPoints[beforeIdx];
+    const after = trackPoints[afterIdx];
+    interpLat = Number(before.lat) + frac * (Number(after.lat) - Number(before.lat));
+    interpLon = Number(before.lon) + frac * (Number(after.lon) - Number(before.lon));
+  } else {
+    // Only one side has a bracket, or both indices coincide (waypoint
+    // timestamp matches a trackpoint exactly). Use whichever single
+    // trackpoint is available, gated by the time window.
+    const idx = beforeIdx >= 0 ? beforeIdx : afterIdx;
+    if (idx < 0) return waypoint;
+    const tpMs = beforeIdx >= 0 ? beforeMs : afterMs;
+    if (Math.abs(tpMs - wpMs) > SNAP_TIME_WINDOW_MS) return waypoint;
+    interpLat = Number(trackPoints[idx].lat);
+    interpLon = Number(trackPoints[idx].lon);
+  }
+
+  // Distance gate — preserve deliberately off-track waypoints.
   const distance = haversineMeters(
     { lat: Number(waypoint.lat), lon: Number(waypoint.lon) },
-    { lat: Number(tp.lat), lon: Number(tp.lon) },
+    { lat: interpLat, lon: interpLon },
   );
   if (distance > SNAP_DISTANCE_MAX_M) return waypoint;
 
-  return { ...waypoint, lat: tp.lat, lon: tp.lon };
+  return { ...waypoint, lat: interpLat, lon: interpLon };
 }
 
 export function buildStartWaypoint(startGPS) {
