@@ -698,6 +698,15 @@ export default function RouteMapperLayout() {
   const [snapWindowMs, setSnapWindowMs] = useState(
     () => Number(localStorage.getItem("rm_snap_window_ms")) || 5000,
   );
+  // Waypoint capture lookback (seconds) — shifts the export-time
+  // snap-to-track target backwards by this amount to compensate for
+  // human reaction time between seeing a landmark and tapping Record.
+  // Default 0 = strict PR #43 behaviour (no compensation). Read by the
+  // GPX exporter via readWaypointLookbackMs() in exportUniversalGpx.js.
+  const [waypointLookbackS, setWaypointLookbackS] = useState(() => {
+    const raw = Number(localStorage.getItem("rm_waypoint_lookback_s"));
+    return Number.isFinite(raw) && raw >= 0 ? raw : 0;
+  });
   const [pendingWaypoint, setPendingWaypoint] = useState(null);
   const [pendingRemainingMs, setPendingRemainingMs] = useState(0);
   const pendingWaypointRef = useRef(null);
@@ -3575,6 +3584,43 @@ export default function RouteMapperLayout() {
                       <span>2s (fast)</span>
                       <span>10s (relaxed)</span>
                     </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        Waypoint capture lookback
+                      </label>
+                      <span className="text-xs text-gray-500 tabular-nums">
+                        {waypointLookbackS.toFixed(1)}s
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={3}
+                      step={0.5}
+                      value={waypointLookbackS}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setWaypointLookbackS(val);
+                        localStorage.setItem(
+                          "rm_waypoint_lookback_s",
+                          String(val),
+                        );
+                      }}
+                      className="w-full accent-blue-600"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                      <span>0s (off)</span>
+                      <span>3s (slow reactions)</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                      If your waypoints consistently land past their
+                      landmarks in Rally Navigator, raise this. Each 0.5 s
+                      shifts pins about 11 m back at highway speed. Applied
+                      at export time only — no effect on already-exported
+                      stages.
+                    </p>
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
