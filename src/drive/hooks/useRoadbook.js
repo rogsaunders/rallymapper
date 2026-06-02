@@ -36,18 +36,87 @@ const STAGE_JSON_LEGACY = /_stage\.json$/;
 const DOCX_PATH_PRIMARY = "Printable/roadbook.docx";
 const DOCX_PATH_LEGACY = /_roadbook\.docx$/;
 
+// Files we should always ignore when scanning a user-supplied ZIP.
+//
+// When users extract our export ZIP on macOS, edit a file (typically
+// Printable/roadbook.docx), then re-Compress the folder via Finder,
+// the resulting archive picks up two kinds of junk:
+//
+//   • __MACOSX/**/._<name>  — AppleDouble resource-fork shadows for
+//     every file. Their basename starts with "._" and the contents
+//     are a small binary header, not the file the user thinks it is.
+//     If the loader latches onto one of these by accident, JSON.parse
+//     fails on the binary header (the surface symptom Roger hit:
+//     "JSON Parse error: Unrecognized token *").
+//   • .DS_Store / Thumbs.db — directory metadata, never user data.
+//
+// Filtering these out before any path matching is the only way to
+// stay robust to macOS re-zips. The original RouteMapper export ZIP
+// (built via JSZip in buildRoutePackage.js) is already clean, so
+// this filter is a no-op on the happy path.
+function isArchiveNoise(name) {
+  if (!name) return true;
+  if (name.startsWith("__MACOSX/") || name.includes("/__MACOSX/")) return true;
+  const base = name.slice(name.lastIndexOf("/") + 1);
+  if (base.startsWith("._")) return true;
+  if (base === ".DS_Store" || base === "Thumbs.db") return true;
+  return false;
+}
+
+// Pull the basename out of a zip entry path. JSZip uses forward
+// slashes regardless of OS, so this is safe to do without path-libs.
+function baseName(name) {
+  return name.slice(name.lastIndexOf("/") + 1);
+}
+
+// Locate stage.json inside a ZIP, in priority order:
+//   1. Exact "Source/stage.json" at the root (clean export from RM).
+//   2. Any non-noise entry whose path ends in "/stage.json" — handles
+//      macOS Finder Compress which wraps everything in a parent
+//      folder, producing e.g. "MyExport/Source/stage.json".
+//   3. Any non-noise entry whose name matches the legacy "_stage.json"
+//      pattern (very old export layouts).
+//
+// Every step skips directory entries (JSZip exposes them with
+// `dir: true`) and archive noise (__MACOSX, ._*, .DS_Store).
 function findStageJsonEntry(zip) {
-  if (zip.files["Source/stage.json"]) return zip.files["Source/stage.json"];
+  const direct = zip.files["Source/stage.json"];
+  if (direct && !direct.dir && !isArchiveNoise("Source/stage.json")) {
+    return direct;
+  }
+  // Parent-folder-wrapped: "<anything>/Source/stage.json" or
+  // just "stage.json" sitting at any depth.
   for (const name of Object.keys(zip.files)) {
-    if (STAGE_JSON_LEGACY.test(name)) return zip.files[name];
+    const entry = zip.files[name];
+    if (entry.dir || isArchiveNoise(name)) continue;
+    if (baseName(name) === "stage.json") return entry;
+  }
+  // Legacy *_stage.json fallback.
+  for (const name of Object.keys(zip.files)) {
+    const entry = zip.files[name];
+    if (entry.dir || isArchiveNoise(name)) continue;
+    if (STAGE_JSON_LEGACY.test(name)) return entry;
   }
   return null;
 }
 
 function findDocxEntry(zip) {
-  if (zip.files[DOCX_PATH_PRIMARY]) return zip.files[DOCX_PATH_PRIMARY];
+  const direct = zip.files[DOCX_PATH_PRIMARY];
+  if (direct && !direct.dir && !isArchiveNoise(DOCX_PATH_PRIMARY)) {
+    return direct;
+  }
+  // Parent-folder-wrapped: "<anything>/Printable/roadbook.docx" or
+  // just "roadbook.docx" at any depth.
   for (const name of Object.keys(zip.files)) {
-    if (DOCX_PATH_LEGACY.test(name)) return zip.files[name];
+    const entry = zip.files[name];
+    if (entry.dir || isArchiveNoise(name)) continue;
+    if (baseName(name) === "roadbook.docx") return entry;
+  }
+  // Legacy *_roadbook.docx fallback.
+  for (const name of Object.keys(zip.files)) {
+    const entry = zip.files[name];
+    if (entry.dir || isArchiveNoise(name)) continue;
+    if (DOCX_PATH_LEGACY.test(name)) return entry;
   }
   return null;
 }
