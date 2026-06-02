@@ -22,6 +22,10 @@ const TYPE_KEYWORDS = {
   nav: ["nav", "navigation", "turn"],
   control: ["control", "checkpoint"],
   terrain: ["terrain"],
+  // "speed N" captures speed-limit signage. The number is resolved by
+  // extractSpeedIcon() after this keyword is stripped; "speed" alone
+  // falls through to the DEFAULT_ICON for the speed category (speed_50).
+  speed: ["speed"],
 };
 
 // ── Icon aliases ─────────────────────────────────────────────────────
@@ -69,7 +73,82 @@ const ICON_ALIASES = [
   ["service", "service"],
   ["start", "start"],
   ["finish", "finish"],
+
+  // Speed icons (speed_25 … speed_110) are NOT listed here on purpose —
+  // they are resolved inline by extractSpeedIcon() once the "speed" type
+  // keyword has been stripped. That gives us word-form support
+  // ("fifty"), arbitrary-number snapping ("speed 70" → speed_60), and
+  // avoids cross-contaminating other types (a hypothetical "hazard 50
+  // something" should not pick up a speed icon).
 ];
+
+// Supported speed-limit icons, in km/h.
+const SPEED_LIMITS = [25, 40, 50, 60, 80, 100, 110];
+
+// English number words we expect speech-to-text to emit for speed
+// limits. Multi-word entries must be probed longest-first so "one
+// hundred and ten" doesn't get shortened to "one" before the long
+// match has a chance. Values are km/h.
+const SPEED_NUMBER_WORDS = {
+  "one hundred and ten": 110,
+  "one hundred ten":     110,
+  "one hundred":         100,
+  "one ten":             110,
+  "twenty five":          25,
+  "twenty-five":          25,
+  forty:                  40,
+  fifty:                  50,
+  sixty:                  60,
+  eighty:                 80,
+  hundred:               100,
+};
+
+/**
+ * After "speed" has been stripped from the command, try to read a
+ * number from the leading edge of `remainder`. Snaps to the nearest
+ * supported speed limit so unanticipated numbers ("speed 70") still
+ * produce a useful icon (speed_60 in that case).
+ *
+ * @param {string} remainder
+ * @returns {{ iconId: string, consumed: number } | null}
+ */
+function extractSpeedIcon(remainder) {
+  if (!remainder) return null;
+
+  let value = null;
+  let consumed = 0;
+
+  // 1. Digit form — "50", "110", etc.
+  const digitMatch = remainder.match(/^(\d{1,3})\b/);
+  if (digitMatch) {
+    value = parseInt(digitMatch[1], 10);
+    consumed = digitMatch[0].length;
+  } else {
+    // 2. Word form — probe longest-first.
+    const keys = Object.keys(SPEED_NUMBER_WORDS).sort(
+      (a, b) => b.length - a.length,
+    );
+    for (const word of keys) {
+      if (
+        remainder === word ||
+        remainder.startsWith(word + " ") ||
+        remainder.startsWith(word + ",")
+      ) {
+        value = SPEED_NUMBER_WORDS[word];
+        consumed = word.length;
+        break;
+      }
+    }
+  }
+
+  if (value == null) return null;
+
+  // Snap to the nearest supported speed limit.
+  const snapped = SPEED_LIMITS.reduce((best, n) =>
+    Math.abs(n - value) < Math.abs(best - value) ? n : best,
+  );
+  return { iconId: `speed_${snapped}`, consumed };
+}
 
 // Reverse lookup: iconId → category type
 const ICON_TO_TYPE = {
@@ -101,6 +180,13 @@ const ICON_TO_TYPE = {
   twisty: "terrain",
   up_hill: "terrain",
   down_hill: "terrain",
+  speed_25: "speed",
+  speed_40: "speed",
+  speed_50: "speed",
+  speed_60: "speed",
+  speed_80: "speed",
+  speed_100: "speed",
+  speed_110: "speed",
 };
 
 // Default icon per type (matches RouteMapperLayout defaults)
@@ -110,6 +196,10 @@ const DEFAULT_ICON = {
   control: "start",
   terrain: "bump",
   note: null,
+  // If the user says just "speed" with no number, fall back to 50 km/h
+  // — the single most-common limit on Australian rural roads. Any
+  // explicit "speed N" matches before this default kicks in.
+  speed: "speed_50",
 };
 
 /**
@@ -153,6 +243,18 @@ export function parseVoiceCommand(raw) {
       }
     }
     if (type) break;
+  }
+
+  // 1.5. Speed icons are number-driven, so they don't fit the flat
+  //      ICON_ALIASES table cleanly. Resolve them here only when the
+  //      "speed" type keyword has actually been spoken, which keeps
+  //      bare numbers in other categories from triggering speed_*.
+  if (type === "speed" && !iconId) {
+    const speedHit = extractSpeedIcon(remainder);
+    if (speedHit) {
+      iconId = speedHit.iconId;
+      remainder = remainder.slice(speedHit.consumed).trim();
+    }
   }
 
   // 2. Try to match an icon alias in whatever remains
