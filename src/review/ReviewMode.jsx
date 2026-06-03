@@ -41,7 +41,11 @@ import MapView from "../components/MapView";
 import RoadbookView from "../components/roadbook/RoadbookView";
 import { generateRoadbook } from "../roadbook";
 import { useAuth } from "../auth/AuthProvider";
-import { listSavedStages, loadSavedStage } from "../lib/stageHistory";
+import {
+  listSavedStages,
+  loadSavedStage,
+  saveStageMutation,
+} from "../lib/stageHistory";
 
 const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
 
@@ -181,9 +185,14 @@ export default function ReviewMode() {
   const stage = selectedStageId == null ? draft : historicalPayload;
 
   const [selectedIndex, setSelectedIndex] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   // Reset selection whenever the source stage changes.
   useEffect(() => {
     setSelectedIndex(null);
+    setEditingIndex(null);
+    setSaveError(null);
   }, [selectedStageId, stage]);
 
   // Terrain is the most useful default for organiser review (task a),
@@ -236,6 +245,100 @@ export default function ReviewMode() {
       (r.linkedWaypointIds || []).includes(waypointId),
     );
     if (idx >= 0) setSelectedIndex(idx);
+  };
+
+  // ── Edit-in-place flow (PR C) ─────────────────────────────────────
+  // Identify which underlying source we're writing back to. Derived
+  // from selectedStageId + savedStages so it stays consistent with
+  // whatever the picker shows.
+  const selectedEntry = selectedStageId
+    ? savedStages.find((s) => s.localId === selectedStageId)
+    : null;
+  const stageSource =
+    selectedStageId == null
+      ? "active"
+      : selectedEntry?.source === "supabase"
+        ? "supabase"
+        : "local";
+
+  // Editable when (a) we have a stage to write to and (b) for the
+  // Supabase source we have a signed-in user (the upsert needs it).
+  // Editing the active draft works for both signed-in users and
+  // guests (the autosave is local).
+  const canEdit =
+    !!stage &&
+    (stageSource !== "supabase" || !!userId);
+
+  const onEditStart = (idx) => {
+    setSaveError(null);
+    setEditingIndex(idx);
+  };
+
+  const onCancelEdit = () => {
+    setEditingIndex(null);
+    setSaveError(null);
+  };
+
+  const onSaveEdit = async (rowIndex, patch) => {
+    if (savingEdit) return;
+    const row = rows[rowIndex];
+    if (!row) return;
+
+    const linkedIds = row.linkedWaypointIds || [];
+    if (linkedIds.length === 0) {
+      // No waypoint to attach to — auto-detected turns don't have one.
+      // Refuse and surface a hint rather than silently dropping the
+      // edit.
+      setSaveError(
+        "This row was auto-detected from the track; it isn't tied to a waypoint, so edits can't be saved here. Add a waypoint at this location in Record mode instead.",
+      );
+      return;
+    }
+
+    // Patch every linked waypoint (usually just one) so a row stays
+    // consistent if multiple waypoints got merged into it.
+    const updatedWaypoints = (stage.waypoints || []).map((w) =>
+      linkedIds.includes(w.id)
+        ? {
+            ...w,
+            poi: patch.poi ?? "",
+            iconId: patch.iconId ?? null,
+            type: patch.type ?? w.type ?? "note",
+          }
+        : w,
+    );
+
+    const updatedStage = { ...stage, waypoints: updatedWaypoints };
+
+    setSavingEdit(true);
+    setSaveError(null);
+    try {
+      const result = await saveStageMutation({
+        userId,
+        owner,
+        source: stageSource,
+        localId: selectedStageId,
+        payload: updatedStage,
+      });
+      if (!result.ok) {
+        setSaveError(result.error?.message || "Save failed.");
+        return;
+      }
+      // Optimistic local update so the row reflects the change
+      // immediately (the next regenerateRoadbook picks it up via the
+      // useMemo dependency on stage).
+      if (stageSource === "active") {
+        setDraft(updatedStage);
+      } else {
+        setHistoricalPayload(updatedStage);
+      }
+      setEditingIndex(null);
+    } catch (err) {
+      console.warn("[ReviewMode] saveStageMutation threw:", err);
+      setSaveError(err?.message || "Save failed.");
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   // Stage-meta strings for the sub-header.
@@ -385,6 +488,19 @@ export default function ReviewMode() {
             the map dominates on desktop, which matches what the
             organiser actually wants to look at. */}
         <div className="md:w-[44ch] md:border-l border-t md:border-t-0 flex flex-col min-h-0 bg-gray-50">
+          {saveError && (
+            <div className="px-3 py-2 text-xs bg-red-50 border-b border-red-200 text-red-800 flex items-start gap-2">
+              <span className="font-semibold">Save failed:</span>
+              <span className="min-w-0 break-words">{saveError}</span>
+              <button
+                type="button"
+                onClick={() => setSaveError(null)}
+                className="ml-auto shrink-0 text-red-700 hover:text-red-900 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {historicalLoading && !rows.length ? (
             <div className="flex-1 flex items-center justify-center p-8 text-gray-500 text-sm">
               Loading stage…
@@ -393,7 +509,20 @@ export default function ReviewMode() {
             <RoadbookView
               rows={rows}
               selectedIndex={selectedIndex}
-              onRowTap={(i) => setSelectedIndex(i)}
+              onRowTap={(i) => {
+                // Tapping any row while another is in edit mode
+                // cancels that edit — prevents accidental discard
+                // surprises by behaving as a navigation gesture.
+                if (editingIndex != null && editingIndex !== i) {
+                  setEditingIndex(null);
+                }
+                setSelectedIndex(i);
+              }}
+              editable={canEdit}
+              editingIndex={editingIndex}
+              onEditStart={onEditStart}
+              onSaveEdit={onSaveEdit}
+              onCancelEdit={onCancelEdit}
             />
           )}
         </div>
