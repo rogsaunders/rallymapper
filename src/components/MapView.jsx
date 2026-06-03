@@ -118,6 +118,9 @@ const ICON_ABBR = {
   // Control
   start: "ST", finish: "FN", stop: "SP", checkpoint: "CP",
   time: "TC", fuel: "F", service: "SV",
+  // Speed (badge shows the limit itself — what a driver wants to read)
+  speed_25: "25", speed_40: "40", speed_50: "50", speed_60: "60",
+  speed_80: "80", speed_100: "100", speed_110: "110",
 };
 
 const TYPE_COLOR = {
@@ -126,6 +129,7 @@ const TYPE_COLOR = {
   control: "#7c3aed", // purple
   terrain: "#b45309", // amber/brown
   note:    "#374151", // grey
+  speed:   "#eab308", // yellow — matches real-world speed signage
 };
 
 function getIconAbbr(type, iconId) {

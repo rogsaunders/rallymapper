@@ -145,6 +145,49 @@ export const ICON_EXPORT_MAP = {
     openRallyType: "ASSISTANCE",
   },
 
+  speed_25: {
+    label: "Speed 25",
+    roadbookEvent: "note",
+    gpxSymbol: "Waypoint",
+    openRallyType: "CAUTION",
+  },
+  speed_40: {
+    label: "Speed 40",
+    roadbookEvent: "note",
+    gpxSymbol: "Waypoint",
+    openRallyType: "CAUTION",
+  },
+  speed_50: {
+    label: "Speed 50",
+    roadbookEvent: "note",
+    gpxSymbol: "Waypoint",
+    openRallyType: "CAUTION",
+  },
+  speed_60: {
+    label: "Speed 60",
+    roadbookEvent: "note",
+    gpxSymbol: "Waypoint",
+    openRallyType: "CAUTION",
+  },
+  speed_80: {
+    label: "Speed 80",
+    roadbookEvent: "note",
+    gpxSymbol: "Waypoint",
+    openRallyType: "CAUTION",
+  },
+  speed_100: {
+    label: "Speed 100",
+    roadbookEvent: "note",
+    gpxSymbol: "Waypoint",
+    openRallyType: "CAUTION",
+  },
+  speed_110: {
+    label: "Speed 110",
+    roadbookEvent: "note",
+    gpxSymbol: "Waypoint",
+    openRallyType: "CAUTION",
+  },
+
   hazard: {
     label: "Hazard",
     roadbookEvent: "note",
