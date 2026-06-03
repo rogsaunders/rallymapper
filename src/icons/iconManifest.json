@@ -202,49 +202,49 @@
 
   {
     "id": "speed_25",
-    "label": "speed_25",
+    "label": "Speed 25",
     "category": "Speed",
     "file": "speed_25.svg"
   },
 
   {
     "id": "speed_40",
-    "label": "speed_40",
+    "label": "Speed 40",
     "category": "Speed",
     "file": "speed_40.svg"
   },
 
   {
     "id": "speed_50",
-    "label": "speed_50",
+    "label": "Speed 50",
     "category": "Speed",
     "file": "speed_50.svg"
   },
 
   {
     "id": "speed_60",
-    "label": "speed_60",
+    "label": "Speed 60",
     "category": "Speed",
     "file": "speed_60.svg"
   },
 
   {
     "id": "speed_80",
-    "label": "speed_80",
+    "label": "Speed 80",
     "category": "Speed",
     "file": "speed_80.svg"
   },
 
   {
     "id": "speed_100",
-    "label": "speed_100",
+    "label": "Speed 100",
     "category": "Speed",
     "file": "speed_100.svg"
   },
 
   {
     "id": "speed_110",
-    "label": "speed_110",
+    "label": "Speed 110",
     "category": "Speed",
     "file": "speed_110.svg"
   },
