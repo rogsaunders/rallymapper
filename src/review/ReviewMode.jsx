@@ -49,6 +49,20 @@ import {
 
 const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
 
+// FEATURE FLAG — historical-stage selection in Review mode.
+//
+// Temporarily disabled (2026-06-04). The picker, async loader and the
+// FitBounds/FlyTo plumbing all work in isolation, but the combined map
+// behaviour for historical stages is erratic in real use (off-route
+// initial framing, imperfect row-tap centring). Active-stage review
+// works perfectly and is what's being demoed.
+//
+// When the historical-stage map behaviour is sorted out, flip this to
+// `true`. No other code changes required — the picker, loader effects,
+// auto-pick logic and stageHistory write-back all remain in the file
+// behind this guard.
+const ENABLE_HISTORICAL_STAGES = false;
+
 const MAP_SOURCES = [
   { id: "osm", label: "OSM" },
   { id: "opentopo", label: "Terrain" },
@@ -115,9 +129,14 @@ export default function ReviewMode() {
 
   // Historical stage list — fetched once on mount (and any time the
   // owner identity changes, e.g. sign-in).
+  // Gated by ENABLE_HISTORICAL_STAGES so the network/localStorage scan
+  // is skipped entirely when historical review is off.
   const [savedStages, setSavedStages] = useState([]);
-  const [stagesLoading, setStagesLoading] = useState(true);
+  const [stagesLoading, setStagesLoading] = useState(
+    ENABLE_HISTORICAL_STAGES,
+  );
   useEffect(() => {
+    if (!ENABLE_HISTORICAL_STAGES) return;
     let cancelled = false;
     setStagesLoading(true);
     listSavedStages(userId, owner)
@@ -363,8 +382,8 @@ export default function ReviewMode() {
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             Review mode shows a stage's roadbook side-by-side with the map.
-            Start a stage in Record mode and capture some waypoints, or
-            open a saved stage from History — then come back here.
+            Start a stage in Record mode and capture some waypoints, then
+            come back here.
           </p>
           <Link
             to="/"
@@ -379,33 +398,36 @@ export default function ReviewMode() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Sub-header — stage picker, identity, map source picker, Back. */}
+      {/* Sub-header — stage picker (when historical enabled), identity,
+          map source picker, Back. */}
       <div className="bg-white border-b">
         <div className="mx-auto max-w-7xl px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <select
-              value={selectedStageId ?? "__active__"}
-              onChange={(e) => {
-                const v = e.target.value;
-                setSelectedStageId(v === "__active__" ? null : v);
-              }}
-              className="text-sm px-2 py-1 rounded-lg border bg-white max-w-[24rem]"
-              aria-label="Stage to review"
-            >
-              {draft && (
-                <option value="__active__">● Active stage{draft.tripName ? ` — ${draft.tripName}` : ""}</option>
-              )}
-              {savedStages.length > 0 && (
-                <optgroup label={draft ? "History" : "Saved stages"}>
-                  {savedStages.map((s) => (
-                    <option key={s.localId} value={s.localId}>
-                      {formatStageOption(s)}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-            <div className="min-w-0 hidden md:block">
+            {ENABLE_HISTORICAL_STAGES && (
+              <select
+                value={selectedStageId ?? "__active__"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedStageId(v === "__active__" ? null : v);
+                }}
+                className="text-sm px-2 py-1 rounded-lg border bg-white max-w-[24rem]"
+                aria-label="Stage to review"
+              >
+                {draft && (
+                  <option value="__active__">● Active stage{draft.tripName ? ` — ${draft.tripName}` : ""}</option>
+                )}
+                {savedStages.length > 0 && (
+                  <optgroup label={draft ? "History" : "Saved stages"}>
+                    {savedStages.map((s) => (
+                      <option key={s.localId} value={s.localId}>
+                        {formatStageOption(s)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            )}
+            <div className="min-w-0">
               <div className="text-sm font-semibold text-gray-900 truncate">
                 {stageTripName}
               </div>
