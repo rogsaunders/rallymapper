@@ -51,10 +51,6 @@ export default function SourcePicker({ onPick, error, isLoading }) {
         )}
 
         <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-500 leading-relaxed">
-          <p className="mb-1">
-            <strong>M1 skeleton:</strong> static roadbook display only.
-            GPS auto-advance and voice readout arrive in M2–M4.
-          </p>
           <p>
             <a href="/" className="text-[#588233] underline">
               ← Back to the recording app

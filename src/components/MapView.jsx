@@ -419,30 +419,20 @@ export default function MapView({
             const lon = Number(pendingWaypoint.lon);
             const type = String(pendingWaypoint.type || "").toLowerCase();
             const iconId = String(pendingWaypoint.iconId || "").toLowerCase();
-            let svgFallback = ICONS.note?.svg;
-            if (type === "hazard") {
-              svgFallback =
-                ICONS.hazard?.variants?.[iconId || "danger_1"]?.svg ||
-                ICONS.hazard?.svg ||
-                ICONS.note?.svg;
-            } else if (type === "nav") {
-              svgFallback =
-                ICONS.nav?.variants?.[iconId || "straight"]?.svg ||
-                ICONS.nav?.svg ||
-                ICONS.note?.svg;
-            } else if (type === "control") {
-              svgFallback =
-                ICONS.control?.variants?.[iconId || "start"]?.svg ||
-                ICONS.control?.svg ||
-                ICONS.note?.svg;
-            } else if (type === "terrain") {
-              svgFallback =
-                ICONS.terrain?.variants?.[iconId || "bump"]?.svg ||
-                ICONS.terrain?.svg ||
-                ICONS.note?.svg;
-            } else if (ICONS[type]?.svg) {
-              svgFallback = ICONS[type].svg;
-            }
+            // Pick the actual selected variant first, then the category's
+            // default SVG, then the note placeholder. Generic across every
+            // category in iconManifest.json — adding a new category (or a
+            // new variant within one) needs no edit here.
+            //
+            // Previously this was a hardcoded if-chain for hazard / nav /
+            // control / terrain, with everything else falling through to
+            // ICONS[type].svg (the category's *first* variant). Speed
+            // therefore always rendered as speed_25 in the pending state
+            // regardless of which variant the user actually selected.
+            const svgFallback =
+              ICONS[type]?.variants?.[iconId]?.svg ||
+              ICONS[type]?.svg ||
+              ICONS.note?.svg;
             const pendingIcon = L.divIcon({
               className: "rm-leaflet-svg-icon rm-leaflet-pending",
               html: `<div class="rm-leaflet-svg-wrap rm-pending-wrap">${svgFallback || ""}</div>`,
