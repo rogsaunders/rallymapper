@@ -95,6 +95,27 @@ function Recenter({ center, zoom, enabled }) {
   return null;
 }
 
+// Pans + zooms to a specific lat/lon when it changes. Used by Review
+// Mode so that selecting a roadbook row flies the map to that row's
+// coordinates. Distinct from <Recenter/> which is the GPS-follow path
+// in Record/Drive Mode.
+function FlyTo({ target, zoom = 16, enabled = true }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!enabled) return;
+    if (!target) return;
+    const lat = Number(target.lat);
+    const lon = Number(target.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    try {
+      map.flyTo([lat, lon], zoom, { animate: true, duration: 0.6 });
+    } catch (_) {
+      map.setView([lat, lon], zoom);
+    }
+  }, [enabled, target?.lat, target?.lon, zoom, map]);
+  return null;
+}
+
 // ── Waypoint map marker helpers ───────────────────────────────────────────────
 //
 // Map markers use a compact two-row HTML badge instead of the full SVG icons.
@@ -143,7 +164,7 @@ function getTypeColor(type) {
   return TYPE_COLOR[(type || "note").toLowerCase()] ?? TYPE_COLOR.note;
 }
 
-function makeWaypointDivIcon(type, iconId, number) {
+function makeWaypointDivIcon(type, iconId, number, { selected = false } = {}) {
   const abbr  = getIconAbbr(type, iconId);
   const bg    = getTypeColor(type);
   const numHtml = number != null
@@ -153,8 +174,18 @@ function makeWaypointDivIcon(type, iconId, number) {
                    box-shadow:0 1px 2px rgba(0,0,0,0.18);">${number}</div>`
     : "";
 
-  const html = `<div style="display:flex;flex-direction:column;align-items:center;
-                             gap:2px;pointer-events:none;">
+  // Review Mode "selected" highlight — a yellow ring around the badge.
+  // Implemented as an outer wrapper so the badge geometry is unaffected
+  // and only the visual emphasis changes.
+  const wrapStyle = selected
+    ? `display:flex;flex-direction:column;align-items:center;gap:2px;
+       padding:3px;border-radius:8px;background:rgba(234,179,8,0.25);
+       box-shadow:0 0 0 2px #eab308, 0 0 12px rgba(234,179,8,0.6);
+       pointer-events:none;`
+    : `display:flex;flex-direction:column;align-items:center;gap:2px;
+       pointer-events:none;`;
+
+  const html = `<div style="${wrapStyle}">
     <div style="background:${bg};color:#fff;border-radius:4px;padding:2px 5px;
                 font-size:10px;font-weight:800;font-family:sans-serif;line-height:1.3;
                 white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.35);
@@ -162,8 +193,10 @@ function makeWaypointDivIcon(type, iconId, number) {
     ${numHtml}
   </div>`;
 
-  const w = Math.max(24, abbr.length * 7 + 12);
-  const h = number != null ? 34 : 20;
+  const baseW = Math.max(24, abbr.length * 7 + 12);
+  const baseH = number != null ? 34 : 20;
+  const w = selected ? baseW + 6 : baseW;
+  const h = selected ? baseH + 6 : baseH;
 
   return L.divIcon({
     className: "rm-waypoint-icon",
@@ -185,6 +218,17 @@ export default function MapView({
   mapMode = "normal",
   mapSource = "osm",
   resizeKey = 0,
+  // Review Mode plumbing (Record/Drive ignore these):
+  //  • selectedWaypointId — id of the waypoint to highlight + fly to.
+  //  • onMarkerClick(id)  — invoked when a waypoint marker is tapped;
+  //                         Review Mode uses this to select the matching
+  //                         roadbook row.
+  //  • flyToTarget        — {lat, lon} to pan/zoom to (independent of
+  //                         selectedWaypointId so Review can fly to
+  //                         derived-row coords that aren't a waypoint).
+  selectedWaypointId = null,
+  onMarkerClick = null,
+  flyToTarget = null,
 }) {
   const tile = useMemo(() => {
     switch (mapSource) {
@@ -324,10 +368,12 @@ export default function MapView({
     <div
       className={
         mapMode === "review"
-          ? "fixed inset-0 z-50" // full screen map
-          : showMap
-            ? "h-[100px] sm:h-[180px] md:h-[200px]" // normal
-            : "h-0" // collapsed
+          ? "fixed inset-0 z-50" // legacy "full-screen map" toggle
+          : mapMode === "fill"
+            ? "h-full w-full" // fills its parent container (Review pane)
+            : showMap
+              ? "h-[100px] sm:h-[180px] md:h-[200px]" // normal record/edit
+              : "h-0" // collapsed
       }
     >
       <MapContainer
@@ -345,6 +391,9 @@ export default function MapView({
         />
 
         <Recenter center={recenterTarget} zoom={14} enabled={followMap} />
+
+        {/* Review Mode: pan/zoom to whatever row the user selected. */}
+        <FlyTo target={flyToTarget} zoom={16} enabled={!!flyToTarget} />
 
         {routePositions.length >= 2 && (
           <Polyline
@@ -387,17 +436,31 @@ export default function MapView({
           const iconId  = String(wp.iconId || "").toLowerCase();
           const isStart = wp.kind === "start" || wp.poi === "START";
           const wpNumber = isStart ? null : waypointNumberMap.get(wp);
+          const isSelected =
+            selectedWaypointId != null && wp.id === selectedWaypointId;
 
           // Start uses the blue-circle SVG icon; all others use the compact badge.
           const icon = isStart
             ? getLeafletIcon("start")
-            : makeWaypointDivIcon(type, iconId, wpNumber);
+            : makeWaypointDivIcon(type, iconId, wpNumber, { selected: isSelected });
+
+          // Review Mode: tapping a marker should select its row. The
+          // `onMarkerClick` callback is null in Record/Drive, so the
+          // handler is a no-op there.
+          const eventHandlers = onMarkerClick
+            ? {
+                click: () => {
+                  if (wp.id != null) onMarkerClick(wp.id);
+                },
+              }
+            : undefined;
 
           return (
             <Marker
               key={`${wp.timestamp ?? "no-ts"}_${lat}_${lon}_${idx}`}
               position={[lat, lon]}
               icon={icon}
+              eventHandlers={eventHandlers}
             >
               <Popup>
                 {isStart ? "START" : wp.poi || `WP ${wpNumber}`}

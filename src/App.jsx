@@ -7,6 +7,7 @@ import RouteMapperLayout from "./RouteMapperLayout";
 import SignIn from "./auth/SignIn";
 import ResetPassword from "./auth/ResetPassword";
 import DriveMode from "./drive/DriveMode";
+import ReviewMode from "./review/ReviewMode";
 
 function GuestOnly({ children }) {
   const { user, loading, guestMode } = useAuth();
@@ -60,6 +61,18 @@ export default function App() {
         element={
           <RequireAuth>
             <DriveMode />
+          </RequireAuth>
+        }
+      />
+
+      {/* Review Mode (Phase 3 — organiser workbench). Same auth model
+          as Record/Drive; reads the active stage draft from
+          localStorage and renders it side-by-side with the map. */}
+      <Route
+        path="/review"
+        element={
+          <RequireAuth>
+            <ReviewMode />
           </RequireAuth>
         }
       />
