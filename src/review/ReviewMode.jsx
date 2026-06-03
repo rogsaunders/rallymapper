@@ -477,14 +477,23 @@ export default function ReviewMode() {
             showMap={true}
             mapMode="fill"
             mapSource={mapSource}
-            resizeKey={`review-${selectedStageId ?? "active"}-${selectedIndex}`}
+            // resizeKey only needs to change when the panel size
+            // could change — that's stage switch, not row selection.
+            // Including selectedIndex here used to fire
+            // map.invalidateSize() on every row tap, which raced
+            // with FlyTo and could land the view off-target.
+            resizeKey={`review-${selectedStageId ?? "active"}`}
             selectedWaypointId={selectedWaypointId}
             onMarkerClick={onMarkerClick}
             flyToTarget={flyToTarget}
-            // Refit the map to the whole route whenever the picker
-            // switches stages, so the user doesn't have to pan
-            // around to find it.
-            fitBoundsKey={selectedStageId ?? "active"}
+            // Refit the map whenever (a) the stage selection
+            // changes, or (b) the data finishes loading
+            // asynchronously. For historical stages the payload
+            // arrives via loadSavedStage AFTER first render —
+            // including the array lengths in the key means
+            // FitBounds re-fires when trackPoints/waypoints flip
+            // from 0 → N.
+            fitBoundsKey={`${selectedStageId ?? "active"}-${trackPoints.length}-${waypoints.length}`}
           />
         </div>
 
