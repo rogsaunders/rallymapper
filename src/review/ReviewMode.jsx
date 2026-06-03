@@ -23,13 +23,15 @@
 //                     waypoint id scrolls into the list pane and gets
 //                     the yellow band.
 //
-// Data source for v1:
-//   Reads the active stage draft that RouteMapperLayout autosaves to
-//   localStorage under `routemapper_stage_draft_v1`. This keeps the
-//   MVP small and avoids touching the waypoint state pathway. PR C
-//   will extract a waypoint store and let Review work against saved
-//   stages too. If no active draft is present, Review shows a small
-//   placeholder card with a link back to Record.
+// Data sources:
+//   • The active stage draft that RouteMapperLayout autosaves to
+//     localStorage under `routemapper_stage_draft_v1`. This is what
+//     Review opens by default whenever a stage is active in Record.
+//   • Historical stages, fetched via listSavedStages / loadSavedStage
+//     (Supabase for signed-in users, localStorage scan for guests).
+//     The stage picker in the sub-header lets the organiser switch
+//     between active and any past stage. Same waypoint/trackPoint
+//     shape, so the rest of the pipeline is unchanged.
 //
 // Read-only in v1. PR C adds tap-to-edit on the row.
 
@@ -38,6 +40,8 @@ import { Link } from "react-router-dom";
 import MapView from "../components/MapView";
 import RoadbookView from "../components/roadbook/RoadbookView";
 import { generateRoadbook } from "../roadbook";
+import { useAuth } from "../auth/AuthProvider";
+import { listSavedStages, loadSavedStage } from "../lib/stageHistory";
 
 const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
 
@@ -46,6 +50,20 @@ const MAP_SOURCES = [
   { id: "opentopo", label: "Terrain" },
   { id: "esri_imagery", label: "Satellite" },
 ];
+
+// Mirror of getGuestOwnerId() in RouteMapperLayout — duplicated here
+// to avoid coupling Review back into the big layout file. The id is
+// random per browser; both places generate the same value because
+// they read the same localStorage key.
+function getGuestOwnerId() {
+  const k = "rm_guest_owner";
+  let v = localStorage.getItem(k);
+  if (!v) {
+    v = `guest_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
+    localStorage.setItem(k, v);
+  }
+  return v;
+}
 
 function loadStageDraft() {
   try {
@@ -59,42 +77,136 @@ function loadStageDraft() {
   }
 }
 
-export default function ReviewMode() {
-  const [draft, setDraft] = useState(() => loadStageDraft());
-  const [selectedIndex, setSelectedIndex] = useState(null);
-  // Terrain is the most useful default for organiser review (task a),
-  // since contour + landcover context is what they're looking for.
-  const [mapSource, setMapSource] = useState("opentopo");
+function formatStageOption(entry) {
+  const m = entry.meta || {};
+  const parts = [];
+  if (m.tripName) parts.push(m.tripName);
+  const sub = [];
+  if (m.dayNumber != null) sub.push(`Day ${m.dayNumber}`);
+  if (m.routeNumber != null) sub.push(`R${m.routeNumber}`);
+  if (m.stageNumber != null) sub.push(`S${m.stageNumber}`);
+  if (sub.length) parts.push(sub.join(" · "));
+  if (entry.savedAt) {
+    try {
+      parts.push(new Date(entry.savedAt).toLocaleDateString());
+    } catch (_) {}
+  }
+  return parts.join(" — ") || "Unnamed stage";
+}
 
-  // Re-read draft if another tab updates it (Record mode autosaves on
-  // every waypoint commit / track-point append, debounced 250ms).
+export default function ReviewMode() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const owner = userId ?? getGuestOwnerId();
+
+  // Active draft (kept in sync with Record's autosave).
+  const [draft, setDraft] = useState(() => loadStageDraft());
   useEffect(() => {
     const onStorage = (e) => {
-      if (e.key === STAGE_DRAFT_KEY) {
-        setDraft(loadStageDraft());
-      }
+      if (e.key === STAGE_DRAFT_KEY) setDraft(loadStageDraft());
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const trackPoints = draft?.trackPoints ?? [];
-  const waypoints = draft?.waypoints ?? [];
-  const startGPS = draft?.startGPS ?? null;
+  // Historical stage list — fetched once on mount (and any time the
+  // owner identity changes, e.g. sign-in).
+  const [savedStages, setSavedStages] = useState([]);
+  const [stagesLoading, setStagesLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    setStagesLoading(true);
+    listSavedStages(userId, owner)
+      .then((list) => {
+        if (!cancelled) setSavedStages(list || []);
+      })
+      .catch((err) => {
+        console.warn("[ReviewMode] listSavedStages failed:", err);
+        if (!cancelled) setSavedStages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setStagesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, owner]);
 
-  // Build the roadbook from the in-memory stage. Same engine the
-  // export pipeline uses, so what the organiser sees here matches
+  // Which stage is currently being reviewed.
+  //   selectedStageId === null  → active draft (default when present)
+  //   selectedStageId === "<localId>" → historical entry from savedStages
+  // When `draft` is absent and at least one historical stage exists,
+  // we auto-pick the most recent historical so Review is useful
+  // straight away on a clean session.
+  const [selectedStageId, setSelectedStageId] = useState(null);
+  useEffect(() => {
+    if (selectedStageId != null) return;
+    if (!draft && savedStages.length > 0) {
+      setSelectedStageId(savedStages[0].localId);
+    }
+  }, [draft, savedStages, selectedStageId]);
+
+  // Historical payload — loaded on demand when the picker selects one.
+  const [historicalPayload, setHistoricalPayload] = useState(null);
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+  useEffect(() => {
+    if (selectedStageId == null) {
+      setHistoricalPayload(null);
+      return;
+    }
+    const entry = savedStages.find((s) => s.localId === selectedStageId);
+    if (!entry) {
+      setHistoricalPayload(null);
+      return;
+    }
+    let cancelled = false;
+    setHistoricalLoading(true);
+    loadSavedStage(userId, owner, entry)
+      .then((payload) => {
+        if (!cancelled) setHistoricalPayload(payload || null);
+      })
+      .catch((err) => {
+        console.warn("[ReviewMode] loadSavedStage failed:", err);
+        if (!cancelled) setHistoricalPayload(null);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoricalLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStageId, savedStages, userId, owner]);
+
+  // What stage we're actually rendering — active draft or historical.
+  const stage = selectedStageId == null ? draft : historicalPayload;
+
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  // Reset selection whenever the source stage changes.
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [selectedStageId, stage]);
+
+  // Terrain is the most useful default for organiser review (task a),
+  // since contour + landcover context is what they're looking for.
+  const [mapSource, setMapSource] = useState("opentopo");
+
+  const trackPoints = stage?.trackPoints ?? [];
+  const waypoints = stage?.waypoints ?? [];
+  const startGPS = stage?.startGPS ?? null;
+
+  // Build the roadbook from whichever stage is loaded. Same engine
+  // the export pipeline uses, so what the organiser sees here matches
   // what ends up in the .docx.
   const roadbook = useMemo(() => {
     if (!trackPoints.length && !waypoints.length) return null;
     try {
       return generateRoadbook({
         meta: {
-          tripName: draft?.tripName,
-          tripDate: draft?.tripDate,
-          dayNumber: draft?.dayNumber,
-          routeName: draft?.routeName,
-          stageNumber: draft?.stageNumber,
+          tripName: stage?.tripName ?? stage?.meta?.tripName,
+          tripDate: stage?.tripDate ?? stage?.meta?.tripDate,
+          dayNumber: stage?.dayNumber ?? stage?.meta?.dayNumber,
+          routeName: stage?.routeName ?? stage?.meta?.routeName,
+          stageNumber: stage?.stageNumber ?? stage?.meta?.stageNumber,
         },
         trackPoints,
         waypoints,
@@ -103,7 +215,7 @@ export default function ReviewMode() {
       console.warn("[ReviewMode] generateRoadbook failed:", err);
       return null;
     }
-  }, [trackPoints, waypoints, draft?.tripName, draft?.tripDate, draft?.dayNumber, draft?.routeName, draft?.stageNumber]);
+  }, [stage, trackPoints, waypoints]);
 
   const rows = roadbook?.rows ?? [];
 
@@ -126,8 +238,20 @@ export default function ReviewMode() {
     if (idx >= 0) setSelectedIndex(idx);
   };
 
-  // Empty-state — no active stage draft to review.
-  if (!draft || (!trackPoints.length && !waypoints.length)) {
+  // Stage-meta strings for the sub-header.
+  const stageTripName =
+    stage?.tripName ?? stage?.meta?.tripName ?? "Untitled Trip";
+  const stageDay = stage?.dayNumber ?? stage?.meta?.dayNumber;
+  const stageRouteName =
+    stage?.routeName ??
+    stage?.meta?.routeName ??
+    `Route ${stage?.routeNumber ?? stage?.meta?.routeNumber ?? "?"}`;
+  const stageNumber = stage?.stageNumber ?? stage?.meta?.stageNumber;
+
+  // Empty state — no active draft AND no historical stages found.
+  const haveAnyStage =
+    !!draft || savedStages.length > 0 || (stage && (trackPoints.length || waypoints.length));
+  if (!stagesLoading && !haveAnyStage) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-sm border max-w-md p-6 text-center">
@@ -135,9 +259,9 @@ export default function ReviewMode() {
             Nothing to review yet
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            Review mode shows the current stage's roadbook side-by-side with
-            the map. Start a stage in Record mode and capture some
-            waypoints, then come back here.
+            Review mode shows a stage's roadbook side-by-side with the map.
+            Start a stage in Record mode and capture some waypoints, or
+            open a saved stage from History — then come back here.
           </p>
           <Link
             to="/"
@@ -152,22 +276,46 @@ export default function ReviewMode() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Sub-header — stage identity + map source picker. Sits below the
-          main header (which is in App-level layout via React Router's
-          layout pattern — for /review specifically the main header
-          isn't rendered, so this is the only header). */}
+      {/* Sub-header — stage picker, identity, map source picker, Back. */}
       <div className="bg-white border-b">
-        <div className="mx-auto max-w-7xl px-3 py-2 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-gray-900 truncate">
-              {draft.tripName || "Untitled Trip"}
-            </div>
-            <div className="text-xs text-gray-500 truncate">
-              Day {draft.dayNumber} · {draft.routeName || `Route ${draft.routeNumber}`} · Stage {draft.stageNumber}
-              {rows.length > 0 && <> · {rows.length} rows</>}
+        <div className="mx-auto max-w-7xl px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <select
+              value={selectedStageId ?? "__active__"}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSelectedStageId(v === "__active__" ? null : v);
+              }}
+              className="text-sm px-2 py-1 rounded-lg border bg-white max-w-[24rem]"
+              aria-label="Stage to review"
+            >
+              {draft && (
+                <option value="__active__">● Active stage{draft.tripName ? ` — ${draft.tripName}` : ""}</option>
+              )}
+              {savedStages.length > 0 && (
+                <optgroup label={draft ? "History" : "Saved stages"}>
+                  {savedStages.map((s) => (
+                    <option key={s.localId} value={s.localId}>
+                      {formatStageOption(s)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <div className="min-w-0 hidden md:block">
+              <div className="text-sm font-semibold text-gray-900 truncate">
+                {stageTripName}
+              </div>
+              <div className="text-xs text-gray-500 truncate">
+                {stageDay != null && <>Day {stageDay} · </>}
+                {stageRouteName}
+                {stageNumber != null && <> · Stage {stageNumber}</>}
+                {rows.length > 0 && <> · {rows.length} rows</>}
+                {historicalLoading && <> · loading…</>}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="hidden sm:inline-flex rounded-full bg-gray-100 p-1">
               {MAP_SOURCES.map((s) => {
                 const active = s.id === mapSource;
@@ -226,7 +374,7 @@ export default function ReviewMode() {
             showMap={true}
             mapMode="fill"
             mapSource={mapSource}
-            resizeKey={`review-${selectedIndex}`}
+            resizeKey={`review-${selectedStageId ?? "active"}-${selectedIndex}`}
             selectedWaypointId={selectedWaypointId}
             onMarkerClick={onMarkerClick}
             flyToTarget={flyToTarget}
@@ -237,11 +385,17 @@ export default function ReviewMode() {
             the map dominates on desktop, which matches what the
             organiser actually wants to look at. */}
         <div className="md:w-[44ch] md:border-l border-t md:border-t-0 flex flex-col min-h-0 bg-gray-50">
-          <RoadbookView
-            rows={rows}
-            selectedIndex={selectedIndex}
-            onRowTap={(i) => setSelectedIndex(i)}
-          />
+          {historicalLoading && !rows.length ? (
+            <div className="flex-1 flex items-center justify-center p-8 text-gray-500 text-sm">
+              Loading stage…
+            </div>
+          ) : (
+            <RoadbookView
+              rows={rows}
+              selectedIndex={selectedIndex}
+              onRowTap={(i) => setSelectedIndex(i)}
+            />
+          )}
         </div>
       </div>
     </div>
