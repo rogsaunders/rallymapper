@@ -33,6 +33,8 @@ import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
 import { createRecordTrigger } from "./voice/recordTrigger";
 import StageHistoryPanel from "./components/StageHistoryPanel";
 import AccountModal from "./components/AccountModal";
+import ModePicker from "./components/ModePicker";
+import OverflowMenu, { OverflowMenuItem } from "./components/OverflowMenu";
 import { getStorageStatus, formatBytes } from "./lib/storageCapacity";
 import { findTrackpointGaps, summariseGaps } from "./lib/trackpointGaps";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
@@ -755,6 +757,27 @@ export default function RouteMapperLayout() {
   const [tripName, setTripName] = useState("");
   const [editingTripName, setEditingTripName] = useState(false);
   const tripNameRef = useRef(null);
+  // Header trip-info popover (the ⓘ next to the trip name) — replaces
+  // the old 3-line title block that ate vertical space on iPad/phone.
+  const [showTripInfo, setShowTripInfo] = useState(false);
+  const tripInfoRef = useRef(null);
+  useEffect(() => {
+    if (!showTripInfo) return;
+    const onDown = (e) => {
+      if (!tripInfoRef.current?.contains(e.target)) setShowTripInfo(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setShowTripInfo(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showTripInfo]);
   const [tripDate, setTripDate] = useState(
     new Date().toISOString().slice(0, 10),
   ); // YYYY-MM-DD
@@ -2602,48 +2625,81 @@ export default function RouteMapperLayout() {
         </div>
       )}
 
-      {/* HEADER */}
+      {/* HEADER
+          Redesigned (feat/nav-redesign) to reclaim vertical real estate
+          on iPad/phone:
+            • Single-line title block (logo + trip name + ⓘ popover for
+              Day/Route/Stage metadata) instead of the old 3-line stack.
+            • ModePicker centred on desktop (segmented pill) / fixed
+              bottom tabs on phone & iPad-portrait.
+            • Status badges (cloud sync, plan) stay visible; secondary
+              actions (Account, Manage billing, Support, Sign out, build
+              stamp) move into the ··· OverflowMenu.
+          Behaviour of every existing action is preserved. */}
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-          {/* Left: logo + title */}
-          <div className="flex items-center gap-3">
+        <div className="mx-auto max-w-6xl px-3 py-2 flex items-center justify-between gap-3">
+          {/* LEFT — logo + trip name + ⓘ trip-details popover */}
+          <div className="relative flex items-center gap-2 min-w-0" ref={tripInfoRef}>
             <img
               src={rrmLogo}
               alt="RouteMapper"
-              className="h-10 w-10 rounded"
+              className="h-9 w-9 rounded shrink-0"
             />
-            <div className="leading-tight">
-              <div className="text-lg font-semibold">RouteMapper</div>
-              <div className="text-sm font-medium text-gray-800">
-                {tripName || "Untitled Trip / Event"}
-              </div>
-              <div className="text-xs text-gray-500">
-                Day {dayNumber} • {routeName || `Route ${routeNumber}`} • Stage{" "}
+            <div className="font-semibold text-gray-900 truncate min-w-0" title={tripName || "Untitled Trip / Event"}>
+              {tripName || (
+                <span className="text-gray-400 font-normal">
+                  Untitled Trip / Event
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="shrink-0 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              onClick={() => setShowTripInfo((v) => !v)}
+              aria-label="Trip details"
+              aria-expanded={showTripInfo}
+              title="Trip details"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </button>
+            {showTripInfo && (
+              <div className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-lg border px-3 py-2 text-xs text-gray-700 whitespace-nowrap z-40">
+                Day {dayNumber} · {routeName || `Route ${routeNumber}`} · Stage{" "}
                 {stageNumber}
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Right: cloud badge + plan badge + account */}
-          <div className="flex items-center gap-3">
-            {/* Drive Mode launcher (Phase 2) */}
-            <a
-              href="/drive"
-              className="text-sm px-3 py-1 rounded-full font-medium bg-[#588233] text-white hover:bg-[#476a29]"
-              title="Open Drive Mode — load a roadbook to drive"
-            >
-              Drive
-            </a>
+          {/* CENTER — mode picker (segmented on ≥md, bottom tabs <md) */}
+          <ModePicker />
 
+          {/* RIGHT — status badges + overflow */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Cloud sync — dot always visible; label hides on tiny screens */}
             <div
-              className={`text-sm px-3 py-1 rounded-full font-medium
+              className={`text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full font-medium
                 ${cloud.color} bg-opacity-15 text-green-700`}
+              title={`Sync: ${cloud.label}`}
             >
               <span className="mr-1">{cloud.dot}</span>
-              <span className="font-medium">{cloud.label}</span>
+              <span className="hidden sm:inline font-medium">{cloud.label}</span>
             </div>
 
-            {/* Plan badge */}
+            {/* Plan badge — hidden on tiny viewports; still shown in overflow info */}
             {(() => {
               const planLabels = {
                 free: { label: "Free", cls: "bg-gray-100 text-gray-600" },
@@ -2667,94 +2723,93 @@ export default function RouteMapperLayout() {
               const p = planLabels[plan] ?? planLabels.free;
               return (
                 <span
-                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${p.cls}`}
+                  className={`hidden sm:inline-flex text-xs font-semibold px-2.5 py-1 rounded-full ${p.cls}`}
                 >
                   {p.label}
                 </span>
               );
             })()}
 
-            {/* Manage Billing — shown to paid users with a Stripe customer */}
-            {user?.id && plan !== "free" && (
-              <button
-                className="text-sm underline text-gray-500 hover:text-gray-800"
-                onClick={() =>
-                  redirectToPortal(session).catch((e) => alert(e.message))
-                }
-              >
-                Manage billing
-              </button>
-            )}
+            {/* Overflow menu — secondary actions previously inline */}
+            <OverflowMenu>
+              {/* Identity (info row, non-clickable) */}
+              <div className="px-3 py-2 text-xs text-gray-500 border-b">
+                {user?.email ? (
+                  <>
+                    Signed in as{" "}
+                    <span className="font-medium text-gray-800">
+                      {user.email}
+                    </span>
+                  </>
+                ) : (
+                  <span>Guest mode</span>
+                )}
+              </div>
 
-            {user?.id && (
-              <button
-                className="text-sm underline text-gray-700 hover:text-gray-900"
-                onClick={() => setShowAccount(true)}
-              >
-                Account
-              </button>
-            )}
-
-            <div className="text-sm text-gray-700">
-              {user?.email ? (
-                <span>
-                  Signed in as <span className="font-medium">{user.email}</span>
-                </span>
-              ) : (
-                <span className="text-gray-500">Guest mode</span>
+              {user?.id && (
+                <OverflowMenuItem onClick={() => setShowAccount(true)}>
+                  Account
+                </OverflowMenuItem>
               )}
-            </div>
 
-            {/* Support — opens the user's default mail client pre-filled
-                with diagnostic context (account / plan / version / UA / URL).
-                Path 1 of the stacked plan; Path 2 (in-app form + Resend)
-                tracked in MEMORY backlog for when support volume justifies. */}
-            {(user?.id || guestMode) && (
-              <a
-                className="text-sm underline text-gray-700 hover:text-gray-900"
-                href="mailto:hello@routemapper.net"
-                onClick={(e) => {
-                  e.preventDefault();
-                  window.location.href = buildSupportMailto({
-                    user,
-                    plan,
-                    guestMode,
-                  });
-                }}
+              {user?.id && plan !== "free" && (
+                <OverflowMenuItem
+                  onClick={() =>
+                    redirectToPortal(session).catch((e) => alert(e.message))
+                  }
+                >
+                  Manage billing
+                </OverflowMenuItem>
+              )}
+
+              {/* Support — opens the user's default mail client pre-filled
+                  with diagnostic context (account / plan / version / UA / URL).
+                  Path 1 of the stacked plan; Path 2 (in-app form + Resend)
+                  tracked in MEMORY backlog for when support volume justifies. */}
+              {(user?.id || guestMode) && (
+                <OverflowMenuItem
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.location.href = buildSupportMailto({
+                      user,
+                      plan,
+                      guestMode,
+                    });
+                  }}
+                >
+                  Support
+                </OverflowMenuItem>
+              )}
+
+              {user?.id && (
+                <OverflowMenuItem onClick={signOut}>Sign out</OverflowMenuItem>
+              )}
+
+              {/* Build stamp — short commit SHA + deploy context.  Lets a
+                  non-technical user confirm at a glance which build they're
+                  on, e.g. when a Netlify deploy preview has updated but the
+                  iPad PWA service worker is still serving the prior bundle.
+                  Defined by Vite at build time (see __COMMIT_SHA__ in
+                  vite.config.js). */}
+              <div
+                className="px-3 py-2 text-[10px] font-mono text-gray-400 border-t select-all"
+                title={`v${
+                  typeof __APP_VERSION__ !== "undefined"
+                    ? __APP_VERSION__
+                    : "?"
+                } · ${
+                  typeof __BUILD_CONTEXT__ !== "undefined"
+                    ? __BUILD_CONTEXT__
+                    : "dev"
+                } · commit ${
+                  typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "?"
+                }`}
               >
-                Support
-              </a>
-            )}
-
-            {user?.id && (
-              <button
-                className="text-sm underline text-gray-700 hover:text-gray-900"
-                onClick={signOut}
-              >
-                Sign out
-              </button>
-            )}
-
-            {/* Build stamp — short commit SHA + deploy context.  Lets a
-                non-technical user confirm at a glance which build they're
-                on, e.g. when a Netlify deploy preview has updated but the
-                iPad PWA service worker is still serving the prior bundle.
-                Defined by Vite at build time (see __COMMIT_SHA__ in
-                vite.config.js). */}
-            <span
-              className="text-[10px] font-mono text-gray-400 select-all"
-              title={`v${
-                typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "?"
-              } · ${
-                typeof __BUILD_CONTEXT__ !== "undefined"
-                  ? __BUILD_CONTEXT__
-                  : "dev"
-              } · commit ${
-                typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "?"
-              }`}
-            >
-              {typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "dev"}
-            </span>
+                {typeof __COMMIT_SHA__ !== "undefined" ? __COMMIT_SHA__ : "dev"}
+                {typeof __APP_VERSION__ !== "undefined" &&
+                  ` · v${__APP_VERSION__}`}
+              </div>
+            </OverflowMenu>
           </div>
         </div>
       </header>
@@ -2789,8 +2844,9 @@ export default function RouteMapperLayout() {
         </div>
       )}
 
-      {/* MAIN */}
-      <main className="mx-auto max-w-6xl px-3 py-3 space-y-3">
+      {/* MAIN — extra bottom padding on <md viewports so the fixed
+          bottom tab bar (ModePicker) doesn't obscure the last section. */}
+      <main className="mx-auto max-w-6xl px-3 py-3 pb-20 md:pb-3 space-y-3">
         {/* TOP CONTROLS STRIP */}
         <section className="bg-white rounded-2xl shadow-sm border p-3">
           <div className="grid grid-cols-1 gap-2">
