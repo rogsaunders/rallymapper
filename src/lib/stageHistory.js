@@ -195,3 +195,123 @@ export function deleteLocalStage(owner, localId) {
     return false;
   }
 }
+
+// ── Write-back ───────────────────────────────────────────────────────────────
+
+const ACTIVE_DRAFT_KEY = "routemapper_stage_draft_v1";
+
+/**
+ * Persist an edited stage payload back to the source it came from.
+ *
+ * Used by Review Mode's edit-in-place flow. Handles three cases:
+ *
+ *   source === "active"
+ *     • Active stage draft. Writes to `routemapper_stage_draft_v1`.
+ *       Record mode will pick up the edit on next remount via the
+ *       "Resume unsaved stage?" gate.
+ *
+ *   source === "local"
+ *     • Historical stage saved only on this device. Writes to
+ *       `rm_stage:{owner}:{localId}`.
+ *
+ *   source === "supabase"
+ *     • Historical stage backed by Supabase. Upserts the cloud row
+ *       AND refreshes the local copy so listSavedStages's offline
+ *       fallback stays consistent.
+ *
+ * @param {Object}  args
+ * @param {?string} args.userId    Auth user id (null for guests).
+ * @param {string}  args.owner     userId || guestOwnerId.
+ * @param {string}  args.source    "active" | "local" | "supabase".
+ * @param {?string} args.localId   Required for "local"/"supabase".
+ * @param {Object}  args.payload   Full stage object to persist.
+ * @param {?Object} [args.meta]    Optional Supabase meta override; if
+ *                                 omitted, falls back to payload.meta
+ *                                 or a minimal summary derived from
+ *                                 the payload itself.
+ * @returns {Promise<{ok: boolean, error?: Error}>}
+ */
+export async function saveStageMutation({
+  userId,
+  owner,
+  source,
+  localId,
+  payload,
+  meta,
+}) {
+  if (!payload || typeof payload !== "object") {
+    return { ok: false, error: new Error("payload required") };
+  }
+
+  if (source === "active") {
+    try {
+      localStorage.setItem(ACTIVE_DRAFT_KEY, JSON.stringify(payload));
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e };
+    }
+  }
+
+  if (!localId) {
+    return {
+      ok: false,
+      error: new Error("localId required for historical mutation"),
+    };
+  }
+
+  if (source === "local") {
+    try {
+      localStorage.setItem(
+        `${LOCAL_KEY_PREFIX}${owner}:${localId}`,
+        JSON.stringify(payload),
+      );
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e };
+    }
+  }
+
+  if (source === "supabase") {
+    if (!userId) {
+      return {
+        ok: false,
+        error: new Error("supabase source requires userId"),
+      };
+    }
+    // Refresh the local cache so an offline list still shows the
+    // edited version. A local write failure here is non-fatal — the
+    // Supabase write is the source of truth.
+    try {
+      localStorage.setItem(
+        `${LOCAL_KEY_PREFIX}${owner}:${localId}`,
+        JSON.stringify(payload),
+      );
+    } catch (_) {
+      /* non-fatal */
+    }
+    const effectiveMeta = meta ?? payload.meta ?? {
+      tripName: payload.tripName,
+      dayNumber: payload.dayNumber,
+      routeNumber: payload.routeNumber,
+      stageNumber: payload.stageNumber,
+    };
+    const { error } = await supabase
+      .from("stage_exports")
+      .upsert(
+        {
+          user_id: userId,
+          local_id: localId,
+          meta: effectiveMeta,
+          payload,
+        },
+        { onConflict: "user_id,local_id" },
+      );
+    if (error) return { ok: false, error };
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    error: new Error(`unknown source: ${source}`),
+  };
+}

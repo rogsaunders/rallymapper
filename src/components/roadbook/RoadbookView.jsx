@@ -23,6 +23,13 @@ export default function RoadbookView({
   currentIndex,
   selectedIndex,
   onRowTap,
+  // Edit-in-place (Review Mode, PR C). All four are opt-in — Drive
+  // Mode doesn't pass them, so its rows render read-only as before.
+  editable = false,
+  editingIndex = null,
+  onEditStart,
+  onSaveEdit,
+  onCancelEdit,
   // Increment from DriveMode to re-trigger scroll without changing
   // currentIndex (used by the ↺ Snap button so the user can re-centre
   // after scrolling away manually).
@@ -76,6 +83,7 @@ export default function RoadbookView({
             else position = "below";
           }
           const selected = selectedIndex != null && i === selectedIndex;
+          const editing = editable && editingIndex != null && i === editingIndex;
           return (
             <RoadbookRow
               key={row.index ?? i}
@@ -85,7 +93,12 @@ export default function RoadbookView({
               row={row}
               position={position}
               selected={selected}
+              editable={editable}
+              editing={editing}
               onTap={() => onRowTap?.(i)}
+              onEditStart={() => onEditStart?.(i)}
+              onSave={(_row, patch) => onSaveEdit?.(i, patch)}
+              onCancel={() => onCancelEdit?.()}
             />
           );
         })}

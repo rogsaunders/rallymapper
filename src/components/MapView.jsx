@@ -116,6 +116,47 @@ function FlyTo({ target, zoom = 16, enabled = true }) {
   return null;
 }
 
+// One-shot "fit the map to encompass the whole route" — triggered
+// whenever fitKey changes (so Review Mode can refit when the user
+// switches between stages). Computes bounds from the union of
+// trackPoints and waypoints; falls back to a single setView if only
+// one point is available. Skips silently if there's nothing to fit.
+function FitBounds({ fitKey, points, padding = 32 }) {
+  const map = useMap();
+  useEffect(() => {
+    if (fitKey == null) return;
+    if (!points || points.length === 0) return;
+
+    const valid = points
+      .map((p) => [Number(p?.lat), Number(p?.lon)])
+      .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+
+    if (valid.length === 0) return;
+
+    if (valid.length === 1) {
+      map.setView(valid[0], 14, { animate: true });
+      return;
+    }
+
+    try {
+      const bounds = L.latLngBounds(valid);
+      map.fitBounds(bounds, {
+        padding: [padding, padding],
+        maxZoom: 16,
+        animate: true,
+      });
+    } catch (e) {
+      // Defensive — fall back to the first point.
+      map.setView(valid[0], 14);
+    }
+    // fitKey is the trigger; points is captured via closure so we
+    // explicitly don't want it in the dep list (would refit on every
+    // marker re-render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey, map]);
+  return null;
+}
+
 // ── Waypoint map marker helpers ───────────────────────────────────────────────
 //
 // Map markers use a compact two-row HTML badge instead of the full SVG icons.
@@ -229,6 +270,12 @@ export default function MapView({
   selectedWaypointId = null,
   onMarkerClick = null,
   flyToTarget = null,
+  // Review Mode: change `fitBoundsKey` to trigger a one-shot fit of
+  // the map to the union of trackPoints + waypoints. The key
+  // identifies "which stage" — when it changes (e.g. switching
+  // between historical entries) the map refits to the new route.
+  // null/undefined = no auto-fit (Record/Drive default).
+  fitBoundsKey = null,
 }) {
   const tile = useMemo(() => {
     switch (mapSource) {
@@ -394,6 +441,19 @@ export default function MapView({
 
         {/* Review Mode: pan/zoom to whatever row the user selected. */}
         <FlyTo target={flyToTarget} zoom={16} enabled={!!flyToTarget} />
+
+        {/* Review Mode: on stage load / stage switch, fit the map to
+            the union of trackPoints + waypoints so the whole route is
+            visible without the user needing to pan. Skipped in
+            Record/Drive (they don't pass fitBoundsKey). */}
+        <FitBounds
+          fitKey={fitBoundsKey}
+          points={[
+            ...(trackPoints || []),
+            ...(waypoints || []),
+            ...(startGPS ? [startGPS] : []),
+          ]}
+        />
 
         {routePositions.length >= 2 && (
           <Polyline
