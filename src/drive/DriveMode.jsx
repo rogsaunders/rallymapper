@@ -23,7 +23,7 @@ import { annotateRowsWithTrackIdx } from "./lib/alongTrack";
 import SourcePicker from "./components/SourcePicker";
 import HeaderBar from "./components/HeaderBar";
 import FooterBar from "./components/FooterBar";
-import RoadbookView from "./components/RoadbookView";
+import RoadbookView from "../components/roadbook/RoadbookView";
 import SettingsPanel from "./components/SettingsPanel";
 import PreStart from "./components/PreStart";
 

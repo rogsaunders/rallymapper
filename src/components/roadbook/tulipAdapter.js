@@ -1,10 +1,13 @@
-// src/drive/lib/tulipAdapter.js
+// src/components/roadbook/tulipAdapter.js
 //
 // Thin wrapper around the existing renderTulipSvg() exported from
-// src/roadbook. Drive Mode calls THIS instead of the underlying
-// function directly, so if the roadbook side ever changes the
-// signature (during the Map PDF branch work, or later), only this
-// one file needs updating.
+// src/roadbook. Both Drive Mode and Review Mode call THIS via
+// RoadbookRow instead of the underlying function directly, so if
+// the roadbook side ever changes the signature only this one file
+// needs updating.
+//
+// (Originally lived in src/drive/lib/ — moved alongside RoadbookRow /
+// RoadbookView when they were lifted into shared components.)
 //
 // Input: a roadbook row (the structure defined in
 // src/roadbook/roadbookTypes.js). Output: an SVG string ready to drop

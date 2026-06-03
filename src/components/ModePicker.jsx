@@ -12,8 +12,8 @@
 // Both variants render simultaneously and are toggled via Tailwind
 // responsive classes — no JS viewport hook required.
 //
-// Review mode (third tab) is added in a follow-up PR alongside the
-// /review route. For now: Record + Drive.
+// Review tab — organiser workbench, side-by-side map + roadbook for
+// verifying tulip accuracy and refining the captured stage.
 
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -21,6 +21,7 @@ import { Link, useLocation } from "react-router-dom";
 const TABS = [
   { to: "/", label: "Record", match: (p) => p === "/" },
   { to: "/drive", label: "Drive", match: (p) => p.startsWith("/drive") },
+  { to: "/review", label: "Review", match: (p) => p.startsWith("/review") },
 ];
 
 export default function ModePicker() {

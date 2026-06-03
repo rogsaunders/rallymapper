@@ -1,13 +1,24 @@
-// src/drive/components/RoadbookRow.jsx
+// src/components/roadbook/RoadbookRow.jsx
 //
-// One row of the scrolling roadbook.
+// One row of the scrolling roadbook. Shared between Drive Mode and
+// Review Mode.
 //
-// M2 changes:
-//   - Tappable: tapping jumps the current-row marker to this row.
-//   - Accepts a ref so RoadbookView can scrollIntoView the current row.
+// Highlight modes (mutually exclusive in practice; selected wins if
+// both happen to be set):
+//   • position="current"   — Drive Mode's "you are here" amber band.
+//   • position="above"     — Drive Mode's faded already-passed style.
+//   • selected={true}      — Review Mode's "you tapped this" yellow band.
+//
+// Drive Mode passes `position` (set by useDriveAdvance). Review Mode
+// passes `selected` (set by user taps on the row or the matching map
+// marker). RoadbookView keeps the two highlight pathways separate.
+//
+// (Originally lived in src/drive/components/ — moved here when the
+// roadbook list was lifted to a shared location so /review could
+// reuse it without depending on /drive.)
 
 import React, { forwardRef, useMemo } from "react";
-import { tulipFor } from "../lib/tulipAdapter";
+import { tulipFor } from "./tulipAdapter";
 
 function fmtKmFromKm(km) {
   if (km == null || !Number.isFinite(Number(km))) return "—";
@@ -21,7 +32,7 @@ function fmtCap(bearing) {
 }
 
 const RoadbookRow = forwardRef(function RoadbookRow(
-  { row, position, onTap },
+  { row, position, selected = false, onTap },
   ref,
 ) {
   // position: "above" | "current" | "below" | "neutral"
@@ -29,11 +40,13 @@ const RoadbookRow = forwardRef(function RoadbookRow(
 
   const isCurrent = position === "current";
 
-  const containerCls = isCurrent
-    ? "bg-amber-50 border-l-4 border-amber-500 pl-3"
-    : position === "above"
-      ? "opacity-60"
-      : "";
+  const containerCls = selected
+    ? "bg-yellow-50 border-l-4 border-yellow-500 pl-3"
+    : isCurrent
+      ? "bg-amber-50 border-l-4 border-amber-500 pl-3"
+      : position === "above"
+        ? "opacity-60"
+        : "";
 
   return (
     <button

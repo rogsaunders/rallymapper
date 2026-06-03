@@ -1,14 +1,19 @@
-// src/drive/components/RoadbookView.jsx
+// src/components/roadbook/RoadbookView.jsx
 //
-// Scrolling list of all roadbook rows.
+// Scrolling list of all roadbook rows. Shared between Drive Mode and
+// Review Mode.
 //
-// M2 changes:
-//   - Accepts currentIndex and onRowTap.
-//   - Maintains a ref per row and calls scrollIntoView({block:"center"})
-//     when currentIndex changes, so the current row stays visible
-//     without the user scrolling manually.
-//   - Smooth-scroll by default; instant on first mount to avoid an
-//     awkward auto-scroll animation the moment the page loads.
+// Two highlight pathways (consumers pick one):
+//   • currentIndex (Drive) — the "you are here" auto-advancing pointer.
+//     Renders amber band. Maintains a ref per row and auto-scrolls into
+//     centre whenever it changes.
+//   • selectedIndex (Review) — the row the user (or a map-marker click)
+//     last selected. Renders yellow band. Also auto-scrolls so the
+//     selected row is visible in the list pane.
+//
+// Both call scrollIntoView({block:"center"}); smooth-scroll by default,
+// instant on first mount to avoid an awkward auto-scroll animation the
+// moment the page loads.
 
 import React, { useEffect, useRef } from "react";
 import RoadbookRow from "./RoadbookRow";
@@ -16,6 +21,7 @@ import RoadbookRow from "./RoadbookRow";
 export default function RoadbookView({
   rows,
   currentIndex,
+  selectedIndex,
   onRowTap,
   // Increment from DriveMode to re-trigger scroll without changing
   // currentIndex (used by the ↺ Snap button so the user can re-centre
@@ -25,9 +31,14 @@ export default function RoadbookView({
   const rowRefs = useRef([]);
   const firstScrollDone = useRef(false);
 
+  // Auto-scroll target = whichever of currentIndex / selectedIndex is
+  // active. selectedIndex (Review) wins if both somehow appear.
+  const scrollTarget =
+    selectedIndex != null ? selectedIndex : currentIndex;
+
   useEffect(() => {
-    if (currentIndex == null) return;
-    const node = rowRefs.current[currentIndex];
+    if (scrollTarget == null) return;
+    const node = rowRefs.current[scrollTarget];
     if (!node) return;
 
     try {
@@ -44,7 +55,7 @@ export default function RoadbookView({
       }
     }
     firstScrollDone.current = true;
-  }, [currentIndex, scrollNonce]);
+  }, [scrollTarget, scrollNonce]);
 
   if (!rows || rows.length === 0) {
     return (
@@ -64,6 +75,7 @@ export default function RoadbookView({
             else if (i < currentIndex) position = "above";
             else position = "below";
           }
+          const selected = selectedIndex != null && i === selectedIndex;
           return (
             <RoadbookRow
               key={row.index ?? i}
@@ -72,6 +84,7 @@ export default function RoadbookView({
               }}
               row={row}
               position={position}
+              selected={selected}
               onTap={() => onRowTap?.(i)}
             />
           );
