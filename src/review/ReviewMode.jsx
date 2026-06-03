@@ -481,6 +481,10 @@ export default function ReviewMode() {
             selectedWaypointId={selectedWaypointId}
             onMarkerClick={onMarkerClick}
             flyToTarget={flyToTarget}
+            // Refit the map to the whole route whenever the picker
+            // switches stages, so the user doesn't have to pan
+            // around to find it.
+            fitBoundsKey={selectedStageId ?? "active"}
           />
         </div>
 
