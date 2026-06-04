@@ -205,24 +205,39 @@ export function deleteLocalStage(owner, localId) {
  * Remove a stage's row from Supabase. No-op (returns ok=true) when
  * `userId` is null — guests have nothing in the cloud.
  *
- * Relies on the table's RLS policy restricting deletes to the row's
- * owning user. Returns `{ ok: false, error }` on RPC error so the
- * caller can surface it.
+ * The DELETE is chained with `.select()` so the response includes the
+ * actually-deleted rows. This matters because Postgres+RLS silently
+ * returns success-with-zero-rows when no DELETE policy grants the
+ * operation (or when the row doesn't exist) — without the .select()
+ * the caller can't distinguish "deleted nothing" from "deleted
+ * successfully." The DELETE RLS policy on stage_exports was added
+ * 2026-06-04; this defensive check guards against the same class of
+ * silent-deny surfacing again.
+ *
+ * Returns:
+ *   { ok: true, rowsDeleted: N }           — N may be 0
+ *   { ok: false, error: { message } }      — RPC error
+ *
+ * Callers decide how to treat rowsDeleted=0 (the unified
+ * deleteStagePermanently treats it as failure for supabase-source
+ * entries and as success for local-source entries that may simply
+ * not have a cloud copy yet).
  */
 async function deleteSupabaseStage(userId, localId) {
-  if (!userId) return { ok: true };
+  if (!userId) return { ok: true, rowsDeleted: 0 };
   if (!localId) return { ok: false, error: { message: "Missing localId" } };
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("stage_exports")
       .delete()
       .eq("user_id", userId)
-      .eq("local_id", localId);
+      .eq("local_id", localId)
+      .select();
     if (error) {
       console.warn("stageHistory: deleteSupabaseStage failed", error.message);
       return { ok: false, error };
     }
-    return { ok: true };
+    return { ok: true, rowsDeleted: Array.isArray(data) ? data.length : 0 };
   } catch (e) {
     console.warn("stageHistory: deleteSupabaseStage threw", e);
     return { ok: false, error: { message: e?.message || String(e) } };
@@ -236,12 +251,17 @@ async function deleteSupabaseStage(userId, localId) {
  * storage and let it reappear next time."
  *
  * Strategy:
- *   1. Attempt the cloud delete first. If it fails (offline, RLS,
- *      network), return early without touching the local copy — that
- *      way the entry stays visible and the user sees the error
- *      rather than a half-deleted state.
- *   2. If the cloud delete succeeds (or the user is a guest with no
- *      cloud copy), delete the local copy too.
+ *   1. Attempt the cloud delete first. Bail out without touching the
+ *      local copy if it fails — that way the entry stays visible and
+ *      the user sees the actual error rather than a half-deleted
+ *      state.
+ *   2. For supabase-sourced entries (the list entry came from the
+ *      cloud), require at least one row to have been deleted. Zero
+ *      rows means the row is still in the cloud and the entry will
+ *      reappear — surface that as a failure.
+ *   3. For local-sourced entries (or guests), accept zero rows: the
+ *      cloud may simply not have a copy, which is fine.
+ *   4. If the cloud step is happy, delete the local copy too.
  *
  * Returns:
  *   { ok: true }                                  — fully deleted
@@ -251,13 +271,32 @@ async function deleteSupabaseStage(userId, localId) {
  * cloud is gone the entry will not reappear, and a stale localStorage
  * key is benign.
  */
-export async function deleteStagePermanently({ userId, owner, localId }) {
+export async function deleteStagePermanently({
+  userId,
+  owner,
+  localId,
+  source = null,
+}) {
   const cloudResult = await deleteSupabaseStage(userId, localId);
   if (!cloudResult.ok) return cloudResult;
 
-  // Cloud delete succeeded (or user is guest). Now clear the local
-  // copy. Best-effort — if it fails the entry won't reappear in the
-  // list anyway.
+  // If the entry was sourced from the cloud, zero rows deleted means
+  // the row is still there — RLS denied or the row genuinely didn't
+  // exist server-side despite appearing in the list (race / stale
+  // cache). Either way, the entry will reappear on next list load, so
+  // we must surface it.
+  if (userId && source === "supabase" && cloudResult.rowsDeleted === 0) {
+    return {
+      ok: false,
+      error: {
+        message:
+          "The cloud copy was not removed (no matching row was affected). It may have been deleted from another device, or the database denied the operation. Refresh the History list and try again.",
+      },
+    };
+  }
+
+  // Cloud step is happy. Now clear the local copy. Best-effort — if
+  // it fails the entry won't reappear in the list anyway.
   try {
     deleteLocalStage(owner, localId);
   } catch (_) {}

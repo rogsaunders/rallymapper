@@ -206,6 +206,7 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
           userId,
           owner,
           localId: entry.localId,
+          source: entry.source,
         });
         if (!result.ok) {
           // Cloud delete failed — surface the actual reason. The local
