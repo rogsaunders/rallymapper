@@ -1994,7 +1994,33 @@ export default function RouteMapperLayout() {
       setStageStartedAt(null);
 
       try {
-        localStorage.removeItem(STAGE_DRAFT_KEY);
+        // Don't wipe the draft on end-stage — leave the just-ended
+        // stage's data in the slot so Review can open it ("review
+        // what I just finished"). The Resume-unsaved-stage prompt at
+        // startup filters on `stageActive` (line 894), so it
+        // correctly ignores ended drafts. Starting a new stage
+        // overwrites this slot via the autosave the moment
+        // `stageActive` flips back to true. Matches the autosave
+        // shape so Review's loadStageDraft reads it identically to
+        // a live draft.
+        const endedDraft = {
+          savedAt: new Date().toISOString(),
+          tripName,
+          tripDate,
+          dayNumber,
+          routeNumber,
+          routeName,
+          stageNumber,
+          stageActive: false,
+          stageStartedAt,
+          startGPS,
+          trackPoints,
+          waypoints,
+          waypointType,
+          iconIdByCategory,
+          poi,
+        };
+        localStorage.setItem(STAGE_DRAFT_KEY, JSON.stringify(endedDraft));
       } catch {
         // ignore
       }
