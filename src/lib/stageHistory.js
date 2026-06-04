@@ -181,6 +181,11 @@ export async function loadSavedStage(userId, owner, entry) {
  * stage was previously synced, it will continue to appear in History
  * (served from Supabase the next time listSavedStages runs).
  *
+ * Use deleteStagePermanently() if you actually want the entry gone — the
+ * trash icon in StageHistoryPanel does that. This local-only helper is
+ * kept for callers that explicitly want device-storage cleanup without
+ * affecting the cloud.
+ *
  * Returns true if a local entry was found and removed.
  */
 export function deleteLocalStage(owner, localId) {
@@ -194,6 +199,69 @@ export function deleteLocalStage(owner, localId) {
     console.warn("stageHistory: deleteLocalStage failed", e);
     return false;
   }
+}
+
+/**
+ * Remove a stage's row from Supabase. No-op (returns ok=true) when
+ * `userId` is null — guests have nothing in the cloud.
+ *
+ * Relies on the table's RLS policy restricting deletes to the row's
+ * owning user. Returns `{ ok: false, error }` on RPC error so the
+ * caller can surface it.
+ */
+async function deleteSupabaseStage(userId, localId) {
+  if (!userId) return { ok: true };
+  if (!localId) return { ok: false, error: { message: "Missing localId" } };
+  try {
+    const { error } = await supabase
+      .from("stage_exports")
+      .delete()
+      .eq("user_id", userId)
+      .eq("local_id", localId);
+    if (error) {
+      console.warn("stageHistory: deleteSupabaseStage failed", error.message);
+      return { ok: false, error };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn("stageHistory: deleteSupabaseStage threw", e);
+    return { ok: false, error: { message: e?.message || String(e) } };
+  }
+}
+
+/**
+ * Permanently delete a saved stage from both the cloud and this
+ * device. Used by the History panel's trash icon — the user's mental
+ * model is "this stage goes away forever," not "free up some device
+ * storage and let it reappear next time."
+ *
+ * Strategy:
+ *   1. Attempt the cloud delete first. If it fails (offline, RLS,
+ *      network), return early without touching the local copy — that
+ *      way the entry stays visible and the user sees the error
+ *      rather than a half-deleted state.
+ *   2. If the cloud delete succeeds (or the user is a guest with no
+ *      cloud copy), delete the local copy too.
+ *
+ * Returns:
+ *   { ok: true }                                  — fully deleted
+ *   { ok: false, error: { message } }             — cloud delete failed
+ *
+ * The local-only failure mode is not reported as an error — if the
+ * cloud is gone the entry will not reappear, and a stale localStorage
+ * key is benign.
+ */
+export async function deleteStagePermanently({ userId, owner, localId }) {
+  const cloudResult = await deleteSupabaseStage(userId, localId);
+  if (!cloudResult.ok) return cloudResult;
+
+  // Cloud delete succeeded (or user is guest). Now clear the local
+  // copy. Best-effort — if it fails the entry won't reappear in the
+  // list anyway.
+  try {
+    deleteLocalStage(owner, localId);
+  } catch (_) {}
+  return { ok: true };
 }
 
 // ── Write-back ───────────────────────────────────────────────────────────────

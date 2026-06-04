@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   listSavedStages,
   loadSavedStage,
-  deleteLocalStage,
+  deleteStagePermanently,
   STAGE_HISTORY_LIMIT,
 } from "../lib/stageHistory.js";
 
@@ -191,32 +191,43 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
   );
 
   const handleDelete = useCallback(
-    (entry) => {
-      // The delete only removes the local copy. If the stage was synced
-      // to Supabase it will continue to appear in History (sourced from
-      // the cloud on next list load). For a "local"-source entry we
-      // can't tell whether a cloud backup exists, so we warn more
-      // strongly.
-      const isLocalOnly = entry.source === "local";
+    async (entry) => {
       const name = stageSummary(entry.meta);
-      const confirmMsg = isLocalOnly
-        ? `Remove "${name}" from this device?\n\nThis stage has not been confirmed as synced to the cloud — if there is no cloud copy, the data will be lost permanently.`
-        : `Remove "${name}" from this device?\n\nThe cloud copy will be kept and the stage will still appear in History.`;
+      const confirmMsg = userId
+        ? `Permanently delete "${name}"?\n\nThis removes the stage from this device AND from the cloud. The action cannot be undone.`
+        : `Permanently delete "${name}"?\n\nThis removes the stage from this device. The action cannot be undone.`;
 
       if (!window.confirm(confirmMsg)) return;
 
       setDeletingId(entry.localId);
+      setError(null);
       try {
-        deleteLocalStage(owner, entry.localId);
+        const result = await deleteStagePermanently({
+          userId,
+          owner,
+          localId: entry.localId,
+        });
+        if (!result.ok) {
+          // Cloud delete failed — surface the actual reason. The local
+          // copy is intentionally left intact so the user sees the
+          // entry stayed in the list (no half-deleted state).
+          const msg = result.error?.message || "Failed to delete stage.";
+          setError(
+            navigator.onLine
+              ? `Failed to delete from cloud: ${msg}`
+              : "You appear to be offline. Reconnect and try again to permanently delete.",
+          );
+          return;
+        }
         setReloadNonce((n) => n + 1);
       } catch (err) {
         console.error("StageHistoryPanel: delete failed", err);
-        setError("Failed to remove stage from device.");
+        setError("Failed to delete stage.");
       } finally {
         setDeletingId(null);
       }
     },
-    [owner],
+    [userId, owner],
   );
 
   return (
