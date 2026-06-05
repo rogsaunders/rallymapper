@@ -99,6 +99,14 @@ export default function RoadbookView({
               onEditStart={() => onEditStart?.(i)}
               onSave={(_row, patch) => onSaveEdit?.(i, patch)}
               onCancel={() => onCancelEdit?.()}
+              // Excel-style Tab: jump focus to the next row's inline
+              // textarea (or wrap to the first row at the end). The
+              // row only renders a single textarea in inline-edit
+              // mode, so a CSS selector is enough.
+              onTabNext={() => {
+                const next = rowRefs.current[i + 1] ?? rowRefs.current[0];
+                next?.querySelector?.("textarea")?.focus();
+              }}
             />
           );
         })}
