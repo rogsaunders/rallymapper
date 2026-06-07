@@ -207,12 +207,15 @@ export default function ReviewMode() {
   const [editingIndex, setEditingIndex] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [saveError, setSaveError] = useState(null);
-  // Reset selection whenever the source stage changes.
+  // Reset selection whenever the source stage changes — or the view
+  // mode toggles. Row indices differ between Driver and Raw views, so
+  // a stale selectedIndex would point at the wrong row after the
+  // switch.
   useEffect(() => {
     setSelectedIndex(null);
     setEditingIndex(null);
     setSaveError(null);
-  }, [selectedStageId, stage]);
+  }, [selectedStageId, stage, viewMode]);
 
   // Terrain is the most useful default for organiser review (task a),
   // since contour + landcover context is what they're looking for.
@@ -245,7 +248,40 @@ export default function ReviewMode() {
     }
   }, [stage, trackPoints, waypoints]);
 
-  const rows = roadbook?.rows ?? [];
+  // View mode — which slice of the roadbook to show.
+  //   • "driver" (default) = roadbook.views.driver — the same condensed
+  //     row set the DOCX exporter uses. Picking this by default means
+  //     what the organiser sees in Review matches what the navigator
+  //     will read in the printed roadbook.
+  //   • "raw" = roadbook.rows (all manual waypoints + every detected
+  //     turn between them). Useful when verifying tulip accuracy or
+  //     debugging the turn-detection pass.
+  const [viewMode, setViewMode] = useState("driver");
+  const rows =
+    viewMode === "driver"
+      ? (roadbook?.views?.driver ?? roadbook?.rows ?? [])
+      : (roadbook?.rows ?? []);
+
+  // Map waypoint-id → its row index (1-based) in the currently
+  // displayed view. The map marker for that waypoint will be
+  // labelled with the SAME number the Review list shows, instead of
+  // its position in the raw waypoints array. Resolves the
+  // "WP 8 on map / Row 23 in list" mismatch.
+  //
+  // Some waypoints (typically auto-derived turns that didn't survive
+  // the driver-view filter) won't appear in `rows` — those fall back
+  // to their original waypoint-array number via MapView's existing
+  // logic so we never silently lose a marker number.
+  const waypointRowNumberMap = useMemo(() => {
+    const m = {};
+    rows.forEach((row, i) => {
+      const num = i + 1;
+      for (const wpId of row.linkedWaypointIds || []) {
+        if (wpId && m[wpId] == null) m[wpId] = num;
+      }
+    });
+    return m;
+  }, [rows]);
 
   // Selection plumbing —
   //   • selectedIndex is the canonical state.
@@ -441,6 +477,38 @@ export default function ReviewMode() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* View toggle — Driver (matches the .docx) vs Raw (all
+                detected turns, useful for tulip-vs-track verification). */}
+            <div
+              className="inline-flex rounded-full bg-gray-100 p-1"
+              role="tablist"
+              aria-label="Roadbook view"
+              title="Driver matches the printed roadbook; Raw shows every detected turn"
+            >
+              {[
+                { id: "driver", label: "Driver" },
+                { id: "raw", label: "Raw" },
+              ].map((v) => {
+                const active = viewMode === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setViewMode(v.id)}
+                    role="tab"
+                    aria-selected={active}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${
+                      active
+                        ? "bg-white shadow text-gray-900"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="hidden sm:inline-flex rounded-full bg-gray-100 p-1">
               {MAP_SOURCES.map((s) => {
                 const active = s.id === mapSource;
@@ -516,6 +584,11 @@ export default function ReviewMode() {
             // FitBounds re-fires when trackPoints/waypoints flip
             // from 0 → N.
             fitBoundsKey={`${selectedStageId ?? "active"}-${trackPoints.length}-${waypoints.length}`}
+            // Re-label the waypoint markers to match the row index in
+            // the Review list rather than the position in the raw
+            // waypoints array. Fixes "WP 8 on map / Row 23 in list"
+            // for the same physical waypoint.
+            waypointNumberOverride={waypointRowNumberMap}
           />
         </div>
 

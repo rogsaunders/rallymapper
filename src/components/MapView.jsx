@@ -276,6 +276,12 @@ export default function MapView({
   // between historical entries) the map refits to the new route.
   // null/undefined = no auto-fit (Record/Drive default).
   fitBoundsKey = null,
+  // Review Mode: override the per-waypoint "WP N" badge number with
+  // the row index of the roadbook view currently being displayed.
+  // Object keyed by waypoint id → 1-based row number. Waypoints
+  // missing from the map fall back to the default 1-based-in-array
+  // numbering. Record/Drive don't pass this and keep the default.
+  waypointNumberOverride = null,
 }) {
   const tile = useMemo(() => {
     switch (mapSource) {
@@ -399,17 +405,25 @@ export default function MapView({
     return pts;
   }, [startGPS, trackPoints, waypoints]);
 
-  // Map each non-start waypoint object → its 1-based display number (WP 1, WP 2, …)
+  // Map each non-start waypoint object → its 1-based display number
+  // (WP 1, WP 2, …).
+  //
+  // If `waypointNumberOverride` is provided (Review Mode), look the
+  // waypoint up there first by id — that lets the marker label match
+  // the Review row index. Waypoints missing from the override (e.g.
+  // filtered out of the Driver view) fall back to the 1-based-in-
+  // array numbering so they still carry a meaningful badge.
   const waypointNumberMap = useMemo(() => {
     const m = new Map();
     let n = 0;
     for (const wp of waypoints || []) {
-      if (wp.kind !== "start" && wp.poi !== "START") {
-        m.set(wp, ++n);
-      }
+      if (wp.kind === "start" || wp.poi === "START") continue;
+      n += 1;
+      const overridden = waypointNumberOverride?.[wp.id];
+      m.set(wp, Number.isFinite(overridden) ? overridden : n);
     }
     return m;
-  }, [waypoints]);
+  }, [waypoints, waypointNumberOverride]);
 
   return (
     <div
