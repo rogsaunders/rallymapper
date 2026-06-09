@@ -119,11 +119,22 @@ function FlyTo({ target, zoom = 16, enabled = true }) {
     const lat = Number(target.lat);
     const lon = Number(target.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    // ── Diagnostic — TEMPORARY (paired with row-tap log + FitBounds log)
+    const before = { c: map.getCenter(), z: map.getZoom() };
     try {
       map.setView([lat, lon], zoom, { animate: false });
     } catch (_) {
       map.setView([lat, lon], zoom);
     }
+    const after = { c: map.getCenter(), z: map.getZoom() };
+    // eslint-disable-next-line no-console
+    console.log(
+      "[FlyTo] want →",
+      lat.toFixed(6), lon.toFixed(6), "z", zoom,
+      "| before:", before.c.lat.toFixed(6), before.c.lng.toFixed(6), "z", before.z,
+      "| after:", after.c.lat.toFixed(6), after.c.lng.toFixed(6), "z", after.z,
+    );
+    // ─────────────────────────────────────────────────────────────────
   }, [enabled, target?.lat, target?.lon, zoom, map]);
   return null;
 }
@@ -148,30 +159,68 @@ function FlyTo({ target, zoom = 16, enabled = true }) {
 function FitBounds({ fitKey, points, padding = 32 }) {
   const map = useMap();
   useEffect(() => {
-    if (fitKey == null) return;
-    if (!points || points.length === 0) return;
+    if (fitKey == null) {
+      // eslint-disable-next-line no-console
+      console.log("[FitBounds] skipped — no fitKey");
+      return;
+    }
+    if (!points || points.length === 0) {
+      // eslint-disable-next-line no-console
+      console.log("[FitBounds] skipped — empty points (key:", fitKey, ")");
+      return;
+    }
 
     const valid = points
       .map((p) => [Number(p?.lat), Number(p?.lon)])
       .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
 
-    if (valid.length === 0) return;
+    if (valid.length === 0) {
+      // eslint-disable-next-line no-console
+      console.log("[FitBounds] skipped — no valid coords from", points.length, "points");
+      return;
+    }
+
+    // ── Diagnostic — TEMPORARY ──────────────────────────────────────
+    const container = map.getContainer();
+    const cw = container?.clientWidth ?? "?";
+    const ch = container?.clientHeight ?? "?";
+    // ─────────────────────────────────────────────────────────────────
 
     if (valid.length === 1) {
       map.setView(valid[0], 14, { animate: false });
+      // eslint-disable-next-line no-console
+      console.log(
+        "[FitBounds] single-point setView", valid[0],
+        "container:", cw + "x" + ch,
+      );
       return;
     }
 
     try {
       const bounds = L.latLngBounds(valid);
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
       map.fitBounds(bounds, {
         padding: [padding, padding],
         maxZoom: 16,
         animate: false,
       });
+      const after = { c: map.getCenter(), z: map.getZoom() };
+      // eslint-disable-next-line no-console
+      console.log(
+        "[FitBounds] fitKey:", fitKey,
+        "| points:", valid.length,
+        "| bounds: SW", sw.lat.toFixed(6), sw.lng.toFixed(6),
+        "→ NE", ne.lat.toFixed(6), ne.lng.toFixed(6),
+        "| container:", cw + "x" + ch,
+        "| after: centre", after.c.lat.toFixed(6), after.c.lng.toFixed(6),
+        "z", after.z,
+      );
     } catch (e) {
       // Defensive — fall back to the first point.
       map.setView(valid[0], 14, { animate: false });
+      // eslint-disable-next-line no-console
+      console.warn("[FitBounds] threw, fallback setView", valid[0], e);
     }
     // fitKey is the trigger; points is captured via closure so we
     // explicitly don't want it in the dep list (would refit on every
