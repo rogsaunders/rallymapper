@@ -51,17 +51,26 @@ const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
 
 // FEATURE FLAG — historical-stage selection in Review mode.
 //
-// Temporarily disabled (2026-06-04). The picker, async loader and the
-// FitBounds/FlyTo plumbing all work in isolation, but the combined map
-// behaviour for historical stages is erratic in real use (off-route
-// initial framing, imperfect row-tap centring). Active-stage review
-// works perfectly and is what's being demoed.
+// Re-enabled 2026-06-09. The map-centring bugs that originally
+// motivated turning this off were fixed upstream:
+//   • FitBounds was firing before the async loadSavedStage payload
+//     arrived (lengths still 0 → no valid points → silent skip).
+//     Fixed by baking trackPoints.length + waypoints.length into
+//     `fitBoundsKey` so FitBounds re-fires when data lands.
+//   • Row-tap centring was getting clobbered by Leaflet's internal
+//     size/tile activity during flyTo's 600 ms animation window.
+//     Fixed by swapping flyTo for setView (instant, no race).
 //
-// When the historical-stage map behaviour is sorted out, flip this to
-// `true`. No other code changes required — the picker, loader effects,
-// auto-pick logic and stageHistory write-back all remain in the file
-// behind this guard.
-const ENABLE_HISTORICAL_STAGES = false;
+// Both fixes have shipped (PRs #51, #59, #60) and confirmed on
+// real-device testing with the active stage. Re-enabling so the
+// organiser can review historical stages too — needed for Lachie's
+// upcoming multi-day survey.
+//
+// If new issues turn up that warrant another shutoff, flip back to
+// `false` — all the historical-path code (picker UI, list/load
+// effects, auto-pick logic, stageHistory write-back) stays in the
+// file behind this guard, so it's a one-line revert.
+const ENABLE_HISTORICAL_STAGES = true;
 
 const MAP_SOURCES = [
   { id: "osm", label: "OSM" },
