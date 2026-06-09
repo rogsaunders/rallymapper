@@ -64,18 +64,30 @@ function FixResize({ resizeKey }) {
     const container = map.getContainer();
     if (!container) return;
 
-    // Always do an immediate invalidation — handles the case where the
-    // observer fires before the map has painted any tiles.
-    map.invalidateSize();
+    // invalidateSize with pan:false stops Leaflet from animating the
+    // map after a container resize. Default behaviour is animate:true
+    // which can shift the view AFTER a recent setView call — a
+    // suspected contributor to the "historical-stage row tap doesn't
+    // land" bug, since the ResizeObserver can fire on any layout
+    // chatter (roadbook list scroll, edit-form expand/collapse) and
+    // would otherwise quietly clobber the centring.
+    map.invalidateSize({ pan: false, debounceMoveend: true });
+    // eslint-disable-next-line no-console
+    console.log("[FixResize] invalidateSize (mount/resizeKey)", resizeKey);
 
     if (typeof ResizeObserver === "undefined") {
-      // Old-Safari fallback: a single delayed invalidation.
-      const t = setTimeout(() => map.invalidateSize(), 250);
+      const t = setTimeout(() => {
+        map.invalidateSize({ pan: false, debounceMoveend: true });
+        // eslint-disable-next-line no-console
+        console.log("[FixResize] invalidateSize (fallback timeout)");
+      }, 250);
       return () => clearTimeout(t);
     }
 
     const ro = new ResizeObserver(() => {
-      map.invalidateSize();
+      map.invalidateSize({ pan: false, debounceMoveend: true });
+      // eslint-disable-next-line no-console
+      console.log("[FixResize] invalidateSize (observer)");
     });
     ro.observe(container);
     return () => ro.disconnect();
@@ -117,11 +129,26 @@ function FlyTo({ target, zoom = 16, enabled = true }) {
     const lat = Number(target.lat);
     const lon = Number(target.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    // Diagnostic — temporary, chasing the "historical-stage row tap
+    // doesn't move the map" bug. Logs every time FlyTo's setView is
+    // about to run, with the coords + zoom going in AND the map's
+    // centre/zoom immediately after the call. If the "after" doesn't
+    // match the "before" we know something is intercepting or
+    // overriding the setView mid-render. Remove once closed.
+    const before = { c: map.getCenter(), z: map.getZoom() };
     try {
       map.setView([lat, lon], zoom, { animate: false });
     } catch (_) {
       map.setView([lat, lon], zoom);
     }
+    const after = { c: map.getCenter(), z: map.getZoom() };
+    // eslint-disable-next-line no-console
+    console.log(
+      "[FlyTo]",
+      "want →", lat.toFixed(6), lon.toFixed(6), "z", zoom,
+      "| before:", before.c.lat.toFixed(6), before.c.lng.toFixed(6), "z", before.z,
+      "| after:", after.c.lat.toFixed(6), after.c.lng.toFixed(6), "z", after.z,
+    );
   }, [enabled, target?.lat, target?.lon, zoom, map]);
   return null;
 }

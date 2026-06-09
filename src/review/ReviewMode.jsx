@@ -250,9 +250,11 @@ export default function ReviewMode() {
     setSaveError(null);
   }, [selectedStageId, stage, viewMode]);
 
-  // Terrain is the most useful default for organiser review (task a),
-  // since contour + landcover context is what they're looking for.
-  const [mapSource, setMapSource] = useState("opentopo");
+  // OSM is the default — gives clean labels and is the most familiar
+  // base layer for organisers who are eyeballing street names. Terrain
+  // / Satellite are one tap away via the toggle for when contour or
+  // imagery context is useful.
+  const [mapSource, setMapSource] = useState("osm");
 
   const trackPoints = stage?.trackPoints ?? [];
   const waypoints = stage?.waypoints ?? [];
@@ -462,8 +464,10 @@ export default function ReviewMode() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Sub-header — stage picker (when historical enabled), identity,
-          map source picker, Back. */}
-      <div className="bg-white border-b">
+          map source picker, Back. Sticky so it stays in reach when the
+          roadbook pane scrolls; z-10 keeps it above the map's tile
+          layer and Leaflet's zoom controls. */}
+      <div className="sticky top-0 z-10 bg-white border-b">
         <div className="mx-auto max-w-7xl px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {ENABLE_HISTORICAL_STAGES && (
