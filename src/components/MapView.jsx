@@ -99,43 +99,27 @@ function Recenter({ center, zoom, enabled }) {
 // Mode so that selecting a roadbook row flies the map to that row's
 // coordinates. Distinct from <Recenter/> which is the GPS-follow path
 // in Record/Drive Mode.
+// Centres the map on a specific lat/lon when it changes. Used by
+// Review Mode so selecting a roadbook row jumps the map to that
+// row's coordinates. Distinct from <Recenter/> which is the
+// GPS-follow path in Record/Drive Mode.
+//
+// Uses setView (instant) rather than flyTo (animated). flyTo's
+// ~600 ms animation window was getting clobbered mid-flight by
+// Leaflet's own size/tile chatter, leaving the view offset from
+// the requested centre. setView lands the view in one frame so
+// nothing can race with it. Confirmed on real-device testing
+// 2026-06-09.
 function FlyTo({ target, zoom = 16, enabled = true }) {
   const map = useMap();
   useEffect(() => {
-    if (!enabled) {
-      // eslint-disable-next-line no-console
-      console.log("[FlyTo] skipped — disabled");
-      return;
-    }
-    if (!target) {
-      // eslint-disable-next-line no-console
-      console.log("[FlyTo] skipped — no target");
-      return;
-    }
+    if (!enabled || !target) return;
     const lat = Number(target.lat);
     const lon = Number(target.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      // eslint-disable-next-line no-console
-      console.warn("[FlyTo] skipped — invalid coords", { target });
-      return;
-    }
-    // Diagnostic — temporary while we chase the "map lands off-row"
-    // bug. Logs every time the effect fires with the coords it's
-    // about to apply. Remove after the bug is closed.
-    // eslint-disable-next-line no-console
-    console.log("[FlyTo] →", lat.toFixed(6), lon.toFixed(6), "zoom:", zoom);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     try {
-      // Was: map.flyTo([lat, lon], zoom, { animate: true, duration: 0.6 })
-      // Swapped to setView (instant, no animation window) to remove
-      // the 600 ms gap during which something else (FitBounds,
-      // invalidateSize, a tile load) could clobber the centring.
-      // If the bug persists with setView, the cause is downstream
-      // (something is overriding view AFTER it's set), not the
-      // animation itself.
       map.setView([lat, lon], zoom, { animate: false });
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("[FlyTo] setView threw, falling back", e);
+    } catch (_) {
       map.setView([lat, lon], zoom);
     }
   }, [enabled, target?.lat, target?.lon, zoom, map]);
