@@ -670,57 +670,6 @@ export default function ReviewMode() {
               rows={rows}
               selectedIndex={selectedIndex}
               onRowTap={(i) => {
-                // ── Diagnostic — TEMPORARY ───────────────────────
-                // Compares the row's lat/lon (what FlyTo uses) with
-                // each linked waypoint's lat/lon (where the marker
-                // is drawn). If they match, the merger fix landed
-                // correctly and the visual offset has a different
-                // cause (probably zoom / marker anchor). If they
-                // differ, the fix isn't reaching the data flowing
-                // through the regenerated roadbook and we have a
-                // pipeline or caching problem to chase. Remove
-                // after the bug is closed.
-                {
-                  const row = rows[i] || {};
-                  const linkedIds = row.linkedWaypointIds || [];
-                  const linked = linkedIds.map((id) => {
-                    const wp = (waypoints || []).find((w) => w.id === id);
-                    return wp
-                      ? { id, lat: wp.lat, lon: wp.lon }
-                      : { id, missing: true };
-                  });
-                  const haversine = (a, b) => {
-                    if (!a || !b) return null;
-                    const R = 6371000;
-                    const toR = (d) => (d * Math.PI) / 180;
-                    const dLat = toR(b.lat - a.lat);
-                    const dLon = toR(b.lon - a.lon);
-                    const x =
-                      Math.sin(dLat / 2) ** 2 +
-                      Math.cos(toR(a.lat)) *
-                        Math.cos(toR(b.lat)) *
-                        Math.sin(dLon / 2) ** 2;
-                    return Math.round(2 * R * Math.asin(Math.sqrt(x)));
-                  };
-                  const distances = linked.map((l) =>
-                    l.missing ? "missing" : `${haversine(row, l)}m`,
-                  );
-                  // eslint-disable-next-line no-console
-                  console.log(
-                    "[ReviewMode] row tap →",
-                    "idx:", i,
-                    "src:", row.source,
-                    "row:", row.lat?.toFixed(6), row.lon?.toFixed(6),
-                    "| linked wps:", linked.map((l) =>
-                      l.missing
-                        ? `(missing ${l.id})`
-                        : `${l.lat?.toFixed(6)},${l.lon?.toFixed(6)}`,
-                    ).join(" / "),
-                    "| Δ:", distances.join(" / "),
-                  );
-                }
-                // ─────────────────────────────────────────────────
-
                 // Tapping any row while another is in edit mode
                 // cancels that edit — prevents accidental discard
                 // surprises by behaving as a navigation gesture.
