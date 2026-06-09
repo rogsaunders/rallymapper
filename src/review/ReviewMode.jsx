@@ -308,6 +308,15 @@ export default function ReviewMode() {
     const idx = rows.findIndex((r) =>
       (r.linkedWaypointIds || []).includes(waypointId),
     );
+    // Diagnostic — pair with [FlyTo] + [ReviewMode] row tap logs.
+    // eslint-disable-next-line no-console
+    console.log(
+      "[ReviewMode] marker click →",
+      "wpId:", waypointId,
+      "matched row idx:", idx,
+      "lat:", rows[idx]?.lat,
+      "lon:", rows[idx]?.lon,
+    );
     if (idx >= 0) setSelectedIndex(idx);
   };
 
@@ -627,6 +636,19 @@ export default function ReviewMode() {
               rows={rows}
               selectedIndex={selectedIndex}
               onRowTap={(i) => {
+                // Diagnostic — temporary while we chase the "map
+                // lands off-row" bug. Logs the row index and the
+                // coords we're about to ask FlyTo to centre on, so
+                // we can match against [FlyTo] in the console.
+                // Remove after the bug is closed.
+                // eslint-disable-next-line no-console
+                console.log(
+                  "[ReviewMode] row tap →",
+                  "idx:", i,
+                  "lat:", rows[i]?.lat,
+                  "lon:", rows[i]?.lon,
+                  "notes:", rows[i]?.notes,
+                );
                 // Tapping any row while another is in edit mode
                 // cancels that edit — prevents accidental discard
                 // surprises by behaving as a navigation gesture.
