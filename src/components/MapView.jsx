@@ -64,18 +64,24 @@ function FixResize({ resizeKey }) {
     const container = map.getContainer();
     if (!container) return;
 
-    // Always do an immediate invalidation — handles the case where the
-    // observer fires before the map has painted any tiles.
-    map.invalidateSize();
+    // invalidateSize with pan:false stops Leaflet from animating the
+    // map after a container resize. Default behaviour is animate:true
+    // which can shift the view AFTER a recent setView call — kept as
+    // a hardening change so the ResizeObserver firing on layout
+    // chatter (roadbook list scroll, edit-form expand/collapse) can't
+    // quietly clobber the centring.
+    map.invalidateSize({ pan: false, debounceMoveend: true });
 
     if (typeof ResizeObserver === "undefined") {
-      // Old-Safari fallback: a single delayed invalidation.
-      const t = setTimeout(() => map.invalidateSize(), 250);
+      const t = setTimeout(
+        () => map.invalidateSize({ pan: false, debounceMoveend: true }),
+        250,
+      );
       return () => clearTimeout(t);
     }
 
     const ro = new ResizeObserver(() => {
-      map.invalidateSize();
+      map.invalidateSize({ pan: false, debounceMoveend: true });
     });
     ro.observe(container);
     return () => ro.disconnect();
@@ -95,10 +101,6 @@ function Recenter({ center, zoom, enabled }) {
   return null;
 }
 
-// Pans + zooms to a specific lat/lon when it changes. Used by Review
-// Mode so that selecting a roadbook row flies the map to that row's
-// coordinates. Distinct from <Recenter/> which is the GPS-follow path
-// in Record/Drive Mode.
 // Centres the map on a specific lat/lon when it changes. Used by
 // Review Mode so selecting a roadbook row jumps the map to that
 // row's coordinates. Distinct from <Recenter/> which is the
@@ -131,6 +133,18 @@ function FlyTo({ target, zoom = 16, enabled = true }) {
 // switches between stages). Computes bounds from the union of
 // trackPoints and waypoints; falls back to a single setView if only
 // one point is available. Skips silently if there's nothing to fit.
+//
+// All movement here is `animate: false` (instant). The animated fit
+// previously raced with FlyTo's setView when the user tapped a row
+// before the ~300 ms fit animation finished — Leaflet would honour
+// the in-flight fit and effectively ignore the row-tap centring,
+// leaving the map landed on the whole-route view instead of the
+// selected row's coords. Active-stage Review didn't trigger this
+// (FitBounds always finished before the user could read the list
+// and tap), but historical stages did because their data arrives
+// async and the user is already looking at the page when the fit
+// runs. Same race the flyTo→setView fix dodged in PR #59, just on
+// the other component.
 function FitBounds({ fitKey, points, padding = 32 }) {
   const map = useMap();
   useEffect(() => {
@@ -144,7 +158,7 @@ function FitBounds({ fitKey, points, padding = 32 }) {
     if (valid.length === 0) return;
 
     if (valid.length === 1) {
-      map.setView(valid[0], 14, { animate: true });
+      map.setView(valid[0], 14, { animate: false });
       return;
     }
 
@@ -153,11 +167,11 @@ function FitBounds({ fitKey, points, padding = 32 }) {
       map.fitBounds(bounds, {
         padding: [padding, padding],
         maxZoom: 16,
-        animate: true,
+        animate: false,
       });
     } catch (e) {
       // Defensive — fall back to the first point.
-      map.setView(valid[0], 14);
+      map.setView(valid[0], 14, { animate: false });
     }
     // fitKey is the trigger; points is captured via closure so we
     // explicitly don't want it in the dep list (would refit on every

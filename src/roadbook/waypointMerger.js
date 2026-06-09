@@ -86,8 +86,27 @@ export function mergeWithWaypoints(events, waypoints, preprocessedTrack, config)
         );
 
     if (nearby) {
-      // Manual waypoint always wins — override classification, note, and
-      // the bearings/angle.
+      // Manual waypoint always wins — override classification, note,
+      // and the bearings/angle. Also override the geographic position
+      // so the row sits where the user actually tapped Record, not at
+      // the auto-detected turn's coords.
+      //
+      // Why this matters: the merge match is by ALONG-TRACK distance
+      // (within mergeRadiusM), not Euclidean distance. On a route
+      // that loops or doubles back, two points hundreds of metres
+      // apart geographically can share an along-track distance —
+      // matching them up gave a row whose lat/lon was up to ~1 km
+      // from the tapped waypoint's lat/lon. Map markers ended up
+      // off-screen relative to where Review's FlyTo landed.
+      // (Confirmed via Roger's road test 2026-06-09: row "onto
+      // driveway" reported `lat,lon` ~950 m NW of its linked
+      // waypoint's `lat,lon`.)
+      //
+      // Bearings stay derived from the surrounding track of the
+      // auto-detected turn — the tulip shape is unchanged by this
+      // move.
+      nearby.lat = waypoint.lat;
+      nearby.lon = waypoint.lon;
       nearby.icon = waypoint.icon || nearby.icon;
       nearby.eventType = waypoint.eventType || nearby.eventType;
       nearby.tulipTemplate = waypoint.eventType || nearby.tulipTemplate;

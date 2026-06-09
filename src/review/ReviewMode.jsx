@@ -51,17 +51,26 @@ const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
 
 // FEATURE FLAG — historical-stage selection in Review mode.
 //
-// Temporarily disabled (2026-06-04). The picker, async loader and the
-// FitBounds/FlyTo plumbing all work in isolation, but the combined map
-// behaviour for historical stages is erratic in real use (off-route
-// initial framing, imperfect row-tap centring). Active-stage review
-// works perfectly and is what's being demoed.
+// Re-enabled 2026-06-09. The map-centring bugs that originally
+// motivated turning this off were fixed upstream:
+//   • FitBounds was firing before the async loadSavedStage payload
+//     arrived (lengths still 0 → no valid points → silent skip).
+//     Fixed by baking trackPoints.length + waypoints.length into
+//     `fitBoundsKey` so FitBounds re-fires when data lands.
+//   • Row-tap centring was getting clobbered by Leaflet's internal
+//     size/tile activity during flyTo's 600 ms animation window.
+//     Fixed by swapping flyTo for setView (instant, no race).
 //
-// When the historical-stage map behaviour is sorted out, flip this to
-// `true`. No other code changes required — the picker, loader effects,
-// auto-pick logic and stageHistory write-back all remain in the file
-// behind this guard.
-const ENABLE_HISTORICAL_STAGES = false;
+// Both fixes have shipped (PRs #51, #59, #60) and confirmed on
+// real-device testing with the active stage. Re-enabling so the
+// organiser can review historical stages too — needed for Lachie's
+// upcoming multi-day survey.
+//
+// If new issues turn up that warrant another shutoff, flip back to
+// `false` — all the historical-path code (picker UI, list/load
+// effects, auto-pick logic, stageHistory write-back) stays in the
+// file behind this guard, so it's a one-line revert.
+const ENABLE_HISTORICAL_STAGES = true;
 
 const MAP_SOURCES = [
   { id: "osm", label: "OSM" },
@@ -182,6 +191,15 @@ export default function ReviewMode() {
       setHistoricalPayload(null);
       return;
     }
+    // Clear the previous payload eagerly so the render between
+    // "new stage selected" and "data arrived" doesn't show the OLD
+    // stage's trackPoints/waypoints. Without this, FitBounds fires
+    // once against the stale data (briefly fitting the previous
+    // route) and then again when the new payload lands — two
+    // animation windows where a row tap could race. Clearing here
+    // means we go through a single "Loading stage…" render, then
+    // one fit on the new data, with no stale view in between.
+    setHistoricalPayload(null);
     let cancelled = false;
     setHistoricalLoading(true);
     loadSavedStage(userId, owner, entry)
@@ -232,9 +250,11 @@ export default function ReviewMode() {
     setSaveError(null);
   }, [selectedStageId, stage, viewMode]);
 
-  // Terrain is the most useful default for organiser review (task a),
-  // since contour + landcover context is what they're looking for.
-  const [mapSource, setMapSource] = useState("opentopo");
+  // OSM is the default — gives clean labels and is the most familiar
+  // base layer for organisers who are eyeballing street names. Terrain
+  // / Satellite are one tap away via the toggle for when contour or
+  // imagery context is useful.
+  const [mapSource, setMapSource] = useState("osm");
 
   const trackPoints = stage?.trackPoints ?? [];
   const waypoints = stage?.waypoints ?? [];
@@ -444,8 +464,10 @@ export default function ReviewMode() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Sub-header — stage picker (when historical enabled), identity,
-          map source picker, Back. */}
-      <div className="bg-white border-b">
+          map source picker, Back. Sticky so it stays in reach when the
+          roadbook pane scrolls; z-10 keeps it above the map's tile
+          layer and Leaflet's zoom controls. */}
+      <div className="sticky top-0 z-10 bg-white border-b">
         <div className="mx-auto max-w-7xl px-3 py-2 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {ENABLE_HISTORICAL_STAGES && (
