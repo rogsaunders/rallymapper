@@ -207,6 +207,21 @@ export default function ReviewMode() {
   const [editingIndex, setEditingIndex] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [saveError, setSaveError] = useState(null);
+
+  // View mode — declared up here (before the reset-selection effect
+  // below) so the effect's dep array doesn't hit a temporal dead
+  // zone on first render. Was previously declared further down by
+  // `rows`, which crashed Review with "Cannot access 'A' before
+  // initialization" the moment a user navigated from Record after
+  // ending a stage. See PR #57 hotfix.
+  //   • "driver" (default) = roadbook.views.driver — the same condensed
+  //     row set the DOCX exporter uses. What the organiser sees in
+  //     Review matches what the navigator gets in the printed roadbook.
+  //   • "raw" = roadbook.rows (all manual waypoints + every detected
+  //     turn between them). Useful when verifying tulip accuracy or
+  //     debugging the turn-detection pass.
+  const [viewMode, setViewMode] = useState("driver");
+
   // Reset selection whenever the source stage changes — or the view
   // mode toggles. Row indices differ between Driver and Raw views, so
   // a stale selectedIndex would point at the wrong row after the
@@ -248,15 +263,9 @@ export default function ReviewMode() {
     }
   }, [stage, trackPoints, waypoints]);
 
-  // View mode — which slice of the roadbook to show.
-  //   • "driver" (default) = roadbook.views.driver — the same condensed
-  //     row set the DOCX exporter uses. Picking this by default means
-  //     what the organiser sees in Review matches what the navigator
-  //     will read in the printed roadbook.
-  //   • "raw" = roadbook.rows (all manual waypoints + every detected
-  //     turn between them). Useful when verifying tulip accuracy or
-  //     debugging the turn-detection pass.
-  const [viewMode, setViewMode] = useState("driver");
+  // viewMode is declared up near the other useState calls (above the
+  // reset-selection effect) to avoid the TDZ crash. See the block
+  // there for the semantics of "driver" vs "raw".
   const rows =
     viewMode === "driver"
       ? (roadbook?.views?.driver ?? roadbook?.rows ?? [])
