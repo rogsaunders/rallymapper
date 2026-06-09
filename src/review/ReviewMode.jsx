@@ -461,8 +461,16 @@ export default function ReviewMode() {
     );
   }
 
+  // h-screen (not min-h-screen) so the whole layout is bounded by
+  // the visible viewport. With min-h-screen the flex split-row grew
+  // to match the roadbook list's natural content height, making the
+  // map container far taller than the screen — FitBounds then placed
+  // the route's geographic centre in the geometric middle of an
+  // off-screen container, leaving most/all of the route invisible
+  // on first open. (Confirmed in Roger's test 2026-06-09: container
+  // reported 816x2081 on iPad portrait.)
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50">
       {/* Sub-header — stage picker (when historical enabled), identity,
           map source picker, Back. Sticky so it stays in reach when the
           roadbook pane scrolls; z-10 keeps it above the map's tile
@@ -587,8 +595,15 @@ export default function ReviewMode() {
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
         {/* Map pane. mapMode="fill" makes MapView size to its parent
             container instead of using the small inline heights it
-            applies in Record/Edit mode. */}
-        <div className="md:flex-1 h-[50vh] md:h-auto min-h-0">
+            applies in Record/Edit mode.
+            • Mobile: fixed 50vh so the map and roadbook share the
+              viewport.
+            • Desktop: md:h-full so the map exactly matches the
+              parent flex-row's height (which is bounded by the
+              outer h-screen). Was md:h-auto, which let the map
+              stretch to match the roadbook list's natural content
+              height and pushed the geographic centre off-screen. */}
+        <div className="md:flex-1 h-[50vh] md:h-full min-h-0">
           <MapView
             currentGPS={null}
             startGPS={startGPS}
@@ -624,9 +639,15 @@ export default function ReviewMode() {
         </div>
 
         {/* Roadbook pane. md:w-[44ch] keeps the list narrow enough that
-            the map dominates on desktop, which matches what the
-            organiser actually wants to look at. */}
-        <div className="md:w-[44ch] md:border-l border-t md:border-t-0 flex flex-col min-h-0 bg-gray-50">
+            the map dominates on desktop.
+            • flex-1 takes the remaining vertical space on mobile
+              (below the 50vh map) and the remaining horizontal space
+              would be implied on desktop by md:w-[44ch].
+            • overflow-y-auto scrolls the list internally instead of
+              pushing the parent flex container's height beyond the
+              viewport — which would put the map's geographic centre
+              off-screen. */}
+        <div className="md:w-[44ch] md:border-l border-t md:border-t-0 flex-1 md:flex-none flex flex-col min-h-0 overflow-y-auto bg-gray-50">
           {saveError && (
             <div className="px-3 py-2 text-xs bg-red-50 border-b border-red-200 text-red-800 flex items-start gap-2">
               <span className="font-semibold">Save failed:</span>
