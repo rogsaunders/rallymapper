@@ -131,6 +131,18 @@ function FlyTo({ target, zoom = 16, enabled = true }) {
 // switches between stages). Computes bounds from the union of
 // trackPoints and waypoints; falls back to a single setView if only
 // one point is available. Skips silently if there's nothing to fit.
+//
+// All movement here is `animate: false` (instant). The animated fit
+// previously raced with FlyTo's setView when the user tapped a row
+// before the ~300 ms fit animation finished — Leaflet would honour
+// the in-flight fit and effectively ignore the row-tap centring,
+// leaving the map landed on the whole-route view instead of the
+// selected row's coords. Active-stage Review didn't trigger this
+// (FitBounds always finished before the user could read the list
+// and tap), but historical stages did because their data arrives
+// async and the user is already looking at the page when the fit
+// runs. Same race the flyTo→setView fix dodged in PR #59, just on
+// the other component.
 function FitBounds({ fitKey, points, padding = 32 }) {
   const map = useMap();
   useEffect(() => {
@@ -144,7 +156,7 @@ function FitBounds({ fitKey, points, padding = 32 }) {
     if (valid.length === 0) return;
 
     if (valid.length === 1) {
-      map.setView(valid[0], 14, { animate: true });
+      map.setView(valid[0], 14, { animate: false });
       return;
     }
 
@@ -153,11 +165,11 @@ function FitBounds({ fitKey, points, padding = 32 }) {
       map.fitBounds(bounds, {
         padding: [padding, padding],
         maxZoom: 16,
-        animate: true,
+        animate: false,
       });
     } catch (e) {
       // Defensive — fall back to the first point.
-      map.setView(valid[0], 14);
+      map.setView(valid[0], 14, { animate: false });
     }
     // fitKey is the trigger; points is captured via closure so we
     // explicitly don't want it in the dep list (would refit on every

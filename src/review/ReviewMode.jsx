@@ -191,6 +191,15 @@ export default function ReviewMode() {
       setHistoricalPayload(null);
       return;
     }
+    // Clear the previous payload eagerly so the render between
+    // "new stage selected" and "data arrived" doesn't show the OLD
+    // stage's trackPoints/waypoints. Without this, FitBounds fires
+    // once against the stale data (briefly fitting the previous
+    // route) and then again when the new payload lands — two
+    // animation windows where a row tap could race. Clearing here
+    // means we go through a single "Loading stage…" render, then
+    // one fit on the new data, with no stale view in between.
+    setHistoricalPayload(null);
     let cancelled = false;
     setHistoricalLoading(true);
     loadSavedStage(userId, owner, entry)
