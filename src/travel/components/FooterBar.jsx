@@ -1,4 +1,4 @@
-// src/drive/components/FooterBar.jsx
+// src/travel/components/FooterBar.jsx
 //
 // Bottom chrome.
 //

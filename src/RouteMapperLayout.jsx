@@ -2047,7 +2047,7 @@ export default function RouteMapperLayout() {
   // Warns first when a roadbook is present — re-export regenerates
   // roadbook.docx from stage.json, which silently discards any edits
   // the user has made to their copy of the previous DOCX. The
-  // Drive Mode reader can overlay an edited DOCX (M5), but only the
+  // Travel Mode reader can overlay an edited DOCX (M5), but only the
   // ZIP-internal copy; a re-export starts that overlay from a fresh
   // unedited DOCX. Better to ask once than to surprise the user later.
   const handleReExportStage = async () => {

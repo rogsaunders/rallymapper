@@ -1,9 +1,9 @@
-// src/drive/lib/alongTrack.js
+// src/travel/lib/alongTrack.js
 //
 // Project a live GPS position onto the recorded GPS track and compute
 // the remaining along-track distance to a target track index.
 //
-// Why this matters in Drive Mode:
+// Why this matters in Travel Mode:
 //
 //   Straight-line (haversine) distance is fast but diverges from the
 //   roadbook's kmPartial/kmTotal values on any winding road. Rally

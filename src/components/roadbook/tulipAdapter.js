@@ -1,7 +1,7 @@
 // src/components/roadbook/tulipAdapter.js
 //
 // Thin wrapper around the existing renderTulipSvg() exported from
-// src/roadbook. Both Drive Mode and Review Mode call THIS via
+// src/roadbook. Both Travel Mode and Review Mode call THIS via
 // RoadbookRow instead of the underlying function directly, so if
 // the roadbook side ever changes the signature only this one file
 // needs updating.

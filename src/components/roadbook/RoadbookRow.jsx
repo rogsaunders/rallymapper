@@ -1,12 +1,12 @@
 // src/components/roadbook/RoadbookRow.jsx
 //
-// One row of the scrolling roadbook. Shared between Drive Mode and
+// One row of the scrolling roadbook. Shared between Travel Mode and
 // Review Mode.
 //
 // Highlight modes (mutually exclusive in practice; selected wins if
 // both happen to be set):
-//   • position="current"   — Drive Mode's "you are here" amber band.
-//   • position="above"     — Drive Mode's faded already-passed style.
+//   • position="current"   — Travel Mode's "you are here" amber band.
+//   • position="above"     — Travel Mode's faded already-passed style.
 //   • selected={true}      — Review Mode's "you tapped this" yellow band.
 //
 // Edit-in-place (Review Mode):
@@ -22,7 +22,7 @@
 //   picker + Save/Cancel) — the inline textarea is for quick note
 //   tweaks, the ✎ form is for switching icons or making bigger edits.
 //
-//   Drive Mode never passes editable so its row stays a single tap-
+//   Travel Mode never passes editable so its row stays a single tap-
 //   target button as before.
 //
 // Save / cancel callbacks:
@@ -230,7 +230,7 @@ const RoadbookRow = forwardRef(function RoadbookRow(
     );
   }
 
-  // ── READ MODE — Drive Mode (editable=false) ───────────────────────
+  // ── READ MODE — Travel Mode (editable=false) ───────────────────────
   // A single tap-target button. Unchanged from the original design.
   if (!editable) {
     return (

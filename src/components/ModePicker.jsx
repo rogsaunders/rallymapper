@@ -20,7 +20,14 @@ import { Link, useLocation } from "react-router-dom";
 
 const TABS = [
   { to: "/", label: "Record", match: (p) => p === "/" },
-  { to: "/drive", label: "Drive", match: (p) => p.startsWith("/drive") },
+  // /travel is the canonical path; /drive is kept as a redirect in
+  // App.jsx for back-compat so the matcher also recognises the legacy
+  // path (so the tab stays highlighted while the redirect happens).
+  {
+    to: "/travel",
+    label: "Travel",
+    match: (p) => p.startsWith("/travel") || p.startsWith("/drive"),
+  },
   { to: "/review", label: "Review", match: (p) => p.startsWith("/review") },
 ];
 

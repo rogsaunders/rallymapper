@@ -1,4 +1,4 @@
-// src/drive/components/PreStart.jsx
+// src/travel/components/PreStart.jsx
 //
 // The screen the navigator sees AFTER loading a roadbook but BEFORE
 // driving begins.  Its job: tell them where the start is, how far

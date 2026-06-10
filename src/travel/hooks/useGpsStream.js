@@ -1,4 +1,4 @@
-// src/drive/hooks/useGpsStream.js
+// src/travel/hooks/useGpsStream.js
 //
 // Subscribe to the device's GPS via watchPosition and expose the
 // latest fix as React state. Self-contained — doesn't depend on the
@@ -8,7 +8,7 @@
 // than 80 m, since those are usually network-location estimates
 // rather than real GPS). The recording side uses 80 m because
 // network fixes regularly come back at 100 m+; mirroring that
-// threshold here keeps Drive Mode's distance-to-row numbers honest.
+// threshold here keeps Travel Mode's distance-to-row numbers honest.
 //
 // Returns:
 //   {

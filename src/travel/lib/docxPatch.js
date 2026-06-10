@@ -1,14 +1,14 @@
-// src/drive/lib/docxPatch.js
+// src/travel/lib/docxPatch.js
 //
 // Parse an edited roadbook.docx and extract user-modified notes per
-// row, so Drive Mode can overlay them on top of the JSON.
+// row, so Travel Mode can overlay them on top of the JSON.
 //
 // **Replacement-only semantics** (per the architecture decision):
 //   - Each DOCX data row maps to the JSON row at the same index.
 //   - Row insertions or deletions in the DOCX are IGNORED — we only
 //     compare and replace TEXT for rows that exist in both. Rows the
 //     user adds in Word that aren't in the JSON simply don't appear
-//     in Drive Mode.
+//     in Travel Mode.
 //   - When DOCX text equals the JSON row's notes OR the humanised
 //     fallback, no override is applied (the DOCX is just showing
 //     the auto-text; the user hasn't actually edited).

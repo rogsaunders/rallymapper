@@ -1,6 +1,6 @@
-// src/drive/hooks/useRoadbook.js
+// src/travel/hooks/useRoadbook.js
 //
-// Load a roadbook into Drive Mode from a user-selected file.
+// Load a roadbook into Travel Mode from a user-selected file.
 //
 // Supported inputs:
 //   1. A RouteMapper export ZIP — extracts Source/stage.json (or the

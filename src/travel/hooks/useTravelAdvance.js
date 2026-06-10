@@ -1,4 +1,4 @@
-// src/drive/hooks/useDriveAdvance.js
+// src/travel/hooks/useTravelAdvance.js
 //
 // Owns "which row is current" + the auto-advance / pause / manual-
 // override state machine.
@@ -35,7 +35,7 @@ import { computeAlongTrackDistance } from "../lib/alongTrack";
 
 const DEFAULT_MANUAL_OVERRIDE_MS = 30000;
 
-export function useDriveAdvance({
+export function useTravelAdvance({
   rows,
   trackPoints,
   gps,
