@@ -252,28 +252,24 @@ ${buildIconPaletteHtml()}
        so the map pins below the palette, not under it. */
     document.documentElement.style.setProperty('--palette-h', h+'px');
   }
-  /* Hide/Show map toggle. The map wrapper lives inside <div class="page">
-     which is parsed AFTER this script tag in source order, so we wait
-     for DOMContentLoaded before looking it up — otherwise
-     getElementById returns null and the click handler is never
-     attached. Pure CSS-class flip; the print stylesheet forces the
-     map visible at print time so a hidden map never makes it onto
-     paper accidentally. */
-  function wireMapToggle(){
-    var mapWrap=document.getElementById('rm-map-wrap');
-    var mapBtn=document.getElementById('rm-map-toggle');
-    if(!mapWrap || !mapBtn) return;
-    mapBtn.addEventListener('click', function(){
-      var hidden=mapWrap.classList.toggle('rm-map-hidden');
-      mapBtn.textContent=hidden?'Show map':'Hide map';
-      mapBtn.setAttribute('aria-pressed', hidden?'true':'false');
-    });
-  }
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', wireMapToggle);
-  } else {
-    wireMapToggle();
-  }
+  /* Hide/Show map toggle — event-delegated on document so it works
+     regardless of when this script tag runs relative to the
+     button/wrapper being parsed. The map wrapper lives inside
+     <div class="page"> below this script in source order; a directly-
+     attached listener would have to wait for DOMContentLoaded (and
+     even then could miss edge cases), while delegation just lets the
+     real click bubble up to document and we route it ourselves.
+     Pure CSS-class flip; the print stylesheet forces the map visible
+     at print time so a hidden map never makes it onto paper. */
+  document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest && e.target.closest('#rm-map-toggle');
+    if (!btn) return;
+    var wrap = document.getElementById('rm-map-wrap');
+    if (!wrap) return;
+    var hidden = wrap.classList.toggle('rm-map-hidden');
+    btn.textContent = hidden ? 'Show map' : 'Hide map';
+    btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+  });
 })();
 </script>
 <div class="page">
