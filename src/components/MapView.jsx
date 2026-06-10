@@ -104,7 +104,7 @@ function Recenter({ center, zoom, enabled }) {
 // Centres the map on a specific lat/lon when it changes. Used by
 // Review Mode so selecting a roadbook row jumps the map to that
 // row's coordinates. Distinct from <Recenter/> which is the
-// GPS-follow path in Record/Drive Mode.
+// GPS-follow path in Record/Travel Mode.
 //
 // Uses setView (instant) rather than flyTo (animated). flyTo's
 // ~600 ms animation window was getting clobbered mid-flight by
@@ -283,7 +283,7 @@ export default function MapView({
   mapMode = "normal",
   mapSource = "osm",
   resizeKey = 0,
-  // Review Mode plumbing (Record/Drive ignore these):
+  // Review Mode plumbing (Record/Travel ignore these):
   //  • selectedWaypointId — id of the waypoint to highlight + fly to.
   //  • onMarkerClick(id)  — invoked when a waypoint marker is tapped;
   //                         Review Mode uses this to select the matching
@@ -298,13 +298,13 @@ export default function MapView({
   // the map to the union of trackPoints + waypoints. The key
   // identifies "which stage" — when it changes (e.g. switching
   // between historical entries) the map refits to the new route.
-  // null/undefined = no auto-fit (Record/Drive default).
+  // null/undefined = no auto-fit (Record/Travel default).
   fitBoundsKey = null,
   // Review Mode: override the per-waypoint "WP N" badge number with
   // the row index of the roadbook view currently being displayed.
   // Object keyed by waypoint id → 1-based row number. Waypoints
   // missing from the map fall back to the default 1-based-in-array
-  // numbering. Record/Drive don't pass this and keep the default.
+  // numbering. Record/Travel don't pass this and keep the default.
   waypointNumberOverride = null,
 }) {
   const tile = useMemo(() => {
@@ -483,7 +483,7 @@ export default function MapView({
         {/* Review Mode: on stage load / stage switch, fit the map to
             the union of trackPoints + waypoints so the whole route is
             visible without the user needing to pan. Skipped in
-            Record/Drive (they don't pass fitBoundsKey). */}
+            Record/Travel (they don't pass fitBoundsKey). */}
         <FitBounds
           fitKey={fitBoundsKey}
           points={[
@@ -543,7 +543,7 @@ export default function MapView({
             : makeWaypointDivIcon(type, iconId, wpNumber, { selected: isSelected });
 
           // Review Mode: tapping a marker should select its row. The
-          // `onMarkerClick` callback is null in Record/Drive, so the
+          // `onMarkerClick` callback is null in Record/Travel, so the
           // handler is a no-op there.
           const eventHandlers = onMarkerClick
             ? {

@@ -1,6 +1,12 @@
-// src/drive/DriveMode.jsx
+// src/travel/TravelMode.jsx
 //
-// Top-level component for the /drive route.
+// Top-level component for the /travel route. Originally called
+// "Travel Mode" (vehicle-centric); renamed to Travel Mode in
+// 2026-06-10 to cover cyclists, motorbike riders and trekkers
+// as well as drivers. The /drive route is preserved as a redirect
+// to /travel so any bookmarks or prior shares keep working.
+// localStorage keys still use the rm_drive_* prefix so existing
+// users don't lose their saved settings.
 //
 // M1 — Source picker, scrolling roadbook display, header + footer.
 // M2 — Live GPS subscription, current-row highlight + auto-scroll,
@@ -17,7 +23,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRoadbook, pickStartCoords } from "./hooks/useRoadbook";
 import { useGpsStream } from "./hooks/useGpsStream";
-import { useDriveAdvance } from "./hooks/useDriveAdvance";
+import { useTravelAdvance } from "./hooks/useTravelAdvance";
 import { useVoiceReadout } from "./hooks/useVoiceReadout";
 import { annotateRowsWithTrackIdx } from "./lib/alongTrack";
 import SourcePicker from "./components/SourcePicker";
@@ -43,7 +49,7 @@ function readNum(key, fallback) {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-export default function DriveMode() {
+export default function TravelMode() {
   const {
     roadbook,
     trackPoints,
@@ -104,7 +110,7 @@ export default function DriveMode() {
     goNext,
     jumpTo,
     togglePause,
-  } = useDriveAdvance({
+  } = useTravelAdvance({
     rows: annotatedRows,
     trackPoints,
     gps,

@@ -1,10 +1,10 @@
 // src/components/roadbook/RoadbookView.jsx
 //
-// Scrolling list of all roadbook rows. Shared between Drive Mode and
+// Scrolling list of all roadbook rows. Shared between Travel Mode and
 // Review Mode.
 //
 // Two highlight pathways (consumers pick one):
-//   • currentIndex (Drive) — the "you are here" auto-advancing pointer.
+//   • currentIndex (Travel) — the "you are here" auto-advancing pointer.
 //     Renders amber band. Maintains a ref per row and auto-scrolls into
 //     centre whenever it changes.
 //   • selectedIndex (Review) — the row the user (or a map-marker click)

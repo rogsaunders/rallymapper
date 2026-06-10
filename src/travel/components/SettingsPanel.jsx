@@ -1,6 +1,6 @@
-// src/drive/components/SettingsPanel.jsx
+// src/travel/components/SettingsPanel.jsx
 //
-// Collapsible bottom-sheet-style overlay for Drive Mode settings.
+// Collapsible bottom-sheet-style overlay for Travel Mode settings.
 //
 // M3:
 //   - Auto-advance on/off
@@ -37,7 +37,7 @@ export default function SettingsPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-lg">Drive Mode settings</h3>
+          <h3 className="font-semibold text-lg">Travel Mode settings</h3>
           <button
             type="button"
             onClick={onClose}

@@ -6,7 +6,7 @@ import { useAuth } from "./auth/AuthProvider";
 import RouteMapperLayout from "./RouteMapperLayout";
 import SignIn from "./auth/SignIn";
 import ResetPassword from "./auth/ResetPassword";
-import DriveMode from "./drive/DriveMode";
+import TravelMode from "./travel/TravelMode";
 import ReviewMode from "./review/ReviewMode";
 
 function GuestOnly({ children }) {
@@ -54,16 +54,23 @@ export default function App() {
         }
       />
 
-      {/* Drive Mode (Phase 2). Logged-in users and guest mode both
-          allowed; auth gate matches the recording side. */}
+      {/* Travel Mode (Phase 2 — formerly "Drive Mode"; renamed to
+          cover cyclists, motorbike riders and trekkers as well as
+          drivers). Logged-in users and guest mode both allowed; auth
+          gate matches the recording side. */}
       <Route
-        path="/drive"
+        path="/travel"
         element={
           <RequireAuth>
-            <DriveMode />
+            <TravelMode />
           </RequireAuth>
         }
       />
+
+      {/* /drive → /travel redirect for back-compat with prior
+          bookmarks, in-vehicle home-screen icons, and any shared
+          URLs. Cheap to keep around indefinitely. */}
+      <Route path="/drive" element={<Navigate to="/travel" replace />} />
 
       {/* Review Mode (Phase 3 — organiser workbench). Same auth model
           as Record/Drive; reads the active stage draft from

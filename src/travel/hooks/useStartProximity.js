@@ -1,4 +1,4 @@
-// src/drive/hooks/useStartProximity.js
+// src/travel/hooks/useStartProximity.js
 //
 // Compute distance + bearing from the user's live GPS to the recorded
 // stage start, and bucket the result into a traffic-light status the

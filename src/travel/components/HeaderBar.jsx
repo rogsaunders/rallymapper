@@ -1,6 +1,6 @@
-// src/drive/components/HeaderBar.jsx
+// src/travel/components/HeaderBar.jsx
 //
-// Top chrome for Drive Mode.
+// Top chrome for Travel Mode.
 //
 // M3 adds a ⚙️ settings cog.
 // M4 adds a 🔊/🔇 quick toggle for voice readout.
@@ -93,7 +93,7 @@ export default function HeaderBar({
           type="button"
           onClick={onOpenSettings}
           className="p-2 rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50"
-          title="Drive Mode settings"
+          title="Travel Mode settings"
           aria-label="Open settings"
         >
           ⚙️

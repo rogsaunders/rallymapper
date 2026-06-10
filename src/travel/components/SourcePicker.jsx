@@ -1,4 +1,4 @@
-// src/drive/components/SourcePicker.jsx
+// src/travel/components/SourcePicker.jsx
 //
 // M1: load a roadbook from disk (ZIP or JSON). M2 will add a
 // "saved stages" list for logged-in users.
@@ -19,11 +19,12 @@ export default function SourcePicker({ onPick, error, isLoading }) {
     <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
       <div className="bg-white rounded-2xl shadow-sm border max-w-md w-full p-6">
         <h1 className="text-xl font-bold text-gray-900 mb-2">
-          🚗 Drive Mode
+          🧭 Travel Mode
         </h1>
         <p className="text-sm text-gray-600 mb-6">
-          Load a roadbook to drive. RouteMapper export ZIP, or a
-          standalone <code>stage.json</code>.
+          Load a roadbook to follow on the road, trail, or track.
+          RouteMapper export ZIP, or a standalone{" "}
+          <code>stage.json</code>.
         </p>
 
         <button

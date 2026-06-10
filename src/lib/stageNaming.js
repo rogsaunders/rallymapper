@@ -1,7 +1,7 @@
 // src/lib/stageNaming.js
 //
 // Single source of truth for how a stage is identified to the user —
-// both as the export ZIP's filename and as the label Drive Mode
+// both as the export ZIP's filename and as the label Travel Mode
 // displays in its header.  Keeps the recording side, the export
 // pipeline, and Drive in sync so the navigator sees the same string
 // they used to pick the file off disk.
