@@ -3,12 +3,12 @@
 
 [[redirects]]
   from = "/guide"
-  to = "https://routemapper.notion.site/RouteMapper-User-Guide-35b87469a8ea80108cc7c86ae9484fbc"
+  to = "https://routemapper.notion.site/RouteMapper-User-Guide-37c87469a8ea80ca82a9c6d135909322"
   status = 302
   force = true
 
 [[redirects]]
   from = "/user-guide"
-  to = "https://routemapper.notion.site/RouteMapper-User-Guide-35b87469a8ea80108cc7c86ae9484fbc"
+  to = "https://routemapper.notion.site/RouteMapper-User-Guide-37c87469a8ea80ca82a9c6d135909322"
   status = 302
   force = true

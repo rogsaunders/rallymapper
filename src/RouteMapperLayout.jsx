@@ -2819,6 +2819,19 @@ export default function RouteMapperLayout() {
                 </OverflowMenuItem>
               )}
 
+              {/* User Guide — opens the Notion-hosted guide via the
+                  friendly /guide redirect (so we can move the Notion
+                  page without touching the app bundle). Placed
+                  immediately above Sign out so it's the last action
+                  the user passes on the way out. */}
+              <OverflowMenuItem
+                href="https://routemapper.net/guide"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                User Guide ↗
+              </OverflowMenuItem>
+
               {user?.id && (
                 <OverflowMenuItem onClick={signOut}>Sign out</OverflowMenuItem>
               )}
