@@ -12,7 +12,7 @@
 
     <meta
       name="description"
-      content="RouteMapper is the fastest way to scout and map real-world journeys — 2-second waypoint capture, push-to-talk voice, auto track recording, roadbook generation, and one organised export ZIP per stage with bundles for Rally Navigator, Garmin, Hema, Guru Maps, Gaia GPS, and Google Earth."
+      content="RouteMapper is the fastest way to scout, map, and drive real-world journeys — 2-second waypoint capture, push-to-talk voice, auto track recording, roadbook generation, Review Mode for refining stages, Travel Mode in-vehicle navigation, and one organised export ZIP per stage with bundles for Rally Navigator, Garmin, Hema, Guru Maps, Gaia GPS, and Google Earth."
     />
 
     <link rel="stylesheet" href="styles.css" />
@@ -32,10 +32,13 @@
     <link rel="apple-touch-icon" href="assets/route-logo-192.png" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="RouteMapper — Route Mapping Engine" />
+    <meta
+      property="og:title"
+      content="RouteMapper — Professional Route Mapping for Rally &amp; Expedition"
+    />
     <meta
       property="og:description"
-      content="Built for rallies, 4WD tours, overlanders, hikers and field survey operations."
+      content="Map, review, and drive real-world routes — built for rallies, 4WD tours, overlanders, hikers and field survey operations."
     />
     <meta property="og:image" content="assets/route-og.jpg" />
     <meta property="og:type" content="website" />
@@ -43,11 +46,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="RouteMapper — Professional Route Mapping Tool"
+      content="RouteMapper — Professional Route Mapping for Rally &amp; Expedition"
     />
     <meta
       name="twitter:description"
-      content="The fastest way to map real-world routes — push-to-talk voice, icons, timing, and a Rally-Navigator-ready export."
+      content="Map, review, and drive real-world routes — built for rallies, 4WD tours, overlanders, hikers and field survey operations."
     />
     <meta name="twitter:image" content="assets/route-og.jpg" />
 
@@ -58,8 +61,8 @@
         "@type": "SoftwareApplication",
         "name": "RouteMapper",
         "applicationCategory": "MobileApplication",
-        "operatingSystem": "iPadOS",
-        "description": "2-second waypoint capture with professional rally icons and push-to-talk voice; exports to Rally Navigator, Hema Maps, Guru Maps, Gaia GPS, Garmin, and Google Earth.",
+        "operatingSystem": "Any (web browser); optimised for iPadOS",
+        "description": "2-second waypoint capture with professional rally icons and push-to-talk voice; Review Mode workbench for refining roadbooks; Travel Mode in-vehicle roadbook reader with GPS auto-advance and voice readout; exports to Rally Navigator, Hema Maps, Guru Maps, Gaia GPS, Garmin, and Google Earth.",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -122,9 +125,10 @@
         <div class="container hero-content">
           <h1>RouteMapper</h1>
           <p class="lead">
-            The most efficient way to scout and map real-world journeys for
-            organisers of fun, fundraising and competitive rallies, explorer
-            tours and discovery trips.
+            The most efficient way to scout, map, and drive real-world journeys
+            for organisers of fun, fundraising and competitive rallies, explorer
+            tours and discovery trips — record the route, review the roadbook,
+            then navigate it in the vehicle.
           </p>
           <p class="lead-sub">
             Now in production. Free to try, no installation — runs in any modern
@@ -155,11 +159,18 @@
             <li>29 rally-standard icons · OpenRally &amp; Garmin compatible</li>
             <li>Auto track recording with live turn detection</li>
             <li>Roadbook generation with tulip diagrams &amp; CAP values</li>
+            <li>Review Mode — map + roadbook side by side, edit in place</li>
             <li>
-              One organised export ZIP per stage — bundles for Rally
-              Navigator, Garmin, Hema, Guru, Google Earth, Gaia GPS
+              Travel Mode — in-vehicle reader with GPS auto-advance &amp; voice
             </li>
-            <li>External trigger ready — Bluetooth headset / foot pedal / presenter</li>
+            <li>
+              One organised export ZIP per stage — bundles for Rally Navigator,
+              Garmin, Hema, Guru, Google Earth, Gaia GPS
+            </li>
+            <li>
+              External trigger ready — Bluetooth headset / foot pedal /
+              presenter
+            </li>
             <li>Offline-first · Guest Mode · Supabase cloud sync</li>
           </ul>
         </div>
@@ -215,10 +226,9 @@
             <div class="card-icon">🎙️</div>
             <h3>Push-to-Talk Voice</h3>
             <p>
-              Tap 🎙 Record and speak — *"left onto Forbes Road"* —
-              GPS locks at the tap, the waypoint captures itself.
-              Optional external trigger for Bluetooth headsets and
-              foot pedals.
+              Tap 🎙 Record and speak — *"left onto Forbes Road"* — GPS locks at
+              the tap, the waypoint captures itself. Optional external trigger
+              for Bluetooth headsets and foot pedals.
             </p>
           </div>
           <div class="card">
@@ -238,12 +248,32 @@
             </p>
           </div>
           <div class="card">
+            <div class="card-icon">🔍</div>
+            <h3>Review Mode</h3>
+            <p>
+              The organiser's workbench — map and roadbook side by side. Tap a
+              row to fly to it on the map, check each tulip against the real
+              corner geometry, and refine notes and icons in place. Works on the
+              active stage or any saved stage.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-icon">🧭</div>
+            <h3>Travel Mode</h3>
+            <p>
+              The in-vehicle roadbook reader. Load a recorded stage and the
+              roadbook advances row by row from GPS position, with spoken turn
+              instructions, distance-to-next, and manual override — navigation
+              from the same data you recorded.
+            </p>
+          </div>
+          <div class="card">
             <div class="card-icon">📤</div>
             <h3>Organised Export ZIP</h3>
             <p>
               One ZIP per stage, organised by use case — Universal,
-              RallyNavigator, Printable, Garmin, Hema, Gaia, Source.
-              A README.txt at the root tells you which file for which tool.
+              RallyNavigator, Printable, Garmin, Hema, Gaia, Source. A
+              README.txt at the root tells you which file for which tool.
             </p>
           </div>
           <div class="card">
@@ -259,7 +289,8 @@
             <h3>iPad-Optimised</h3>
             <p>
               Two-row glove-friendly controls, landscape and portrait layouts.
-              Guest Mode for instant start — no login required.
+              Guest Mode for instant start — no login required. Also runs in any
+              modern browser, including Chrome on Android.
             </p>
           </div>
         </div>
@@ -293,7 +324,9 @@
           </div>
           <div class="comparison-row">
             <div class="comparison-cell">Voice capture</div>
-            <div class="comparison-cell highlight">✓ Push-to-talk + external trigger</div>
+            <div class="comparison-cell highlight">
+              ✓ Push-to-talk + external trigger
+            </div>
             <div class="comparison-cell">✗ Separate recorder</div>
             <div class="comparison-cell">~ Limited</div>
           </div>
@@ -310,6 +343,14 @@
             <div class="comparison-cell">✗ Not available</div>
           </div>
           <div class="comparison-row">
+            <div class="comparison-cell">In-vehicle navigation</div>
+            <div class="comparison-cell highlight">
+              ✓ Travel Mode — GPS auto-advance + voice
+            </div>
+            <div class="comparison-cell">✗ Navigator reads paper</div>
+            <div class="comparison-cell">~ Generic turn-by-turn</div>
+          </div>
+          <div class="comparison-row">
             <div class="comparison-cell">Offline mode</div>
             <div class="comparison-cell highlight">✓ Full functionality</div>
             <div class="comparison-cell">✓ Paper works</div>
@@ -317,7 +358,10 @@
           </div>
           <div class="comparison-row">
             <div class="comparison-cell">Export formats</div>
-            <div class="comparison-cell highlight">✓ 10+ formats</div>
+            <div class="comparison-cell highlight">
+              ✓ One organised ZIP — GPX, KML, Garmin, Hema, Gaia, roadbook
+              HTML/DOCX/CSV, Map PDF
+            </div>
             <div class="comparison-cell">✗ Manual entry</div>
             <div class="comparison-cell">~ 1–2 formats</div>
           </div>
@@ -565,11 +609,10 @@
             <span class="timeline-period">Complete · May 2026</span>
             <strong>Rally Navigator import validated</strong>
             <p>
-              The combined GPX export now imports cleanly into Rally
-              Navigator with the full waypoint list (including the START
-              point) and the recorded polyline rendered from the track —
-              validated on real recon data with a professional fundraising-
-              rally organiser.
+              The combined GPX export now imports cleanly into Rally Navigator
+              with the full waypoint list (including the START point) and the
+              recorded polyline rendered from the track — validated on real
+              recon data with a professional fundraising- rally organiser.
             </p>
           </li>
           <li class="timeline-done">
@@ -578,18 +621,41 @@
             <p>
               Replaced wake-word activation with a deterministic 🎙 Record
               button. Field testing showed in-vehicle speech recognition
-              degraded the wake word too often; push-to-talk is reliable
-              every time. External trigger added for Bluetooth headsets,
-              foot pedals, presenter clickers, and Bluetooth keyboards.
+              degraded the wake word too often; push-to-talk is reliable every
+              time. External trigger added for Bluetooth headsets, foot pedals,
+              presenter clickers, and Bluetooth keyboards.
+            </p>
+          </li>
+          <li class="timeline-done">
+            <span class="timeline-period">Complete · June 2026</span>
+            <strong>Travel Mode (in-vehicle Roadbook Reader)</strong>
+            <p>
+              The in-vehicle reader is live at app.routemapper.net/drive. Load a
+              recorded stage from your saved list or an export ZIP and the
+              roadbook advances by GPS proximity with spoken turn instructions,
+              a pre-start screen, manual Prev/Next override, and adjustable
+              trigger radius — turning RouteMapper into a complete authoring +
+              navigation workflow.
+            </p>
+          </li>
+          <li class="timeline-done">
+            <span class="timeline-period">Complete · June 2026</span>
+            <strong>Review Mode (organiser workbench)</strong>
+            <p>
+              A laptop-first split view at app.routemapper.net/review — map and
+              roadbook side by side with bidirectional selection. Verify every
+              tulip against the real corner geometry, refine notes and icons in
+              place, and review the active stage or any saved stage from Stage
+              History.
             </p>
           </li>
           <li class="timeline-active">
             <span class="timeline-period">Now</span>
-            <strong>Drive Mode (in-vehicle Roadbook Reader)</strong>
+            <strong>Field hardening</strong>
             <p>
-              Currently building the in-vehicle reader that consumes the
-              roadbook JSON and advances rows by GPS — turning RouteMapper
-              into a complete authoring + navigation workflow.
+              Refining Travel Mode and Review Mode on live recon and event data
+              — roadbook accuracy, map behaviour, and stage-history reliability
+              tuned from real road-test feedback.
             </p>
           </li>
           <li>
@@ -597,8 +663,8 @@
             <strong>Expansion</strong>
             <p>
               Additional icon packs, team collaboration tools, Android tablet
-              support, and strategic partnerships — prioritised by feedback
-              from real-world users.
+              support, and strategic partnerships — prioritised by feedback from
+              real-world users.
             </p>
           </li>
         </ol>
@@ -610,10 +676,17 @@
         <h2>Latest Updates</h2>
         <ul class="updates">
           <li>
+            <time datetime="2026-06">June 2026</time>
+            <a href="updates.html#jun-2026"
+              >Travel Mode live · Review Mode live · roadbook map toggle ·
+              stage-history fixes</a
+            >
+          </li>
+          <li>
             <time datetime="2026-05">May 2026 · part 2</time>
             <a href="updates.html#may-2026-part2"
-              >Push-to-talk voice · Rally Navigator import validated ·
-              external trigger · UI consolidation</a
+              >Push-to-talk voice · Rally Navigator import validated · external
+              trigger · UI consolidation</a
             >
           </li>
           <li>
@@ -649,11 +722,42 @@
             <summary>Is there a step-by-step guide?</summary>
             <p>
               Yes — the
-              <a href="/guide">RouteMapper User Guide</a> covers everything
-              from your first sign-in to exporting a roadbook, with sections
-              on the snap-first waypoint flow, push-to-talk voice (and the
-              external trigger for Bluetooth headsets / foot pedals / presenters),
-              Stage History, Map PDF export, and the organised export ZIP.
+              <a href="/guide">RouteMapper User Guide</a> covers everything from
+              your first sign-in to exporting a roadbook, with sections on the
+              snap-first waypoint flow, push-to-talk voice (and the external
+              trigger for Bluetooth headsets / foot pedals / presenters), Stage
+              History, Map PDF export, and the organised export ZIP.
+            </p>
+          </details>
+          <details>
+            <summary>
+              Can RouteMapper navigate the route, not just record it?
+            </summary>
+            <p>
+              Yes — that's <strong>Travel Mode</strong>, the in-vehicle roadbook
+              reader at
+              <a href="https://app.routemapper.net/drive"
+                >app.routemapper.net/drive</a
+              >. Load a recorded stage from your saved list or from an export
+              ZIP, and the roadbook advances row by row from your GPS position,
+              speaks each turn instruction aloud, and shows distance to the next
+              instruction. Manual Prev/Next override, a pause toggle, and an
+              adjustable trigger radius are built in.
+            </p>
+          </details>
+          <details>
+            <summary>How do I check a roadbook before the event?</summary>
+            <p>
+              Use <strong>Review Mode</strong> at
+              <a href="https://app.routemapper.net/review"
+                >app.routemapper.net/review</a
+              >
+              — a split view with the map on one side and the roadbook on the
+              other. Tap a row and the map flies to that waypoint; tap a marker
+              and the matching row scrolls into view. You can verify each tulip
+              against the actual corner geometry and edit notes and icons in
+              place. It works on your active stage or any saved stage from Stage
+              History.
             </p>
           </details>
           <details>
@@ -667,17 +771,17 @@
           <details>
             <summary>What export formats are supported?</summary>
             <p>
-              One ZIP per stage, organised by use case rather than by file
-              type. <strong>Universal/</strong> holds <code>route.gpx</code>
-              and <code>route.kml</code> for any mapping tool;
-              <strong>RallyNavigator/</strong> holds the GPX bundled for
-              Rally Navigator import (validated working — full waypoint list
-              + polyline render in RN); <strong>Printable/</strong> holds
-              the roadbook as HTML, DOCX, CSV plus the Map PDF;
+              One ZIP per stage, organised by use case rather than by file type.
+              <strong>Universal/</strong> holds <code>route.gpx</code> and
+              <code>route.kml</code> for any mapping tool;
+              <strong>RallyNavigator/</strong> holds the GPX bundled for Rally
+              Navigator import (validated working — full waypoint list +
+              polyline render in RN); <strong>Printable/</strong> holds the
+              roadbook as HTML, DOCX, CSV plus the Map PDF;
               <strong>Source/</strong> holds <code>stage.json</code> for
-              re-importing back into RouteMapper. Pre-organised Garmin,
-              Hema and Gaia folders included for users who prefer those
-              products' native file conventions. A <code>README.txt</code>
+              re-importing back into RouteMapper. Pre-organised Garmin, Hema and
+              Gaia folders included for users who prefer those products' native
+              file conventions. A <code>README.txt</code>
               at the root tells you exactly which file for which tool.
             </p>
           </details>
@@ -719,6 +823,18 @@
               demand. The web app already runs in Chrome on Android — feature
               parity is the goal — but we haven't yet tuned the glove-friendly
               controls for the Android tablet form factor.
+            </p>
+          </details>
+          <details>
+            <summary>Can I get back to stages I recorded earlier?</summary>
+            <p>
+              Yes — <strong>Stage History</strong> keeps every saved stage,
+              synced to the cloud for signed-in users (and stored locally in
+              Guest Mode). Reopen any stage to re-export it, review it in Review
+              Mode, or drive it in Travel Mode. Stages can also be permanently
+              deleted from history. Your <strong>Account</strong> panel in the
+              top bar holds your name, username, and phone — used as the billing
+              name on Stripe and the crew line on generated roadbook PDFs.
             </p>
           </details>
           <details>
