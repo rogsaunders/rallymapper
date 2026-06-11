@@ -20,6 +20,16 @@ If you're brand new, the fastest path to value is **Guest Mode** — no signup, 
 
 You can start in Guest Mode and create an account later.
 
+### Three modes, one app
+
+Once you're in, a mode picker at the top of the page (a bottom tab bar on phone / iPad-portrait) lets you switch between:
+
+- **Record** — capture a route. Map, controls, waypoints panel. Most users live here.
+- **Travel** — in-vehicle / on-trail roadbook reader. Loads an exported stage and follows you along it. See [Travel Mode](#travel-mode-roadbook-reader).
+- **Review** — organiser workbench for verifying and refining a captured stage before sharing. See [Review Mode](#review-mode-organiser-workbench).
+
+Switching modes is one tap. Your current mode is highlighted.
+
 ---
 
 ## Install as a Progressive Web App
@@ -103,7 +113,10 @@ Open the ZIP and read the **`README.txt`** at the root — it tells you which fi
 Open the HTML roadbook and the map PDF — both should render cleanly.
 
 ### 8. Review past stages
-Tap the green **History** button in the stage control row. The panel lists your last 20 stages. Tap **Open** on a row to load it in review mode (read-only — your current session is unaffected). Tap **↓ Re-export ZIP** to regenerate the export, or **Close Review** to return to the live screen.
+Two ways to do this:
+
+- **Stage History panel** (good for re-exporting or deleting). Tap the green **History** button in the stage control row. The panel lists up to 200 saved stages. Tap **Open** to load one in read-only review, **↓ Re-export ZIP** to regenerate the export, or **🗑** to permanently delete.
+- **Review Mode** (good for organiser-level inspection and inline note edits). Tap **Review** in the mode picker, then pick a stage from the dropdown. See the [Review Mode](#review-mode-organiser-workbench) section below.
 
 ---
 
@@ -223,17 +236,17 @@ Every stage is saved independently, so a multi-day event becomes a clean tree in
 
 ### Stage History
 
-Every completed stage is saved automatically. The **History** button on the stage control row opens a panel listing your last 20 stages with date, name, distance, and waypoint count.
+Every completed stage is saved automatically. The **History** button on the stage control row opens a panel listing up to 200 saved stages with date, name, distance, and waypoint count. For each row:
 
-Tap **Open** to load any past stage in review mode:
-- Map switches to the historical route and waypoints
-- Amber banner shows stage name and date
-- **↓ Re-export ZIP** regenerates the full export package
-- **Close Review** returns to the live screen
+- **Open** — load the stage in review mode. Map switches to the historical route, an amber banner shows the stage name and date.
+- **↓ Re-export ZIP** — regenerate the full export package fresh from the stored data.
+- **🗑 Trash** — **permanently delete** the stage from both this device AND the cloud. The confirmation dialog spells out that it's irreversible. Use this to clean up your History list of test stages or one-offs you don't need to keep.
 
-History is read-only — opening a past stage doesn't affect your current session. The button is hidden while a stage is recording; it reappears when you end the stage.
+History is read-only when opened from this panel; opening a past stage doesn't affect your current session. The History button is hidden while a stage is recording and reappears when you end the stage.
 
-> **Re-export warning:** if the stage has a roadbook, tapping **↓ Re-export ZIP** shows a confirmation dialog. Re-export regenerates `roadbook.docx` fresh from the stored stage data — any edits you have made to your existing DOCX copy (typo fixes, custom prose, formatting) live only on your device and will NOT be in the new ZIP. Cancel if you want to preserve those edits. The Drive Mode reader can overlay an edited DOCX on top of the JSON — see [Drive Mode → DOCX overlay](#docx-overlay-edit-notes-in-word) below.
+To verify the rows side-by-side with the map (and edit notes inline), use **Review Mode** instead — see the section below. Review Mode reads the same stage data but presents it as an organiser workbench.
+
+> **Re-export warning:** if the stage has a roadbook, tapping **↓ Re-export ZIP** shows a confirmation dialog. Re-export regenerates `roadbook.docx` fresh from the stored stage data — any edits you have made to your existing DOCX copy (typo fixes, custom prose, formatting) live only on your device and will NOT be in the new ZIP. Cancel if you want to preserve those edits. The Travel Mode reader can overlay an edited DOCX on top of the JSON — see [Travel Mode → DOCX overlay](#docx-overlay-edit-notes-in-word) below.
 
 ### Map PDF export
 
@@ -253,6 +266,11 @@ The HTML roadbook generates automatically when you end a stage. Each waypoint ap
 - Your icon and POI note
 - Time of capture
 
+A **stage-overview map** is embedded at the top of both the HTML and DOCX roadbooks by default — full route polyline, waypoint markers, and the trip / stage label.
+
+- **HTML** — the reader can tap the **Hide map** / **Show map** button in the top-right of the map block to collapse it (their choice each time they open the file). When printed, the map is forced visible so a hidden map never lands on paper accidentally.
+- **DOCX** — controlled at export time by the **"Include map in DOCX"** checkbox next to the **Export Map PDF** button in the recording app. Checked by default; uncheck to omit the map paragraph from the next end-stage / re-export. The preference persists across sessions.
+
 Open the HTML roadbook in any browser. It's print-friendly and works on any device — no special software required.
 
 ### Export package
@@ -269,27 +287,29 @@ One ZIP per stage, organised by use case rather than by file type. A `README.txt
 
 ---
 
-## Drive Mode (Roadbook Reader)
+## Travel Mode (Roadbook Reader)
 
-Drive Mode is RouteMapper's in-vehicle roadbook reader. Load an exported stage (your own or one an event organiser has shared) and Drive Mode displays it as a scrolling roadbook that follows you down the road. The current row stays centred on screen, distance to the next instruction updates live, and you can optionally hear each row read aloud as you approach it.
+Travel Mode is RouteMapper's in-vehicle / on-trail roadbook reader. Load an exported stage (your own or one an event organiser has shared) and Travel Mode displays it as a scrolling roadbook that follows you along the route. The current row stays centred on screen, distance to the next instruction updates live, and you can optionally hear each row read aloud as you approach it.
 
-Designed for rally co-drivers, but equally useful for walkers, cyclists, and motorbike riders following a pre-mapped route.
+Designed for rally co-drivers but equally useful for walkers, cyclists, motorbike riders, and trekkers following a pre-mapped route. Originally called "Travel Mode"; renamed in mid-2026 to better reflect the range of users.
 
-### Opening Drive Mode
+> **Note:** the old URL `app.routemapper.net/drive` still works — it redirects to `/travel`, so any existing bookmarks, home-screen icons, or shared links keep functioning.
 
-- Tap the **🚗 Drive** pill in the top-right of the recording app, or
-- Go directly to **[app.routemapper.net/drive](https://app.routemapper.net/drive)**
+### Opening Travel Mode
+
+- Tap **Travel** in the mode picker at the top of the app (or the bottom tab bar on phone / iPad-portrait), or
+- Go directly to **[app.routemapper.net/travel](https://app.routemapper.net/travel)**
 
 You'll see the source picker — a single big **📂 Load roadbook (ZIP or JSON)** button.
 
 ### Loading a roadbook
 
-Drive Mode accepts:
+Travel Mode accepts:
 
-- A **RouteMapper export ZIP** — the same ZIP that's generated when a stage ends. Drive Mode reads `Source/stage.json` for the roadbook structure, `trackPoints` for along-track distance, and (optionally) `Printable/roadbook.docx` for any text edits you've made (see below).
+- A **RouteMapper export ZIP** — the same ZIP that's generated when a stage ends. Travel Mode reads `Source/stage.json` for the roadbook structure, `trackPoints` for along-track distance, and (optionally) `Printable/roadbook.docx` for any text edits you've made (see below).
 - A **bare `stage.json`** — extracted from a ZIP, or shared as a single file.
 
-Older export layouts (with `*_stage.json` at the top level) also work — Drive Mode falls back automatically.
+Older export layouts (with `*_stage.json` at the top level) also work — Travel Mode falls back automatically.
 
 ### What you'll see
 
@@ -314,7 +334,7 @@ The current row is highlighted in amber with a left rail. As you approach it, th
 
 ### Auto-advance
 
-Drive Mode advances the current row automatically as you drive past each waypoint. The trigger is GPS proximity — when you enter the configured radius (default 30 m) of the next row's recorded position, it advances.
+Travel Mode advances the current row automatically as you drive past each waypoint. The trigger is GPS proximity — when you enter the configured radius (default 30 m) of the next row's recorded position, it advances.
 
 - **Tap a row** to jump to it manually
 - **◀ ▶** to step one row back or forward
@@ -343,26 +363,26 @@ The same Settings panel toggle is also available under **⚙️ Voice readout** 
 
 ### DOCX overlay — edit notes in Word
 
-Want to polish row notes, fix typos, or add custom prose before driving? Drive Mode supports a **text-overlay** workflow:
+Want to polish row notes, fix typos, or add custom prose before driving? Travel Mode supports a **text-overlay** workflow:
 
 1. End your stage and download the export ZIP
 2. Extract the ZIP and open `Printable/roadbook.docx` in Word, Pages, or LibreOffice
 3. Edit row notes — fix typos, add commentary, expand abbreviations
 4. **Save the DOCX back in place** (in the Printable folder)
 5. **Re-zip the export folder**
-6. Load the new ZIP into Drive Mode
+6. Load the new ZIP into Travel Mode
 
-If Drive Mode detects an edited DOCX inside the loaded ZIP, it overlays the edited text on top of the JSON and shows a **📝 N edits** badge in the header indicating how many rows were overridden. Voice readout will speak the edited text.
+If Travel Mode detects an edited DOCX inside the loaded ZIP, it overlays the edited text on top of the JSON and shows a **📝 N edits** badge in the header indicating how many rows were overridden. Voice readout will speak the edited text.
 
 **Scope and limits (replacement-only):**
 
 - ✅ Edited row notes replace the JSON's notes for that row
 - ✅ Voice readout uses the edited text
-- ❌ New rows you add in Word that don't exist in the JSON are **not** shown (Drive Mode's row set is authoritative)
-- ❌ Rows you delete from the DOCX are still shown in Drive Mode (deletion is not honoured)
+- ❌ New rows you add in Word that don't exist in the JSON are **not** shown (Travel Mode's row set is authoritative)
+- ❌ Rows you delete from the DOCX are still shown in Travel Mode (deletion is not honoured)
 - ❌ Tulip diagrams, distances, and GPS coordinates can't be edited — those come from the geometry
 
-**Why this scope?** Edits to notes are safe and don't break the relationship between rows, distances, and tulips. Insertions and deletions would create rows the Drive Mode reader couldn't reconcile with the GPS-driven advancement. If you need to insert or remove rows, do it in RouteMapper itself (edit/delete waypoints) and re-export — but remember to re-do any DOCX text edits afterwards, since re-export starts from a fresh template.
+**Why this scope?** Edits to notes are safe and don't break the relationship between rows, distances, and tulips. Insertions and deletions would create rows the Travel Mode reader couldn't reconcile with the GPS-driven advancement. If you need to insert or remove rows, do it in RouteMapper itself (edit/delete waypoints) and re-export — but remember to re-do any DOCX text edits afterwards, since re-export starts from a fresh template.
 
 ### Settings
 
@@ -377,17 +397,85 @@ All settings persist across sessions in localStorage.
 
 ### Plan gating
 
-- **Free** — Drive Mode works for one loaded roadbook at a time (same limit as the recording side)
+- **Free** — Travel Mode works for one loaded roadbook at a time (same limit as the recording side)
 - **Solo / Pro** — unlimited loaded roadbooks, same as the recording side
 
-The on-screen 🚗 Drive button is visible to all logged-in users including Guest Mode.
+The on-screen **Travel** tab is visible to all logged-in users including Guest Mode.
 
-### Tips for using Drive Mode
+### Tips for using Travel Mode
 
-- **Mount the iPhone in portrait orientation** within easy reach of the navigator (or in eye-line if solo-driving with voice readout on)
-- **Test the trigger radius on your first stage** — 30 m default is good for typical recon driving, but on fast open roads 50–60 m gives more reading time
-- **Use 🔊 voice with Bluetooth audio** — speakerphone over engine noise gets lost; a headset or car audio system is far clearer
-- **Edit the DOCX before the event**, then save and re-zip ONCE. Re-exporting from RouteMapper Stage History wipes your DOCX edits
+- **Mount your device** within easy reach (or eye-line if solo with voice readout on) — handlebar mount for cyclists / motorbike riders, dashboard cradle for drivers, armband or pocket for walkers / trekkers.
+- **Test the trigger radius on your first stage** — 30 m default is good for typical recon driving, but on fast open roads 50–60 m gives more reading time. For walkers / cyclists, dial it down to 10–15 m so the row advances closer to the actual point.
+- **Use 🔊 voice with Bluetooth audio** — engine noise / wind / headwind makes speakerphone unreliable; a headset or in-helmet audio is far clearer.
+- **Edit the DOCX before the event**, then save and re-zip ONCE. Re-exporting from RouteMapper Stage History wipes your DOCX edits.
+
+---
+
+## Review Mode (Organiser Workbench)
+
+Review Mode is RouteMapper's laptop-first workbench for **event organisers and route authors** to verify what they captured before sharing the roadbook with navigators. Open any stage (the one you're currently recording, or any from history) and see the map and the roadbook side by side. Tap a row to fly the map to that point; tap a marker to scroll the list to its row; edit row notes inline. What you see is what the navigator will see in the printed roadbook.
+
+### Opening Review Mode
+
+- Tap **Review** in the mode picker, or
+- Go directly to **[app.routemapper.net/review](https://app.routemapper.net/review)**
+
+If you have an active stage in progress (Record mode), Review opens on that one. Otherwise it auto-loads your most recent saved stage.
+
+### What you'll see
+
+A split view: map on the left, roadbook list on the right. The sub-header above carries a **stage picker** (active stage + every historical stage), a **Driver / Raw view toggle**, a **map source toggle** (OSM / Terrain / Satellite), and **Back** to return to Record.
+
+```
+┌─────────────────────────────────────────────────┐
+│ Stage picker ▾   Trip · Day · Route · Stage     │
+│                  [Driver | Raw]  [OSM|Terrain|Sat] │
+├──────────────────────────────┬──────────────────┤
+│                              │ 1 ↑ START        │
+│                              │ 2 ↰ keep straight│
+│         MAP                  │ 3 ▶ onto Forbes  │
+│   (route polyline +          │   …notes…        │
+│    waypoint markers)         │ 4 ↑ railway      │
+│                              │ 5 ◀ Left 90      │
+└──────────────────────────────┴──────────────────┘
+```
+
+### Driver / Raw views
+
+- **Driver** (default) — shows the same condensed row set the printed roadbook (DOCX) uses. Tap a row, it's exactly the row the navigator will read.
+- **Raw** — shows every detected turn between manual waypoints. Useful when verifying tulip accuracy against the real road geometry; rarely needed for everyday review.
+
+Map marker numbers match the displayed row numbers, so a row labelled `Row 7` corresponds to the marker labelled `7` (or `L 7`, `R 7`, etc.) on the map. Tap a row → map flies to it. Tap a marker → the matching row scrolls into view and gets a yellow band.
+
+### Editing row notes inline
+
+Every row's note text is an **inline textarea** in Review. Just click into it, type, click out — the change saves automatically (auto-save on blur). **Tab** moves focus to the next row's textarea, Excel-style, so you can batch-edit a whole stage quickly.
+
+For bigger edits (changing the icon as well as the note), tap the **✎ Edit** button on a selected row. That opens a fuller inline form with both a notes textarea and an icon picker, plus explicit ✓ Save / ✗ Cancel buttons.
+
+**Where edits go:**
+
+- **Active stage** — written to the autosave slot, picked up by Record next time you switch back.
+- **Historical stage on this device** — written to the local copy. Re-export to refresh the .docx / .html with the new text.
+- **Historical stage synced to the cloud** (signed-in users) — written to both the local copy AND your Supabase row, so it persists across devices.
+
+**Read-only rows:** auto-detected turns that don't link back to a manual waypoint can't be saved here. If you try, Review tells you to add a waypoint at that location in Record instead — geometry-derived rows don't have anywhere to store custom notes.
+
+### Stage picker
+
+The dropdown in the sub-header lists every stage you have access to:
+
+- **● Active stage** — pinned at the top when one exists. The autosave reflects the most recent state you tapped End Stage on (or the live state, if you're partway through).
+- **Saved stages** — every entry from Stage History, newest first. Switching pulls the payload from the cloud (signed-in) or from local storage (guest), refits the map to the new route, and resets the selected row.
+
+If you're already on `/review` and switch to a different historical stage via the picker, the map automatically re-fits to the new route's bounds.
+
+### Tips for organisers
+
+- **Default to Driver view.** The navigator's printed roadbook is the Driver view, so that's the one to verify. Flip to Raw only if a specific tulip looks wrong.
+- **Use Satellite for tulip checks.** Switch the map source to Satellite when you want to verify a tulip lines up with the actual road geometry (especially at roundabouts and forks).
+- **Tab through rows** to batch-add or fix POI notes — much faster than tapping each one.
+- **End Stage before reviewing.** Edits to the active draft propagate to Record on the next remount, but it's tidier to review a finalised stage.
 
 ---
 
@@ -413,7 +501,7 @@ Current prices at [routemapper.net/#pricing](https://routemapper.net/#pricing). 
 - **Bluetooth headset** — in a noisy vehicle or windy conditions, a headset mic dramatically improves voice accuracy. The same headset's play/pause button can also fire 🎙 Record — see [External trigger](#external-trigger-bluetooth-foot-pedal-presenter) above.
 - **Stage History is read-only** — review past stages freely between live sessions; nothing gets overwritten.
 - **Pre-load tiles** — pan around your area on a connection before going off-grid; cached map tiles render even when you lose signal.
-- **Drive Mode trigger radius** — default 30 m works for typical recon. On fast open roads, bump to 50–60 m so the row advances earlier and gives the navigator more reading time.
+- **Travel Mode trigger radius** — default 30 m works for typical recon. On fast open roads, bump to 50–60 m so the row advances earlier and gives the navigator more reading time.
 - **Edit the DOCX once** — if you're polishing roadbook prose in Word/Pages, do it after the final recording and re-zip. Re-exporting from Stage History regenerates the DOCX and silently wipes your edits.
 
 ---
