@@ -123,13 +123,27 @@ export async function buildRoutePackage(stage, options = {}) {
       );
     }
 
-    const exportOpts = {
+    // HTML always carries the map (the HTML output has its own
+    // Hide/Show toggle so the reader can collapse it without losing
+    // the ability to bring it back). DOCX honours the
+    // `includeOverviewMap` config flag at export time — a static
+    // document can't toggle, so whoever runs the export decides
+    // whether the recipient sees it. Defaults to true so the
+    // existing behaviour is preserved when the caller doesn't set
+    // the flag.
+    const includeMapInDocx = config.includeOverviewMap !== false;
+    const htmlOpts = {
       author: config.author || null,
       mapImageDataUrl: mapImage?.dataUrl ?? null,
       mapImageBytes:   mapImage?.bytes   ?? null,
     };
-    printable.file("roadbook.html", await exportRoadbookHtml(stage, exportOpts));
-    printable.file("roadbook.docx", await exportRoadbookDocx(stage, exportOpts));
+    const docxOpts = {
+      author: config.author || null,
+      mapImageDataUrl: includeMapInDocx ? mapImage?.dataUrl ?? null : null,
+      mapImageBytes:   includeMapInDocx ? mapImage?.bytes   ?? null : null,
+    };
+    printable.file("roadbook.html", await exportRoadbookHtml(stage, htmlOpts));
+    printable.file("roadbook.docx", await exportRoadbookDocx(stage, docxOpts));
     // Tabular roadbook view — useful for Excel/Numbers analysis. Note:
     // this is NOT a Rally Navigator native import format despite the
     // exporter being historically named exportRallyNavCsv.

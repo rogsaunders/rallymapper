@@ -139,6 +139,29 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
 }
 .rm-map-img { display: block; width: 100%; height: auto; }
 
+/* Hide/Show map toggle. The button sits flush with the right edge of
+   the map; clicking it adds .rm-map-hidden to the wrapper which
+   collapses the image while keeping the button reachable. Reader's
+   choice each time they open the doc — no persisted state. */
+.rm-map-toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 6;                /* above the map image */
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border: 1.5px solid #000;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.92);
+  color: #000;
+  cursor: pointer;
+}
+.rm-map-toggle:hover { background: #fff; }
+.rm-map-wrap.rm-map-hidden .rm-map-img { display: none; }
+.rm-map-wrap.rm-map-hidden { border: none; padding: 0; }
+
 /* Narrow viewports (iPad portrait, phones) don't have the vertical room
    to spare a sticky map — it would crowd the table.  Below this width
    the map sits as a normal banner that scrolls away with the rest. */
@@ -146,7 +169,15 @@ body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f0f0f0
   .rm-map-wrap { position: static; }
 }
 
-@media print { .rm-map-wrap { position: static; break-inside: avoid; } }
+@media print {
+  .rm-map-wrap { position: static; break-inside: avoid; }
+  /* Don't print the toggle button — and if the reader had hidden
+     the map, force it visible for the print render so the printed
+     copy always carries the overview. */
+  .rm-map-toggle { display: none !important; }
+  .rm-map-wrap.rm-map-hidden .rm-map-img { display: block !important; }
+  .rm-map-wrap.rm-map-hidden { border: 2px solid #000 !important; }
+}
 
 /* ── Warning block ── */
 .rm-warning { border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; background: #fff; }
@@ -221,11 +252,32 @@ ${buildIconPaletteHtml()}
        so the map pins below the palette, not under it. */
     document.documentElement.style.setProperty('--palette-h', h+'px');
   }
+  /* Hide/Show map toggle — event-delegated on document so it works
+     regardless of when this script tag runs relative to the
+     button/wrapper being parsed. The map wrapper lives inside
+     <div class="page"> below this script in source order; a directly-
+     attached listener would have to wait for DOMContentLoaded (and
+     even then could miss edge cases), while delegation just lets the
+     real click bubble up to document and we route it ourselves.
+     Pure CSS-class flip; the print stylesheet forces the map visible
+     at print time so a hidden map never makes it onto paper. */
+  document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest && e.target.closest('#rm-map-toggle');
+    if (!btn) return;
+    var wrap = document.getElementById('rm-map-wrap');
+    if (!wrap) return;
+    var hidden = wrap.classList.toggle('rm-map-hidden');
+    btn.textContent = hidden ? 'Show map' : 'Hide map';
+    btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+  });
 })();
 </script>
 <div class="page">
   ${buildRmHeader(stage, rows, logoSrc, opts.author)}
-  ${opts.mapImageDataUrl ? `<div class="rm-map-wrap"><img class="rm-map-img" alt="Stage overview map" src="${opts.mapImageDataUrl}"></div>` : ""}
+  ${opts.mapImageDataUrl ? `<div class="rm-map-wrap" id="rm-map-wrap">
+    <button type="button" class="rm-map-toggle no-print" id="rm-map-toggle" aria-pressed="false" aria-controls="rm-map-wrap">Hide map</button>
+    <img class="rm-map-img" alt="Stage overview map" src="${opts.mapImageDataUrl}">
+  </div>` : ""}
   <div class="rm-warning">
     <div class="rm-warning-title">WARNING</div>
     <div class="rm-warning-body">

@@ -750,6 +750,16 @@ export default function RouteMapperLayout() {
   const [mapMode, setMapMode] = useState("normal"); // "normal" | "review"
   const [mapSource, setMapSource] = useState("osm"); // "osm" | "esri_imagery" | "opentopo"
   const [exportingMapPdf, setExportingMapPdf] = useState(false);
+  // "Include overview map" toggle for the DOCX roadbook in the export
+  // ZIP. Persisted to localStorage so the user's last preference
+  // sticks across sessions. Defaults to true so existing behaviour is
+  // unchanged for users who never touch it. (The HTML roadbook
+  // always carries the map — it has its own Hide/Show toggle inside
+  // the file.)
+  const [includeMapInDocx, setIncludeMapInDocx] = useState(() => {
+    const v = localStorage.getItem("rm_include_map_in_docx");
+    return v === null ? true : v === "true";
+  });
   const [upgradePrompt, setUpgradePrompt] = useState(null); // null | reason string
   const [billingToast, setBillingToast] = useState(null); // null | 'success' | 'cancelled'
 
@@ -1915,6 +1925,7 @@ export default function RouteMapperLayout() {
           includeGoogleEarth: fullExport,
           includeGaia: fullExport,
           includePdf: false,
+          includeOverviewMap: includeMapInDocx,
           author: profile?.full_name || null,
           mapPdfBlob,
         });
@@ -2073,6 +2084,7 @@ export default function RouteMapperLayout() {
         includeGoogleEarth: true,
         includeGaia: true,
         includePdf: false,
+        includeOverviewMap: includeMapInDocx,
         author: profile?.full_name || null,
       });
       // Same filename format as the stage-end export — see stageNaming.js
@@ -3239,6 +3251,28 @@ export default function RouteMapperLayout() {
           >
             {exportingMapPdf ? "Exporting…" : "Export Map PDF"}
           </button>
+
+          {/* Toggle: include the stage-overview map image in the DOCX
+              roadbook at the next end-stage / re-export. HTML roadbook
+              always carries the map (it has its own in-doc Hide/Show
+              button), so this only affects the .docx. Preference
+              persists across sessions. */}
+          <label
+            className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-gray-700 text-sm cursor-pointer select-none"
+            title="Include the stage-overview map image in the DOCX roadbook (the HTML roadbook always carries it with its own in-doc Hide/Show button)"
+          >
+            <input
+              type="checkbox"
+              checked={includeMapInDocx}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setIncludeMapInDocx(v);
+                localStorage.setItem("rm_include_map_in_docx", String(v));
+              }}
+              className="accent-[#588233]"
+            />
+            <span>Include map in DOCX</span>
+          </label>
 
           {/* Right-side cluster: Follow Map toggle + GPS traffic light */}
           <div className="ml-auto flex items-center gap-2">
