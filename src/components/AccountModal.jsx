@@ -283,14 +283,10 @@ export default function AccountModal({
           >
             Cancel
           </button>
-          <a
-            href="https://routemapper.net/guide"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-gray-600 hover:text-gray-900 underline"
-          >
-            User Guide ↗
-          </a>
+          {/* User Guide link moved out of here into the OverflowMenu
+              (just above Sign out) so it lives with the other
+              identity / app-level secondary actions instead of in the
+              Account-edit dialog. */}
           <button
             onClick={onSave}
             disabled={!canSave}
