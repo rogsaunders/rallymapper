@@ -10,18 +10,30 @@
 // watchPosition callback stops firing. When the tab wakes again,
 // recording resumes — leaving a long straight-line gap between two
 // trackpoints in the otherwise smooth stream. By default normal
-// trackpoint spacing is 5-10 s; anything beyond 60 s is almost
-// certainly a pause, not real driving.
+// trackpoint spacing is 5-10 s.
+//
+// Threshold history:
+//   • Original: 60 s — fine on suburban / metro surveys where
+//     mobile data is constant and the surveyor isn't far from
+//     landmarks.
+//   • 2026-06-15: raised to 300 s (5 min) after Lachie's outback
+//     test surfaced a stage with 9 false-positive warnings.
+//     Auto-Lock was off and the app was visible the whole time,
+//     so the gaps were genuine remote-area GPS dropouts rather
+//     than iOS suspension — exactly the kind of "real travel"
+//     pause that shouldn't pop a warning. 300 s catches genuine
+//     iOS sleeps and tab backgrounding while tolerating the
+//     normal cadence of remote-area GPS hiccups.
 //
 // Pure function, no side effects, easy to unit-test.
 
-const DEFAULT_THRESHOLD_MS = 60_000; // 60 s
+const DEFAULT_THRESHOLD_MS = 300_000; // 5 min — see "Threshold history" above
 
 /**
  * Find gaps in the trackpoint stream larger than the threshold.
  *
  * @param {Array<{ time?: string, timestamp?: string, lat: number, lon: number }>} trackPoints
- * @param {number} thresholdMs - minimum gap to report (default 60 s)
+ * @param {number} thresholdMs - minimum gap to report (default 300 s / 5 min)
  * @returns {Array<{ startIdx, endIdx, startTime, endTime, gapMs, gapSeconds }>}
  *          ordered by appearance in the stream
  */
@@ -91,7 +103,7 @@ export function summariseGaps(gaps) {
   return (
     `⚠️ Possible recording pause${plural} detected\n\n` +
     `Your stage has ${count} gap${plural} in the GPS track ` +
-    `where recording paused for more than 60 seconds:\n\n` +
+    `where recording paused for more than 5 minutes:\n\n` +
     lines.join("\n") +
     `\n\n` +
     `This usually happens when the iPad goes to sleep or the app is ` +
