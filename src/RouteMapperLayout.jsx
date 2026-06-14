@@ -37,6 +37,15 @@ import ModePicker from "./components/ModePicker";
 import OverflowMenu, { OverflowMenuItem } from "./components/OverflowMenu";
 import { getStorageStatus, formatBytes } from "./lib/storageCapacity";
 import { findTrackpointGaps, summariseGaps } from "./lib/trackpointGaps";
+import {
+  acquireScreenWakeLock,
+  releaseScreenWakeLock,
+} from "./lib/wakeLock";
+import {
+  logLifecycleEvent,
+  formatIosLifecycleLogText,
+  clearIosLifecycleLog,
+} from "./lib/iosLifecycleLog";
 import { initSounds, playStartSound, playStopSound } from "./utils/sounds";
 import startSoundUrl from "./assets/sounds/start.wav";
 import stopSoundUrl from "./assets/sounds/stop.wav";
@@ -1672,6 +1681,19 @@ export default function RouteMapperLayout() {
     setStageActive(true);
     setStageStartedAt(new Date().toISOString());
 
+    // ── Issue #72: keep iOS Safari from suspending us ────────────────
+    // Acquire a screen wake lock so the device keeps the JS context
+    // alive while recording. Best-effort: silent no-op where the API
+    // isn't supported. We're already inside the Start-Stage user
+    // gesture, which is the only context the iOS wake-lock API will
+    // honour. Wipe the lifecycle log first so the diagnostic paper
+    // trail for this stage starts clean.
+    clearIosLifecycleLog();
+    logLifecycleEvent("stage_start");
+    acquireScreenWakeLock().catch(() => {
+      // logged inside the helper
+    });
+
     // Clear stage-scoped data
     setWaypoints([]);
     setPoi("");
@@ -1985,11 +2007,24 @@ export default function RouteMapperLayout() {
       // drives away from the site. Catches the one data-quality risk
       // that Starlink/network reliability can't fix. Pure data check;
       // does not block stage save.
+      //
+      // Issue #72: if gaps ARE detected, append a recent iOS
+      // lifecycle log to the dialog so the surveyor can paste it
+      // back to us. The log records visibility/pagehide/freeze/wake-
+      // lock events with timestamps and is the only way we can
+      // distinguish "iOS suspended the tab" from "GPS signal lost in
+      // the bush" remotely.
       try {
         const gaps = findTrackpointGaps(stageWithRoadbook.trackPoints);
         if (gaps.length > 0) {
-          const message = summariseGaps(gaps);
-          if (message) alert(message);
+          let message = summariseGaps(gaps);
+          if (message) {
+            const lifecycleTail = formatIosLifecycleLogText(30);
+            message +=
+              "\n\n— Diagnostic (please copy if reporting this) —\n" +
+              lifecycleTail;
+            alert(message);
+          }
         }
       } catch (e) {
         console.warn("trackpoint gap detection failed:", e);
@@ -2003,6 +2038,15 @@ export default function RouteMapperLayout() {
       // number before clearing).
       setStageActive(false);
       setStageStartedAt(null);
+
+      // ── Issue #72: release the wake lock + mark end of stage ─────
+      // The wake lock is paired with handleStartStage's acquire. The
+      // stage_end log entry anchors the timeline so the dialog's
+      // diagnostic tail always has a clear stop point.
+      logLifecycleEvent("stage_end");
+      releaseScreenWakeLock().catch(() => {
+        // logged inside the helper
+      });
 
       try {
         // Don't wipe the draft on end-stage — leave the just-ended

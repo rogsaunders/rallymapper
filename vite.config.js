@@ -85,6 +85,14 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Main bundle has grown to ~2.1 MB after several feature
+        // landings (Review Mode, Travel Mode, history multi-select,
+        // wake-lock + lifecycle log for issue #72). Workbox defaults
+        // to a 2 MiB precache limit and fails the build above it;
+        // bumping to 4 MiB gives healthy headroom without changing
+        // any runtime behaviour. Reduce when the code-splitting
+        // follow-up lands.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
