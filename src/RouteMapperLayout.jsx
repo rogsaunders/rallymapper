@@ -35,6 +35,7 @@ import StageHistoryPanel from "./components/StageHistoryPanel";
 import AccountModal from "./components/AccountModal";
 import ModePicker from "./components/ModePicker";
 import OverflowMenu, { OverflowMenuItem } from "./components/OverflowMenu";
+import AvgSpeedPanel from "./components/AvgSpeedPanel";
 import { getStorageStatus, formatBytes } from "./lib/storageCapacity";
 import { findTrackpointGaps, summariseGaps } from "./lib/trackpointGaps";
 import {
@@ -2781,6 +2782,33 @@ export default function RouteMapperLayout() {
               <span className="hidden sm:inline font-medium">{cloud.label}</span>
             </div>
 
+            {/* GPS signal — moved here from the controls strip to keep
+                status indicators together. Same shape/sizing as the
+                Sync pill above so the cluster reads as a single
+                status group. Dot always visible; "GPS" label hides on
+                tiny screens. */}
+            {(() => {
+              const hasGpsFix =
+                currentGPS &&
+                Number.isFinite(Number(currentGPS.lat)) &&
+                Number.isFinite(Number(currentGPS.lon));
+              return (
+                <div
+                  className={`text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full font-medium ${
+                    hasGpsFix ? "bg-green-500" : "bg-red-500"
+                  } bg-opacity-15`}
+                  title={
+                    hasGpsFix
+                      ? `GPS fix: ${Number(currentGPS.lat).toFixed(5)}, ${Number(currentGPS.lon).toFixed(5)}`
+                      : "Waiting for GPS fix…"
+                  }
+                >
+                  <span className="mr-1">{hasGpsFix ? "🟢" : "🔴"}</span>
+                  <span className="hidden sm:inline font-medium">GPS</span>
+                </div>
+              );
+            })()}
+
             {/* Plan badge — hidden on tiny viewports; still shown in overflow info */}
             {(() => {
               const planLabels = {
@@ -3318,7 +3346,19 @@ export default function RouteMapperLayout() {
             <span>Include map in DOCX</span>
           </label>
 
-          {/* Right-side cluster: Follow Map toggle + GPS traffic light */}
+          {/* Avg Speed — collapsible inline panel. Default closed in
+              Record mode (screen real estate is precious mid-survey);
+              Review Mode uses defaultOpen so post-survey analysis
+              flows straight into entering WP numbers. Both placements
+              share the same component + lib/wpSpeed.js. */}
+          <AvgSpeedPanel
+            stage={{ waypoints }}
+            defaultOpen={false}
+            className="text-xs"
+          />
+
+          {/* Right-side cluster: Follow Map toggle (GPS pill moved to
+              the top status cluster — see header above). */}
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -3337,26 +3377,8 @@ export default function RouteMapperLayout() {
               🎯 Follow
             </button>
 
-            {(() => {
-              const hasGpsFix =
-                currentGPS &&
-                Number.isFinite(Number(currentGPS.lat)) &&
-                Number.isFinite(Number(currentGPS.lon));
-              const gpsTitle = hasGpsFix
-                ? `GPS fix: ${Number(currentGPS.lat).toFixed(5)}, ${Number(currentGPS.lon).toFixed(5)}`
-                : "Waiting for GPS fix…";
-              return (
-                <div
-                  className={`text-sm px-3 py-1 rounded-full font-medium ${
-                    hasGpsFix ? "bg-green-500" : "bg-red-500"
-                  } bg-opacity-15`}
-                  title={gpsTitle}
-                >
-                  <span className="mr-1">{hasGpsFix ? "🟢" : "🔴"}</span>
-                  <span className="font-medium">GPS</span>
-                </div>
-              );
-            })()}
+            {/* GPS pill moved to the top-bar status cluster (next to
+                Sync) — see the header above. */}
           </div>
         </div>
 
