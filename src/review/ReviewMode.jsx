@@ -40,6 +40,7 @@ import { Link } from "react-router-dom";
 import MapView from "../components/MapView";
 import RoadbookView from "../components/roadbook/RoadbookView";
 import { generateRoadbook } from "../roadbook";
+import AvgSpeedPanel from "../components/AvgSpeedPanel";
 import { useAuth } from "../auth/AuthProvider";
 import {
   listSavedStages,
@@ -588,6 +589,22 @@ export default function ReviewMode() {
             </Link>
           </div>
         </div>
+
+        {/* Avg Speed panel — Lachie's primary use of the historical
+            workflow. Default open since "open a stage and scan
+            through WP pairs" is the dominant Review-mode pattern;
+            collapses if the user wants it out of the way. Lives
+            inside the sticky sub-header so it stays in reach as the
+            roadbook list scrolls. */}
+        {stage && (
+          <div className="px-3 pb-2">
+            <AvgSpeedPanel
+              stage={stage}
+              defaultOpen={true}
+              className="text-xs"
+            />
+          </div>
+        )}
       </div>
 
       {/* Split view — map left, roadbook right.
