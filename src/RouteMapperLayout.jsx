@@ -38,10 +38,7 @@ import OverflowMenu, { OverflowMenuItem } from "./components/OverflowMenu";
 import AvgSpeedPanel from "./components/AvgSpeedPanel";
 import { getStorageStatus, formatBytes } from "./lib/storageCapacity";
 import { findTrackpointGaps, summariseGaps } from "./lib/trackpointGaps";
-import {
-  acquireScreenWakeLock,
-  releaseScreenWakeLock,
-} from "./lib/wakeLock";
+import { acquireScreenWakeLock, releaseScreenWakeLock } from "./lib/wakeLock";
 import {
   logLifecycleEvent,
   formatIosLifecycleLogText,
@@ -257,9 +254,7 @@ function shouldReplaceAsRefinement(prev, next) {
   // Empty-previous → any non-empty next is a refinement
   if (prevPoi.length === 0 && nextPoi.length > 0) return true;
   // Non-empty-previous → next must extend it (prefix match)
-  return (
-    nextPoi.length > prevPoi.length && nextPoi.startsWith(prevPoi)
-  );
+  return nextPoi.length > prevPoi.length && nextPoi.startsWith(prevPoi);
 }
 
 function applyCapturePolicy(prev, next) {
@@ -533,6 +528,14 @@ export default function RouteMapperLayout() {
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
   const [showAccount, setShowAccount] = useState(false);
+  // Diagnostic Log modal — opens a read-only view of the iOS lifecycle
+  // ring buffer (rm_ios_lifecycle_v1 in localStorage). Reached from the
+  // OverflowMenu. Lets a surveyor copy-paste the recent event timeline
+  // to us when something unexpected happens (e.g. a stage finished with
+  // far fewer waypoints than they tapped). Pre-#73 the same text was
+  // only surfaced inside the end-of-stage gap-warning alert, which
+  // doesn't fire when the track itself looks clean.
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(
     () => sessionStorage.getItem("rm_profile_banner_dismissed") === "1",
   );
@@ -2509,6 +2512,55 @@ export default function RouteMapperLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
+      {/* ── Diagnostic Log modal ───────────────────────────────────────────
+          Read-only view of the iOS lifecycle ring buffer. Surveyor opens
+          this from the OverflowMenu when asked for a diagnostic dump.
+          Textarea is readOnly + select-all-friendly so iOS users can
+          long-press → Select All → Copy without a keyboard. */}
+      {showDiagnostic && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5 flex flex-col gap-3">
+            <h2 className="text-lg font-bold text-gray-900">Diagnostic Log</h2>
+            <p className="text-xs text-gray-600 leading-snug">
+              Recent app-lifecycle events (visibility / pagehide / wake-lock /
+              stage markers). Copy and paste this back to support if you're
+              reporting unexpected behaviour. Capped at the last 200 events.
+            </p>
+            <textarea
+              readOnly
+              value={formatIosLifecycleLogText(200)}
+              className="w-full h-64 text-[11px] font-mono leading-tight border border-gray-300 rounded-lg p-2 bg-gray-50 text-gray-800"
+              onFocus={(e) => e.target.select()}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Clear the diagnostic log? Use this after a clean stage so the next one starts fresh.",
+                    )
+                  ) {
+                    clearIosLifecycleLog();
+                    setShowDiagnostic(false);
+                  }
+                }}
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-sm rounded-lg bg-gray-800 text-white hover:bg-gray-900"
+                onClick={() => setShowDiagnostic(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Upgrade prompt modal ───────────────────────────────────────────── */}
       {upgradePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -2722,13 +2774,19 @@ export default function RouteMapperLayout() {
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b">
         <div className="mx-auto max-w-6xl px-3 py-2 flex items-center justify-between gap-3">
           {/* LEFT — logo + trip name + ⓘ trip-details popover */}
-          <div className="relative flex items-center gap-2 min-w-0" ref={tripInfoRef}>
+          <div
+            className="relative flex items-center gap-2 min-w-0"
+            ref={tripInfoRef}
+          >
             <img
               src={rrmLogo}
               alt="RouteMapper"
               className="h-9 w-9 rounded shrink-0"
             />
-            <div className="font-semibold text-gray-900 truncate min-w-0" title={tripName || "Untitled Trip / Event"}>
+            <div
+              className="font-semibold text-gray-900 truncate min-w-0"
+              title={tripName || "Untitled Trip / Event"}
+            >
               {tripName || (
                 <span className="text-gray-400 font-normal">
                   Untitled Trip / Event
@@ -2779,7 +2837,9 @@ export default function RouteMapperLayout() {
               title={`Sync: ${cloud.label}`}
             >
               <span className="mr-1">{cloud.dot}</span>
-              <span className="hidden sm:inline font-medium">{cloud.label}</span>
+              <span className="hidden sm:inline font-medium">
+                {cloud.label}
+              </span>
             </div>
 
             {/* GPS signal — moved here from the controls strip to keep
@@ -2891,6 +2951,15 @@ export default function RouteMapperLayout() {
                 </OverflowMenuItem>
               )}
 
+              {/* Diagnostic Log — opens a read-only view of the iOS
+                  lifecycle ring buffer (visibility / pagehide / wake-
+                  lock / stage markers). Useful when a stage finishes
+                  with surprising waypoint counts or unexpected behaviour
+                  and we need to see whether the tab was suspended. */}
+              <OverflowMenuItem onClick={() => setShowDiagnostic(true)}>
+                Diagnostic Log
+              </OverflowMenuItem>
+
               {/* User Guide — opens the Notion-hosted guide via the
                   friendly /guide redirect (so we can move the Notion
                   page without touching the app bundle). Placed
@@ -2917,9 +2986,7 @@ export default function RouteMapperLayout() {
               <div
                 className="px-3 py-2 text-[10px] font-mono text-gray-400 border-t select-all"
                 title={`v${
-                  typeof __APP_VERSION__ !== "undefined"
-                    ? __APP_VERSION__
-                    : "?"
+                  typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "?"
                 } · ${
                   typeof __BUILD_CONTEXT__ !== "undefined"
                     ? __BUILD_CONTEXT__
@@ -3810,11 +3877,10 @@ export default function RouteMapperLayout() {
                       <span>3s (slow reactions)</span>
                     </div>
                     <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-                      If your waypoints consistently land past their
-                      landmarks in Rally Navigator, raise this. Each 0.5 s
-                      shifts pins about 11 m back at highway speed. Applied
-                      at export time only — no effect on already-exported
-                      stages.
+                      If your waypoints consistently land past their landmarks
+                      in Rally Navigator, raise this. Each 0.5 s shifts pins
+                      about 11 m back at highway speed. Applied at export time
+                      only — no effect on already-exported stages.
                     </p>
                   </div>
                   <div>
