@@ -103,6 +103,21 @@ export default defineConfig({
         orientation: "portrait",
         start_url: "/",
         scope: "/",
+        // File Handling API — let the installed app open RouteMapper
+        // export ZIPs (and bare stage.json) directly from the OS file
+        // browser / "Open with". The launch is handled by the launchQueue
+        // consumer in apps/travel/main.jsx, which feeds the file into
+        // Travel Mode. Supported on Chromium desktop/Android; a no-op
+        // elsewhere (iOS Safari falls back to the in-app source picker).
+        file_handlers: [
+          {
+            action: "/",
+            accept: {
+              "application/zip": [".zip"],
+              "application/json": [".json"],
+            },
+          },
+        ],
         icons: [
           { src: "/pwa-192.png", sizes: "192x192", type: "image/png" },
           { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },

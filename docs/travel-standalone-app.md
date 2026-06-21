@@ -1,7 +1,7 @@
 # Standalone Travel Mode App — Scoping & Build Plan
 
-**Status:** Scoped 2026-06-21. Phase 0 ✅ and Phase 1 ✅ landed; ready for
-Netlify wiring + beta deploy. Derived from the
+**Status:** Scoped 2026-06-21. Phases 0 ✅, 1 ✅, 2 ✅ landed (one branch /
+PR); ready for Netlify wiring + beta deploy. Derived from the
 MEMORY.md strategic item "Standalone Travel Mode app extraction" (flagged
 2026-05-29), to be revisited after Phase 2 (M6) Travel Mode field testing.
 
@@ -138,6 +138,34 @@ new site overrides build command + publish dir in its own UI settings.
    `.zip`/`.json`), not localStorage.
 9. Keep the in-app `/travel` route alive during transition — parallel-run,
    don't cut over.
+
+### Phase 2 — built (2026-06-21)
+- **File hand-off (receiving side):** manifest `file_handlers` for
+  `.zip`/`.json` (vite.travel.config.js). `apps/travel/StandaloneApp.jsx`
+  consumes `window.launchQueue` and passes the launched File to TravelMode
+  via a new `initialFile` prop; TravelMode loads it once (ref-guarded) and
+  it takes precedence over an IndexedDB-restored stage. Chromium
+  desktop/Android; no-op on iOS Safari (falls back to the source picker).
+- **Offline / update UX:** `UpdateToast` via `virtual:pwa-register/react`
+  shows "Ready to work offline" once the SW precaches, and "new version
+  available → Reload" when an updated bundle is waiting.
+- **Offline resume (item 7):** already functional from Phase 0's IndexedDB
+  persistence + the precached shell + OSM-tile runtime cache. No code beyond
+  the toast; needs a real-device offline cold-launch check.
+- **Item 9 (parallel-run):** the editor's in-app `/travel` route + the
+  `ModePicker` "Travel" tab are left untouched, so nothing is cut over.
+- Entry split: `main.jsx` is render-only; components live in
+  `StandaloneApp.jsx` (keeps fast-refresh happy).
+
+### Deferred (next, not in this PR)
+- **Web Share Target** (`share_target`, POST + files) needs a service
+  worker that intercepts the POST — i.e. switching vite-plugin-pwa to
+  `injectManifest` with a custom SW. File Handling covers the main
+  "open this export" path without that, so it was scoped out here.
+- **Editor → Travel deep-link button** ("Open in Travel Mode" pointing at
+  the standalone origin) is held until the `go.routemapper.net` site is
+  actually deployed — a button to a dead domain is worse than none. Wire it
+  (behind a `__TRAVEL_HOME__` define) right after the Netlify step below.
 
 ### Phase 3 — Optional
 10. **Optional sign-in + cloud saved-stages** in the thin app, lazy-loaded

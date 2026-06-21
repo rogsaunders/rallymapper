@@ -20,7 +20,7 @@
 //      in the header. Voice on/off + test button in settings.
 // M5+ — DOCX overlay, iPhone polish.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRoadbook, pickStartCoords } from "./hooks/useRoadbook";
 import { useGpsStream } from "./hooks/useGpsStream";
 import { useTravelAdvance } from "./hooks/useTravelAdvance";
@@ -49,7 +49,7 @@ function readNum(key, fallback) {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-export default function TravelMode() {
+export default function TravelMode({ initialFile = null } = {}) {
   const {
     roadbook,
     trackPoints,
@@ -64,6 +64,23 @@ export default function TravelMode() {
   } = useRoadbook();
 
   const { gps, error: gpsError } = useGpsStream();
+
+  // File hand-off (standalone PWA): when launched via the OS file handler
+  // — e.g. the user opens a downloaded RouteMapper export ZIP — the entry
+  // passes the launched File here. Load it once; guarded by a ref so a
+  // re-render with the same File reference doesn't reload it. Takes
+  // precedence over any IndexedDB-restored stage, since an explicit open
+  // is a clear "use this one" signal.
+  const loadedInitialRef = useRef(null);
+  useEffect(() => {
+    if (initialFile && loadedInitialRef.current !== initialFile) {
+      loadedInitialRef.current = initialFile;
+      loadFile(initialFile);
+    }
+    // loadFile is stable enough for our purpose; intentionally keyed on the
+    // File reference only to avoid reload loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
 
   // Settings (persisted)
   const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(() =>
