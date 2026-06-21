@@ -1,7 +1,9 @@
 # Standalone Travel Mode App — Scoping & Build Plan
 
-**Status:** Scoped 2026-06-21. Phases 0 ✅, 1 ✅, 2 ✅ landed (one branch /
-PR); ready for Netlify wiring + beta deploy. Derived from the
+**Status:** Scoped 2026-06-21. Phases 0 ✅, 1 ✅, 2 ✅ landed (PR #78);
+Netlify project `standalonetravel` + `go.routemapper.net` DNS wired ✅.
+Remaining: merge PR, confirm prod build settings, then the deferred
+editor-deep-link + Web Share Target. Derived from the
 MEMORY.md strategic item "Standalone Travel Mode app extraction" (flagged
 2026-05-29), to be revisited after Phase 2 (M6) Travel Mode field testing.
 
@@ -118,16 +120,32 @@ Build result: **446 kB JS (gzip 139)** vs the editor's 2,060 kB (gzip 620),
 104 modules vs 907, precache **994 KB / 16 entries**. Proper root
 `index.html` + `manifest.webmanifest` emitted.
 
-### Netlify wiring (to do — needs Roger)
-One repo → two Netlify sites. For the new site:
-1. New Site → import the same Git repo.
-2. Build command: `npm run build:travel`  ·  Publish dir: `dist-travel`.
-3. Domain management → add `go.routemapper.net` → create the CNAME at the
-   DNS host.
-4. Optionally set env `EDITOR_HOME` if the editor origin differs from the
-   default `https://app.routemapper.net/`.
-The existing `netlify.toml` keeps driving the editor site unchanged; the
-new site overrides build command + publish dir in its own UI settings.
+### Netlify wiring (done 2026-06-21)
+One repo → two Netlify **projects** (Netlify renamed "Sites" → "Projects"
+in late 2024; the CLI/API still say "site"). The new project:
+
+- **Project name:** `standalonetravel` → `standalonetravel.netlify.app`.
+- **Build command:** `npm run build:travel`  ·  **Publish dir:** `dist-travel`.
+- **Custom domain:** `go.routemapper.net`.
+- Optional env `EDITOR_HOME` if the editor origin ever differs from the
+  default `https://app.routemapper.net/`.
+
+**DNS:** `routemapper.net` is on **Netlify DNS**, so adding the custom
+domain auto-created the record below — no manual CNAME needed. The
+`NETLIFY` record type is Netlify's managed ALIAS/CNAME equivalent (resolves
+internally; also valid at apex):
+
+| Name | TTL | Type | Value |
+|---|---|---|---|
+| `go.routemapper.net` | 3600 | `NETLIFY` | `standalonetravel.netlify.app` |
+
+HTTPS (Let's Encrypt) provisions automatically once the record resolves.
+
+The repo-root `netlify.toml` keeps driving the editor project unchanged;
+the `standalonetravel` project overrides build command + publish dir in its
+own UI settings. The project must build from a branch that has the
+`build:travel` script (i.e. after this PR merges to `main`, or point its
+production branch at the feature branch for early testing).
 
 ### Phase 2 — Field-ready
 7. **Offline resume** end-to-end (IndexedDB stage + cached tiles + cached
