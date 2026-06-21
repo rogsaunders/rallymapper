@@ -53,7 +53,7 @@ export default function SourcePicker({ onPick, error, isLoading }) {
 
         <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-500 leading-relaxed">
           <p>
-            <a href="/" className="text-[#588233] underline">
+            <a href={__EDITOR_HOME__} className="text-[#588233] underline">
               ← Back to the recording app
             </a>
           </p>

@@ -13,7 +13,12 @@
 // src/roadbook/roadbookTypes.js). Output: an SVG string ready to drop
 // into a React component via dangerouslySetInnerHTML.
 
-import { renderTulipSvg } from "../../roadbook";
+// Import straight from the tulipRenderer module rather than the
+// src/roadbook barrel. The barrel also re-exports generateRoadbook
+// (the engine) and the CSV/JSON exporters; going through it would drag
+// editor-side code into the thin Travel Mode build. See
+// docs/travel-standalone-app.md §2 (cone leak).
+import { renderTulipSvg } from "../../roadbook/tulipRenderer";
 
 /**
  * Render a tulip diagram for one roadbook row.

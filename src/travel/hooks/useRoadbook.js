@@ -25,9 +25,10 @@
 //     clear,
 //   }
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import JSZip from "jszip";
 import { extractDocxNotePatches, applyNotePatches } from "../lib/docxPatch";
+import { saveStage, loadStage, clearStage } from "../lib/stageCache";
 
 const STAGE_JSON_LEGACY = /_stage\.json$/;
 // Where the DOCX lives inside the current export layout (see
@@ -241,6 +242,33 @@ export function useRoadbook() {
   const [docxPatchCount, setDocxPatchCount] = useState(0);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  // True until the one-shot IndexedDB restore attempt resolves. Lets the
+  // UI hold the source picker back for a beat rather than flashing it and
+  // then swapping in a restored stage.
+  const [restoring, setRestoring] = useState(true);
+
+  // On mount, try to restore the last-loaded stage from IndexedDB so a
+  // reopened / reloaded PWA resumes where it left off. Best-effort: any
+  // miss or failure just leaves the source picker showing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cached = await loadStage();
+      if (!cancelled && cached?.roadbook?.rows?.length) {
+        setRoadbook(cached.roadbook);
+        setTrackPoints(
+          Array.isArray(cached.trackPoints) ? cached.trackPoints : [],
+        );
+        setStageMeta(cached.stageMeta ?? null);
+        setStartCoords(cached.startCoords ?? null);
+        setDocxPatchCount(cached.docxPatchCount ?? 0);
+      }
+      if (!cancelled) setRestoring(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function loadFile(file) {
     if (!file) return;
@@ -308,11 +336,22 @@ export function useRoadbook() {
         }
       }
 
+      const safeTp = Array.isArray(tp) ? tp : [];
       setRoadbook(finalRoadbook);
-      setTrackPoints(Array.isArray(tp) ? tp : []);
+      setTrackPoints(safeTp);
       setStageMeta(meta);
       setStartCoords(sc);
       setDocxPatchCount(patchCount);
+
+      // Persist for resume-on-reopen. Fire-and-forget — the reader is
+      // already usable; a cache write failure must not surface to the user.
+      saveStage({
+        roadbook: finalRoadbook,
+        trackPoints: safeTp,
+        stageMeta: meta,
+        startCoords: sc,
+        docxPatchCount: patchCount,
+      });
     } catch (e) {
       console.warn("useRoadbook: load failed", e);
       setError(e?.message || String(e));
@@ -333,6 +372,9 @@ export function useRoadbook() {
     setStartCoords(null);
     setDocxPatchCount(0);
     setError(null);
+    // Drop the persisted stage too, so Exit genuinely returns the user to
+    // the source picker on the next reopen rather than silently resuming.
+    clearStage();
   }
 
   return {
@@ -343,6 +385,7 @@ export function useRoadbook() {
     docxPatchCount,
     error,
     isLoading,
+    restoring,
     loadFile,
     clear,
   };

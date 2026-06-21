@@ -50,6 +50,11 @@ export default defineConfig({
     __APP_VERSION__:   JSON.stringify(pkg.version),
     __COMMIT_SHA__:    JSON.stringify(getCommitSha()),
     __BUILD_CONTEXT__: JSON.stringify(buildContext),
+    // Where the "← Back to the recording app" link in Travel Mode's
+    // SourcePicker points. In the main app this is the editor itself, so
+    // a relative "/". The standalone Travel build overrides it with the
+    // editor's absolute origin (see vite.travel.config.js).
+    __EDITOR_HOME__:   JSON.stringify("/"),
   },
   server: {
     https: getHttpsConfig(),
