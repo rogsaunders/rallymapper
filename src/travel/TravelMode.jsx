@@ -58,6 +58,7 @@ export default function TravelMode() {
     docxPatchCount,
     error,
     isLoading,
+    restoring,
     loadFile,
     clear,
   } = useRoadbook();
@@ -168,6 +169,16 @@ export default function TravelMode() {
   useEffect(() => {
     setHasStarted(false);
   }, [roadbook]);
+
+  // Hold the source picker back while the one-shot IndexedDB restore is
+  // still resolving, so a resumable stage doesn't flash the picker first.
+  if (restoring && !roadbook) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-500 text-sm">
+        Loading…
+      </div>
+    );
+  }
 
   if (!roadbook) {
     return (

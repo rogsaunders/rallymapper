@@ -1,13 +1,19 @@
 // src/App.jsx
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthProvider";
 
 import RouteMapperLayout from "./RouteMapperLayout";
 import SignIn from "./auth/SignIn";
 import ResetPassword from "./auth/ResetPassword";
-import TravelMode from "./travel/TravelMode";
-import ReviewMode from "./review/ReviewMode";
+
+// Travel Mode and Review Mode are lazy-loaded so the editor (the "/"
+// route most sessions land on) no longer ships their code in the main
+// chunk. This also proves the Travel Mode dependency cone is cleanly
+// severable ahead of the standalone-app extraction — see
+// docs/travel-standalone-app.md (Phase 0).
+const TravelMode = lazy(() => import("./travel/TravelMode"));
+const ReviewMode = lazy(() => import("./review/ReviewMode"));
 
 function GuestOnly({ children }) {
   const { user, loading, guestMode } = useAuth();
@@ -37,8 +43,19 @@ function RequireAuth({ children }) {
   }
 />;
 
+// Lightweight fallback shown only while a lazy route chunk (Travel /
+// Review) is fetched. The eager "/" editor route never hits this.
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-500 text-sm">
+      Loading…
+    </div>
+  );
+}
+
 export default function App() {
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/auth" element={<SignIn />} />
 
@@ -86,5 +103,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
