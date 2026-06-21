@@ -98,13 +98,15 @@ install" goal).
 
 ### Phase 1 — built (2026-06-21)
 Files added:
-- `apps/travel/index.html` — standalone entry; Vite `root`. Script points
-  at `../../src/travel-main.jsx` in the shared tree.
-- `apps/travel/public/` — minimal PWA icons only (pwa-192/512/maskable +
-  apple-touch), so the thin app doesn't precache the editor's 1 MB+ legacy
-  artwork in `public/`.
-- `src/travel-main.jsx` — minimal React root: renders `<TravelMode/>` with
-  no editor layout / Supabase / Stripe / react-router / Sentry.
+- `apps/travel/index.html` — standalone entry html; Vite `root`. Script
+  src is the root-relative `/main.jsx`.
+- `apps/travel/main.jsx` — minimal React root: renders `<TravelMode/>` with
+  no editor layout / Supabase / Stripe / react-router / Sentry. Lives next
+  to index.html so the dev server serves it root-relatively; imports the
+  shared tree via `../../src` (served from outside the root via the dev
+  server's `fs.allow`). NB: the entry must sit inside the Vite root — a
+  relative `../../src/...` in the html `<script src>` breaks `dev` because
+  the browser can't resolve above the origin root (build is unaffected).
 - `vite.travel.config.js` — `root: apps/travel`, `outDir: dist-travel`,
   standalone PWA manifest ("RouteMapper Travel"), OSM-tile runtime cache,
   `__EDITOR_HOME__` define → editor origin for the SourcePicker back-link.

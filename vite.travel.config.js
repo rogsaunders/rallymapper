@@ -79,6 +79,11 @@ export default defineConfig({
     https: getHttpsConfig(),
     host: "0.0.0.0",
     port: 5174, // distinct from the editor's 5173 so both can run at once
+    fs: {
+      // apps/travel/main.jsx imports from ../../src (outside the Vite
+      // root). Allow the dev server to serve files from the whole repo.
+      allow: [r(".")],
+    },
   },
 
   plugins: [
