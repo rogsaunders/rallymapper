@@ -1,6 +1,7 @@
 # Standalone Travel Mode App — Scoping & Build Plan
 
-**Status:** Scoped 2026-06-21. Phase 0 in progress. Derived from the
+**Status:** Scoped 2026-06-21. Phase 0 ✅ and Phase 1 ✅ landed; ready for
+Netlify wiring + beta deploy. Derived from the
 MEMORY.md strategic item "Standalone Travel Mode app extraction" (flagged
 2026-05-29), to be revisited after Phase 2 (M6) Travel Mode field testing.
 
@@ -94,6 +95,37 @@ install" goal).
 6. **Deploy:** second Netlify site, `vite build --config
    vite.travel.config.js`, publish `dist-travel`, custom domain
    `go.routemapper.net` (CNAME). Ship behind a beta link first.
+
+### Phase 1 — built (2026-06-21)
+Files added:
+- `apps/travel/index.html` — standalone entry; Vite `root`. Script points
+  at `../../src/travel-main.jsx` in the shared tree.
+- `apps/travel/public/` — minimal PWA icons only (pwa-192/512/maskable +
+  apple-touch), so the thin app doesn't precache the editor's 1 MB+ legacy
+  artwork in `public/`.
+- `src/travel-main.jsx` — minimal React root: renders `<TravelMode/>` with
+  no editor layout / Supabase / Stripe / react-router / Sentry.
+- `vite.travel.config.js` — `root: apps/travel`, `outDir: dist-travel`,
+  standalone PWA manifest ("RouteMapper Travel"), OSM-tile runtime cache,
+  `__EDITOR_HOME__` define → editor origin for the SourcePicker back-link.
+- npm scripts: `dev:travel` (:5174), `build:travel`, `preview:travel`.
+- `__EDITOR_HOME__` added to the main `vite.config.js` define (`"/"`) and to
+  eslint globals; `SourcePicker` back-link now uses it.
+
+Build result: **446 kB JS (gzip 139)** vs the editor's 2,060 kB (gzip 620),
+104 modules vs 907, precache **994 KB / 16 entries**. Proper root
+`index.html` + `manifest.webmanifest` emitted.
+
+### Netlify wiring (to do — needs Roger)
+One repo → two Netlify sites. For the new site:
+1. New Site → import the same Git repo.
+2. Build command: `npm run build:travel`  ·  Publish dir: `dist-travel`.
+3. Domain management → add `go.routemapper.net` → create the CNAME at the
+   DNS host.
+4. Optionally set env `EDITOR_HOME` if the editor origin differs from the
+   default `https://app.routemapper.net/`.
+The existing `netlify.toml` keeps driving the editor site unchanged; the
+new site overrides build command + publish dir in its own UI settings.
 
 ### Phase 2 — Field-ready
 7. **Offline resume** end-to-end (IndexedDB stage + cached tiles + cached

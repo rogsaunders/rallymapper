@@ -24,6 +24,7 @@ export default [
         __APP_VERSION__: 'readonly',
         __COMMIT_SHA__: 'readonly',
         __BUILD_CONTEXT__: 'readonly',
+        __EDITOR_HOME__: 'readonly',
       },
       parserOptions: {
         ecmaVersion: 'latest',
