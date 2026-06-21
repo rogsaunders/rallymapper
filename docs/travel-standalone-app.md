@@ -125,8 +125,18 @@ One repo → two Netlify **projects** (Netlify renamed "Sites" → "Projects"
 in late 2024; the CLI/API still say "site"). The new project:
 
 - **Project name:** `standalonetravel` → `standalonetravel.netlify.app`.
-- **Build command:** `npm run build:travel`  ·  **Publish dir:** `dist-travel`.
 - **Custom domain:** `go.routemapper.net`.
+- **Build:** driven by `netlify.toml`, NOT the project UI. Because
+  `netlify.toml` build settings override the UI and BOTH projects share
+  this repo's `netlify.toml`, the command is parameterised:
+  `command = "npm run ${RM_BUILD_CMD:-build}"`, `publish = "dist"`.
+  - Editor project: leave `RM_BUILD_CMD` unset → runs `npm run build` → the
+    editor in `dist` (unchanged).
+  - **standalonetravel project: set env `RM_BUILD_CMD=build:travel:netlify`.**
+    That script builds the standalone app and moves its output into `dist`,
+    so the shared `publish = "dist"` serves Travel Mode.
+  - Setting `build:travel`/`dist-travel` in the project UI does NOT work —
+    `netlify.toml` wins.
 - Optional env `EDITOR_HOME` if the editor origin ever differs from the
   default `https://app.routemapper.net/`.
 

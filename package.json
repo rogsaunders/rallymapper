@@ -8,6 +8,7 @@
     "dev:travel": "vite --config vite.travel.config.js",
     "build": "vite build",
     "build:travel": "vite build --config vite.travel.config.js",
+    "build:travel:netlify": "vite build --config vite.travel.config.js && rm -rf dist && mv dist-travel dist",
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:travel": "vite preview --config vite.travel.config.js"
