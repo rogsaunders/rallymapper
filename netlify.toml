@@ -1,5 +1,17 @@
+# Shared by BOTH Netlify projects that build from this repo:
+#   • the editor   (app.routemapper.net)  → default build
+#   • standalonetravel (go.routemapper.net) → the thin Travel Mode PWA
+#
+# netlify.toml build settings OVERRIDE each project's UI settings, so we
+# can't just set a different build command in the travel project's UI.
+# Instead the command is parameterised by RM_BUILD_CMD (a bash default-
+# value substitution): with the var unset it runs the editor build, so the
+# editor project is unchanged. The travel project sets
+# RM_BUILD_CMD=build:travel:netlify in its env, which builds the standalone
+# app and moves its output into `dist` so the shared publish dir serves it.
+# See docs/travel-standalone-app.md (Netlify wiring).
 [build]
-  command = "npm run build"
+  command = "npm run ${RM_BUILD_CMD:-build}"
   publish = "dist"
 
 [functions]
