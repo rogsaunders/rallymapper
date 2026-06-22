@@ -2960,6 +2960,21 @@ export default function RouteMapperLayout() {
                 Diagnostic Log
               </OverflowMenuItem>
 
+              {/* Open the standalone Travel app — the lightweight,
+                  installable in-vehicle reader at go.routemapper.net. The
+                  in-app "Travel" tab (ModePicker) still works; this opens
+                  the thin standalone surface in a new tab for users who
+                  want to install it on a phone/iPad. Target resolved at
+                  build time (__TRAVEL_HOME__ in vite.config.js): the
+                  production origin, or the in-app /travel route in dev. */}
+              <OverflowMenuItem
+                href={__TRAVEL_HOME__}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Travel app ↗
+              </OverflowMenuItem>
+
               {/* User Guide — opens the Notion-hosted guide via the
                   friendly /guide redirect (so we can move the Notion
                   page without touching the app bundle). Placed
