@@ -25,6 +25,7 @@ export default [
         __COMMIT_SHA__: 'readonly',
         __BUILD_CONTEXT__: 'readonly',
         __EDITOR_HOME__: 'readonly',
+        __TRAVEL_HOME__: 'readonly',
       },
       parserOptions: {
         ecmaVersion: 'latest',

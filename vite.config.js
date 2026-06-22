@@ -55,6 +55,15 @@ export default defineConfig({
     // a relative "/". The standalone Travel build overrides it with the
     // editor's absolute origin (see vite.travel.config.js).
     __EDITOR_HOME__:   JSON.stringify("/"),
+    // Where the editor's "Open Travel app ↗" menu item points — the
+    // standalone Travel PWA. In production that's go.routemapper.net; in
+    // local dev we keep it on the in-app /travel route (same origin) so
+    // there's nothing external to reach. Override with TRAVEL_HOME if the
+    // standalone ever moves.
+    __TRAVEL_HOME__:   JSON.stringify(
+      process.env.TRAVEL_HOME ||
+        (buildContext === "dev" ? "/travel" : "https://go.routemapper.net/"),
+    ),
   },
   server: {
     https: getHttpsConfig(),

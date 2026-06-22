@@ -4,6 +4,7 @@
 // "saved stages" list for logged-in users.
 
 import React, { useRef } from "react";
+import brandLogo from "../../assets/routemapper-logo.png";
 
 export default function SourcePicker({ onPick, error, isLoading }) {
   const inputRef = useRef(null);
@@ -18,7 +19,16 @@ export default function SourcePicker({ onPick, error, isLoading }) {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
       <div className="bg-white rounded-2xl shadow-sm border max-w-md w-full p-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-2">
+        {/* RouteMapper brand lockup — gives the standalone landing screen
+            (the first thing a go.routemapper.net visitor sees) a clear
+            identity. Same asset as the HeaderBar so branding is consistent
+            across the app. */}
+        <img
+          src={brandLogo}
+          alt="RouteMapper"
+          className="h-16 w-auto mx-auto mb-4"
+        />
+        <h1 className="text-xl font-bold text-gray-900 mb-2 text-center">
           🧭 Travel Mode
         </h1>
         <p className="text-sm text-gray-600 mb-6">

@@ -8,7 +8,7 @@
 //          through from the export filename (see lib/stageNaming.js).
 
 import React from "react";
-import fullLogo from "../../assets/fullLogo_transparent.png";
+import fullLogo from "../../assets/routemapper-logo.png";
 import { stageDisplayParts } from "../../lib/stageNaming";
 
 export default function HeaderBar({
