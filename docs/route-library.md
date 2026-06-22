@@ -1,8 +1,11 @@
-# Route Store — Scoping & Build Plan
+# Route Library — Scoping & Build Plan
 
-**Status:** Scoped 2026-06-22. Not started. Captures the MEMORY strategic
-item "Route store with 60/40 revenue share" (flagged 2026-05-29) and the
-2026-06-22 design discussion. Sibling to
+**Name:** "Route Library" (decided 2026-06-22).
+
+**Status:** Scoped 2026-06-22. **Phase A started** (foundation: schema +
+content policy) — see §11/§15. Captures the MEMORY strategic item "Route
+store with 60/40 revenue share" (flagged 2026-05-29) and the 2026-06-22
+design discussion. Sibling to
 [travel-standalone-app.md](travel-standalone-app.md) and
 [waypoint-activation.md](waypoint-activation.md).
 
@@ -100,8 +103,14 @@ route_listings
   sub_type        text            -- trail|adventure|road|...
   region          text            -- free-text + country code
   country         text
-  bbox            geography(POLYGON, 4326)  -- PostGIS, for geo search
-  distance_km     numeric
+  -- Phase A stores the bounding box as plain numerics (region filtering is
+  -- enough for the free catalogue). PostGIS geography + GiST radius search
+  -- is deferred to Phase D — PostGIS is available on the project but NOT
+  -- installed, and we don't want the heavy extension prematurely.
+  min_lat, min_lon, max_lat, max_lon, center_lat, center_lon  numeric
+  stage_count     int             -- complexity inputs (see §pricing) —
+  distance_km     numeric         --   auto-derived from stage.json at
+  waypoint_count  int             --   submission, drive the sliding scale
   surface         text            -- sealed|gravel|sand|mixed|technical
   difficulty      int             -- 1..5
   elevation_gain_m int
@@ -145,9 +154,11 @@ thumbnail is the only world-readable asset.
 
 - **Facets:** activity + sub-type, region/country, difficulty, distance
   bands, surface, price (free/paid), language, rating.
-- **Full-text:** Postgres `tsvector` over title/summary/description/tags.
-- **Geospatial:** PostGIS `bbox` → "routes near me" / "within this map
-  area" / "in this region". This is a differentiator for a route market.
+- **Full-text:** Postgres generated `tsvector` (title/summary/description/
+  region) + `pg_trgm` for fuzzy title match (both available on the project).
+- **Geospatial:** Phase A filters by `region`/`country` + bbox numerics;
+  true "routes near me" radius search lands in Phase D via PostGIS. A
+  differentiator, but not needed to launch.
 - Metadata is **auto-extracted at submission** from `Source/stage.json`
   (distance, bbox from track points, row/waypoint counts) and the author
   fills the rest (title, description, price, activity).
@@ -242,13 +253,27 @@ Each phase is independently shippable and useful.
 
 ---
 
-## 12. Decisions made
+## 12. Decisions made (2026-06-22)
 
-- **Basic Travel stays FREE** (2026-06-22). It is the store's delivery
-  surface and the adoption hook; paywalling it double-charges buyers and
-  forces auth back into the thin app. Monetise premium *Travel features*
-  under the existing Solo/Pro plans + the store's sales — do **not**
-  hard-paywall Travel.
+- **Name: "Route Library".**
+- **Launch free-only** to build trust (Phase A). Pricing switches on in
+  Phase B.
+- **Pricing = sliding scale by complexity.** Not stage-count alone (a weak
+  proxy): a **composite score** from `stage_count` + `distance_km` +
+  `waypoint_count`, bucketed into 3–4 tiers. Phase A captures those metrics
+  at submission so the scale can be turned on cleanly later.
+- **Author eligibility:** must be a **current subscriber AND a trusted
+  author** (a `route_authors` row with `status='active'`, mirroring the
+  `beta_users` gating pattern). Trust accrues over time. **Buying/
+  downloading stays open** (free routes openable even by guests) — never
+  gate consumption, or the market won't grow.
+- **Content policy + safety disclaimer + author warranty are REQUIRED
+  before any money changes hands** (before Phase B). First draft:
+  [route-library-content-policy.md](route-library-content-policy.md).
+- **Basic Travel stays FREE** — it is the Library's delivery surface and the
+  adoption hook; paywalling it double-charges buyers and forces auth back
+  into the thin app. Monetise premium *Travel features* under the existing
+  Solo/Pro plans + Library sales — do **not** hard-paywall Travel.
 - **Storefront lives on `go.routemapper.net`** (same origin as Travel).
 - **Payments reuse Stripe**; payouts start manual (ledger), move to Connect
   in Phase D.
@@ -269,13 +294,34 @@ Each phase is independently shippable and useful.
 - **Quality bar** — bad routes erode trust fast; ratings + easy
   unpublish/refund are the pressure valve.
 
-## 14. Open questions (need Roger)
+## 14. Open questions — resolved 2026-06-22
 
-1. Currency/pricing model — fixed AUD, or author-set with a floor?
-2. Free vs paid mix at launch — is Phase A free-only enough to validate, or
-   do we want paid from the first public release?
-3. Author eligibility — any RouteMapper user, or invite/trusted-only to
-   start?
-4. Naming — "Route Store", "Route Library", "Marketplace"?
-5. How much legal scaffolding (terms, disclaimers) before Phase B vs a
-   later hardening pass?
+All five answered (see §12). Remaining for Phase B (not blocking Phase A):
+
+1. The exact complexity → price-tier breakpoints (define the buckets once we
+   have a few real stages to calibrate against).
+2. Whether the composite score weights distance vs waypoints differently per
+   activity (a 300 km road route vs a 30 km technical trail).
+3. Connect onboarding UX + payout cadence (Phase D).
+
+## 15. Phase A — build steps & status
+
+Phase A = the free catalogue. Foundation-first (schema before UI):
+
+1. **Schema migration** (`route-library-phase-a-migration.sql`) — ✅ drafted;
+   awaiting review + apply to project `rfmvyachiypzvtxpdvma`.
+   Tables: `route_authors`, `route_listings`, `route_versions`,
+   `route_downloads`; RLS; storage buckets `route-files` (private) +
+   `route-previews` (public); indexes; `updated_at` triggers.
+2. **Content policy + disclaimer + author terms** —
+   ✅ first draft (`route-library-content-policy.md`).
+3. **Read API + storefront surface** on `go.routemapper.net/library` —
+   browse/search published listings, listing detail, one-tap "Open in
+   Travel". *(next increment)*
+4. **Submission flow** (author-gated) — upload ZIP → validate via the shared
+   `useRoadbook` parser → auto-derive metadata + preview → draft listing.
+   *(next increment)*
+5. **Seed** with Roger's own routes to bootstrap content. *(next)*
+
+⚠️ Before the storefront ships: correct any stale `VITE_SUPABASE_URL` on the
+`standalonetravel` Netlify project (it must point at `rfmvyachiypzvtxpdvma`).
