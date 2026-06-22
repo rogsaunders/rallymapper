@@ -308,8 +308,16 @@ All five answered (see §12). Remaining for Phase B (not blocking Phase A):
 
 Phase A = the free catalogue. Foundation-first (schema before UI):
 
-1. **Schema migration** (`route-library-phase-a-migration.sql`) — ✅ drafted;
-   awaiting review + apply to project `rfmvyachiypzvtxpdvma`.
+1. **Schema migration** (`route-library-phase-a-migration.sql`) — ✅ drafted
+   and **validated on a Supabase dev branch** (2026-06-22): all 4 tables +
+   RLS (9 table policies), 2 storage buckets (4 policies), 8 indexes, and the
+   generated `search_tsv` apply cleanly; full-text + trigram query paths
+   verified. Branch caught one bug — the `search_tsv` generated column needs
+   `to_tsvector('english'::regconfig, …)` and must NOT include
+   `array_to_string(tags,…)` (STABLE); tags are filtered via their own GIN
+   index. **Still to do: apply to production `rfmvyachiypzvtxpdvma`** (the
+   prod schema is NOT under Supabase migration control — a fresh branch comes
+   up empty — so this runs as a one-off against prod).
    Tables: `route_authors`, `route_listings`, `route_versions`,
    `route_downloads`; RLS; storage buckets `route-files` (private) +
    `route-previews` (public); indexes; `updated_at` triggers.

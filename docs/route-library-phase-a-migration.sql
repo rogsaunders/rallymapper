@@ -114,12 +114,17 @@ create table if not exists public.route_listings (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   published_at    timestamptz,
-  -- Generated full-text vector over the human-facing fields
+  -- Generated full-text vector over the human-facing text fields. Two
+  -- immutability constraints a generated column enforces:
+  --   • the config must be cast to regconfig — to_tsvector('english', ...)
+  --     with a text literal is only STABLE; the ::regconfig form is IMMUTABLE.
+  --   • array_to_string() is STABLE, so `tags` is deliberately NOT folded in
+  --     here — tags are filtered via their own GIN index (exact match), which
+  --     is the right tool for them anyway.
   search_tsv tsvector generated always as (
-    to_tsvector('english',
+    to_tsvector('english'::regconfig,
       coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' ||
-      coalesce(description,'') || ' ' || coalesce(region,'') || ' ' ||
-      coalesce(array_to_string(tags,' '),''))
+      coalesce(description,'') || ' ' || coalesce(region,''))
   ) stored
 );
 
