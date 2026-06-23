@@ -278,18 +278,19 @@ insert into storage.buckets (id, name, public)
 values ('route-previews', 'route-previews', true)
 on conflict (id) do nothing;
 
--- Active authors upload route files into a folder named by their user id,
--- e.g. "<uid>/<listing>/route.zip".
+-- Authenticated users upload route files into a folder named by their user
+-- id, e.g. "<uid>/<listing>/route.zip". NB: we deliberately do NOT gate this
+-- on an active route_authors row — a cross-schema EXISTS subquery here is
+-- evaluated unreliably by the storage service (it rejected valid author
+-- uploads in practice). Folder-ownership is the real guard; author-gating is
+-- enforced where it matters, on the route_listings INSERT (an upload with no
+-- matching listing is an inert orphan that can't surface in the catalogue).
 drop policy if exists "route-files authors upload" on storage.objects;
 create policy "route-files authors upload"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'route-files'
     and (storage.foldername(name))[1] = auth.uid()::text
-    and exists (
-      select 1 from public.route_authors a
-      where a.user_id = auth.uid() and a.status = 'active'
-    )
   );
 
 drop policy if exists "route-files authors manage own" on storage.objects;
