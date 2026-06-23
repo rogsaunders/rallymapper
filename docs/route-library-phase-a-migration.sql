@@ -142,12 +142,16 @@ create policy "route_listings read own"
   on public.route_listings for select to authenticated
   using (author_id = auth.uid());
 
--- Active authors may create listings for themselves.
+-- Active authors may create listings for themselves — but only in an author-
+-- controlled state. Without the status guard an author could insert a row
+-- already `published`, bypassing curation; restrict inserts to draft/submitted
+-- (publishing is a service-role/curation transition only).
 drop policy if exists "route_listings insert own" on public.route_listings;
 create policy "route_listings insert own"
   on public.route_listings for insert to authenticated
   with check (
     author_id = auth.uid()
+    and status = any (array['draft','submitted'])
     and exists (
       select 1 from public.route_authors a
       where a.user_id = auth.uid() and a.status = 'active'
