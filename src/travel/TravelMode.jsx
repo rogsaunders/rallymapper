@@ -49,7 +49,7 @@ function readNum(key, fallback) {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
-export default function TravelMode({ initialFile = null } = {}) {
+export default function TravelMode({ initialFile = null, libraryHref = null } = {}) {
   const {
     roadbook,
     trackPoints,
@@ -199,7 +199,12 @@ export default function TravelMode({ initialFile = null } = {}) {
 
   if (!roadbook) {
     return (
-      <SourcePicker onPick={loadFile} error={error} isLoading={isLoading} />
+      <SourcePicker
+        onPick={loadFile}
+        error={error}
+        isLoading={isLoading}
+        libraryHref={libraryHref}
+      />
     );
   }
 

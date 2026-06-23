@@ -114,12 +114,17 @@ create table if not exists public.route_listings (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   published_at    timestamptz,
-  -- Generated full-text vector over the human-facing fields
+  -- Generated full-text vector over the human-facing text fields. Two
+  -- immutability constraints a generated column enforces:
+  --   • the config must be cast to regconfig — to_tsvector('english', ...)
+  --     with a text literal is only STABLE; the ::regconfig form is IMMUTABLE.
+  --   • array_to_string() is STABLE, so `tags` is deliberately NOT folded in
+  --     here — tags are filtered via their own GIN index (exact match), which
+  --     is the right tool for them anyway.
   search_tsv tsvector generated always as (
-    to_tsvector('english',
+    to_tsvector('english'::regconfig,
       coalesce(title,'') || ' ' || coalesce(summary,'') || ' ' ||
-      coalesce(description,'') || ' ' || coalesce(region,'') || ' ' ||
-      coalesce(array_to_string(tags,' '),''))
+      coalesce(description,'') || ' ' || coalesce(region,''))
   ) stored
 );
 
@@ -256,12 +261,13 @@ create index if not exists route_downloads_listing_idx
 -- ============================================================================
 -- 5. Storage buckets
 -- ============================================================================
--- Private: the purchasable/downloadable export ZIPs. Downloads are served via
--- short-lived signed URLs minted by a server function (service role), which
--- is also where any future entitlement check lives.
+-- The downloadable export ZIPs. PUBLIC-read for Phase A (free catalogue) so
+-- the storefront is fully client-side — no signed-URL function / service-role
+-- key needed. Phase B reverts this to private + short-lived signed URLs minted
+-- by a server function (where the purchase/entitlement check will live).
 insert into storage.buckets (id, name, public)
-values ('route-files', 'route-files', false)
-on conflict (id) do nothing;
+values ('route-files', 'route-files', true)
+on conflict (id) do update set public = true;
 
 -- Public: preview thumbnails (world-readable via the public URL).
 insert into storage.buckets (id, name, public)

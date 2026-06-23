@@ -131,6 +131,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Keep the installed Travel app thin: don't precache the lazy Route
+        // Library chunk (storefront + supabase-js). Browsing the catalogue
+        // needs the network regardless, so there's no offline value in
+        // shipping its code to every Travel install — it loads on demand.
+        globIgnores: ["**/LibraryApp-*.js"],
         runtimeCaching: [
           {
             // Cache OSM tiles so PreStart's static map and any future map
