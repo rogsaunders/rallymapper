@@ -1,18 +1,27 @@
 // apps/travel/StandaloneApp.jsx
 //
-// Root component for the standalone Travel Mode PWA. Kept separate from
-// the main.jsx entry so the entry stays render-only (and HMR fast-refresh
-// is happy). See apps/travel/main.jsx and docs/travel-standalone-app.md
-// (Phase 2).
+// Root component for the standalone PWA on go.routemapper.net. Two surfaces
+// share this origin (and SPA):
+//   • "/"          → Travel Mode (the thin in-vehicle reader)
+//   • "/library/*" → the Route Library storefront (lazy-loaded, so Travel-only
+//                    users never download it or supabase-js)
+//
+// See apps/travel/main.jsx and docs/travel-standalone-app.md / route-library.md.
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import TravelMode from "../../src/travel/TravelMode";
+import { takePendingRoute } from "../../src/library/lib/handoff";
+
+const LibraryApp = lazy(() => import("../../src/library/LibraryApp"));
 
 // Consume a file launched via the OS file handler (File Handling API).
-// Returns the launched File once available, or null. Feature-detected —
-// browsers without launchQueue (e.g. iOS Safari today) simply never set a
-// file, and the user falls back to the in-app source picker.
 function useLaunchFile() {
   const [file, setFile] = useState(null);
   useEffect(() => {
@@ -30,7 +39,24 @@ function useLaunchFile() {
   return file;
 }
 
-// Small bottom toast driven by the PWA service-worker lifecycle.
+// Travel Mode home. Its initial file comes from either an OS file-handler
+// launch or a "Open in Travel" handoff from the Route Library. Travel exposes
+// a /library link on its source picker via the libraryHref prop.
+function TravelHome() {
+  const launched = useLaunchFile();
+  // Read-and-clear the library handoff once, on mount.
+  const [handoff] = useState(() => takePendingRoute());
+  return <TravelMode initialFile={launched || handoff} libraryHref="/library" />;
+}
+
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-500 text-sm">
+      Loading…
+    </div>
+  );
+}
+
 function UpdateToast() {
   const {
     offlineReady: [offlineReady, setOfflineReady],
@@ -79,11 +105,16 @@ function UpdateToast() {
 }
 
 export default function StandaloneApp() {
-  const initialFile = useLaunchFile();
   return (
-    <>
-      <TravelMode initialFile={initialFile} />
+    <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<TravelHome />} />
+          <Route path="/library/*" element={<LibraryApp />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
       <UpdateToast />
-    </>
+    </BrowserRouter>
   );
 }

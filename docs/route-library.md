@@ -308,20 +308,29 @@ All five answered (see §12). Remaining for Phase B (not blocking Phase A):
 
 Phase A = the free catalogue. Foundation-first (schema before UI):
 
-1. **Schema migration** (`route-library-phase-a-migration.sql`) — ✅ drafted;
-   awaiting review + apply to project `rfmvyachiypzvtxpdvma`.
-   Tables: `route_authors`, `route_listings`, `route_versions`,
-   `route_downloads`; RLS; storage buckets `route-files` (private) +
-   `route-previews` (public); indexes; `updated_at` triggers.
+1. **Schema migration** (`route-library-phase-a-migration.sql`) — ✅ applied
+   to prod `rfmvyachiypzvtxpdvma` (validated on a dev branch first). Tables:
+   `route_authors`, `route_listings`, `route_versions`, `route_downloads`;
+   RLS; storage buckets; indexes; `updated_at` triggers. **Phase A note:**
+   `route-files` is PUBLIC-read (free catalogue → no signed-URL function);
+   Phase B reverts to private + signed URLs + entitlement.
 2. **Content policy + disclaimer + author terms** —
    ✅ first draft (`route-library-content-policy.md`).
-3. **Read API + storefront surface** on `go.routemapper.net/library` —
-   browse/search published listings, listing detail, one-tap "Open in
-   Travel". *(next increment)*
+3. **Read API + storefront surface** on `go.routemapper.net/library` — ✅
+   built: `src/library/` (anon read API, browse + search + activity facets,
+   listing detail, one-tap "Open in Travel" via same-origin file handoff into
+   TravelMode `initialFile`). Lazy-loaded chunk, excluded from the Travel PWA
+   precache. Roger granted an `active` `route_authors` row. Verified: anon
+   read + full-text paths return 200 against prod; build/lint/dev-transform
+   clean. Pending real data (catalogue is empty until seeding/submission).
+   `download_count` increment deferred (anon can't update under RLS → needs a
+   small RPC/function later).
 4. **Submission flow** (author-gated) — upload ZIP → validate via the shared
    `useRoadbook` parser → auto-derive metadata + preview → draft listing.
    *(next increment)*
 5. **Seed** with Roger's own routes to bootstrap content. *(next)*
 
-⚠️ Before the storefront ships: correct any stale `VITE_SUPABASE_URL` on the
-`standalonetravel` Netlify project (it must point at `rfmvyachiypzvtxpdvma`).
+⚠️ Before the storefront ships: set `VITE_SUPABASE_URL` +
+`VITE_SUPABASE_ANON_KEY` on the `standalonetravel` Netlify project (must
+point at `rfmvyachiypzvtxpdvma`) — the storefront build needs them; the
+Netlify MCP couldn't enumerate the project, so this is a manual UI step.
