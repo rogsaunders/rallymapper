@@ -325,10 +325,19 @@ Phase A = the free catalogue. Foundation-first (schema before UI):
    clean. Pending real data (catalogue is empty until seeding/submission).
    `download_count` increment deferred (anon can't update under RLS → needs a
    small RPC/function later).
-4. **Submission flow** (author-gated) — upload ZIP → validate via the shared
-   `useRoadbook` parser → auto-derive metadata + preview → draft listing.
-   *(next increment)*
-5. **Seed** with Roger's own routes to bootstrap content. *(next)*
+4. **Submission flow** (author-gated) — ✅ built: approach A (Supabase
+   password sign-in on the standalone, `LibraryAuthProvider`, lazy with
+   `/library`). `/library/submit` requires sign-in + an `active`
+   `route_authors` row. Parser extracted to `src/travel/lib/roadbookParse.js`
+   (`parseRouteFile`, shared with Travel via the slimmed `useRoadbook`);
+   `deriveMetadata.js` computes stage_count/distance_km/waypoint_count/bbox;
+   `submitApi.submitRoute` uploads to `route-files/<uid>/<listingId>/` and
+   inserts a `submitted` listing + version. RLS hardened: author inserts are
+   restricted to `draft`/`submitted` (can't self-publish). **Publishing is a
+   service-role/admin transition** (Roger flips `submitted → published`).
+   Preview-thumbnail generation deferred (cards show a placeholder).
+5. **Seed** with Roger's own routes to bootstrap content. *(next — submit via
+   `/library/submit`, then publish; or seed + publish via SQL.)*
 
 ⚠️ Before the storefront ships: set `VITE_SUPABASE_URL` +
 `VITE_SUPABASE_ANON_KEY` on the `standalonetravel` Netlify project (must

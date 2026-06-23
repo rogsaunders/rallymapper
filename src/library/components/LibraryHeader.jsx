@@ -15,6 +15,12 @@ export default function LibraryHeader() {
         </Link>
         <div className="flex-1" />
         <Link
+          to="/library/submit"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900"
+        >
+          Submit a route
+        </Link>
+        <Link
           to="/"
           className="text-sm font-medium text-[#588233] hover:underline"
         >
