@@ -47,4 +47,12 @@ export default [
       ],
     },
   },
+  {
+    // Netlify serverless functions run in Node as CommonJS (require/exports).
+    files: ['netlify/functions/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: globals.node,
+    },
+  },
 ]
