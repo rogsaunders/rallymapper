@@ -40,6 +40,26 @@ exports.handler = async (event) => {
     return json(500, { error: "Server not configured" });
   }
 
+  // Config self-check (no secrets): confirms the function's project URL and
+  // whether the service-role key actually works (a service-role read bypasses
+  // RLS — fails if the key is wrong/mismatched). Call: ?check=config
+  if (event.queryStringParameters && event.queryStringParameters.check === "config") {
+    let host = null;
+    try {
+      host = new URL(process.env.VITE_SUPABASE_URL).host;
+    } catch {
+      host = "(invalid URL)";
+    }
+    const { error: probeErr } = await admin
+      .from("route_authors")
+      .select("user_id", { head: true, count: "exact" });
+    return json(200, {
+      projectHost: host,
+      serviceRoleOk: !probeErr,
+      serviceRoleError: probeErr?.message || null,
+    });
+  }
+
   // ── Authenticate the caller ────────────────────────────────────────────────
   const token = (event.headers.authorization || "").replace("Bearer ", "");
   if (!token) return json(401, { error: "Not signed in" });
@@ -48,7 +68,9 @@ exports.handler = async (event) => {
     data: { user },
     error: authError,
   } = await admin.auth.getUser(token);
-  if (authError || !user) return json(401, { error: "Invalid session" });
+  if (authError || !user) {
+    return json(401, { error: "Invalid session", detail: authError?.message || null });
+  }
 
   // ── Author gate (service role → bypasses RLS) ───────────────────────────────
   const { data: author } = await admin
