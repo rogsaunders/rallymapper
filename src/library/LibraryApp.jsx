@@ -11,6 +11,7 @@ import { LibraryAuthProvider } from "./lib/libraryAuth";
 import LibraryBrowse from "./LibraryBrowse";
 import ListingDetail from "./ListingDetail";
 import SubmitRoute from "./SubmitRoute";
+import AdminReview from "./AdminReview";
 
 export default function LibraryApp() {
   return (
@@ -18,6 +19,7 @@ export default function LibraryApp() {
       <Routes>
         <Route index element={<LibraryBrowse />} />
         <Route path="submit" element={<SubmitRoute />} />
+        <Route path="admin" element={<AdminReview />} />
         <Route path=":id" element={<ListingDetail />} />
         <Route path="*" element={<Navigate to="/library" replace />} />
       </Routes>
