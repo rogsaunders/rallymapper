@@ -36,3 +36,5 @@ export const listQueue = () => call("list").then((p) => p.listings ?? []);
 export const publishListing = (id) => call("publish", { id });
 export const rejectListing = (id, reason) => call("reject", { id, reason });
 export const unpublishListing = (id) => call("unpublish", { id });
+export const deleteListing = (id) => call("delete", { id });
+export const setPreview = (id, previewBase64) => call("set-preview", { id, previewBase64 });

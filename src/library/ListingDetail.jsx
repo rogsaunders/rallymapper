@@ -12,7 +12,9 @@ import {
 } from "./lib/libraryApi";
 import { setPendingRoute } from "./lib/handoff";
 import { useLibraryAuth } from "./lib/libraryAuth";
-import { unpublishListing } from "./lib/adminApi";
+import { unpublishListing, setPreview } from "./lib/adminApi";
+import { parseRouteFile } from "../travel/lib/roadbookParse";
+import { generatePreviewBase64 } from "./lib/preview";
 import LibraryHeader from "./components/LibraryHeader";
 
 function meta(label, value) {
@@ -75,6 +77,30 @@ export default function ListingDetail() {
       navigate("/");
     } catch (e) {
       setError(e?.message || String(e));
+      setBusy(false);
+    }
+  }
+
+  // Admin-only: (re)generate the map thumbnail from the route file. Backfills
+  // listings published before previews existed; reuses the submit-time path.
+  async function onRegeneratePreview() {
+    if (!version) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(fileUrl(version.storage_path));
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const name = version.storage_path.split("/").pop() || "route.zip";
+      const parsed = await parseRouteFile(new File([blob], name));
+      const previewBase64 = await generatePreviewBase64(parsed);
+      if (!previewBase64) throw new Error("No track to render a preview from.");
+      await setPreview(id, previewBase64);
+      const fresh = await getListing(id);
+      setListing(fresh || listing);
+    } catch (e) {
+      setError(e?.message || String(e));
+    } finally {
       setBusy(false);
     }
   }
@@ -148,14 +174,24 @@ export default function ListingDetail() {
               </a>
             )}
             {isAdmin && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onUnpublish}
-                className="mt-3 sm:mt-0 sm:ml-3 inline-block text-sm text-red-600 hover:underline disabled:opacity-50"
-              >
-                Unpublish
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onRegeneratePreview}
+                  className="mt-3 sm:mt-0 sm:ml-3 inline-block text-sm text-gray-600 hover:underline disabled:opacity-50"
+                >
+                  Regenerate preview
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={onUnpublish}
+                  className="mt-3 sm:mt-0 sm:ml-3 inline-block text-sm text-red-600 hover:underline disabled:opacity-50"
+                >
+                  Unpublish
+                </button>
+              </>
             )}
             {!version && (
               <p className="mt-3 text-sm text-amber-700">
