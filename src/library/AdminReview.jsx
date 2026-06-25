@@ -79,7 +79,12 @@ export default function AdminReview() {
             <li key={l.id} className="bg-white rounded-2xl border shadow-sm p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-gray-900">{l.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">{l.title}</h3>
+                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                      {l.status}
+                    </span>
+                  </div>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {[l.activity, l.region, l.country].filter(Boolean).join(" · ") || "—"}
                   </p>
@@ -111,16 +116,22 @@ export default function AdminReview() {
                     className="px-3 py-1.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
                     style={{ backgroundColor: "#588233" }}
                   >
-                    {busyId === l.id ? "…" : "Publish"}
+                    {busyId === l.id
+                      ? "…"
+                      : l.status === "unpublished"
+                        ? "Re-publish"
+                        : "Publish"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={busyId === l.id}
-                    onClick={() => onReject(l.id)}
-                    className="px-3 py-1.5 rounded-lg border text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
+                  {l.status !== "unpublished" && (
+                    <button
+                      type="button"
+                      disabled={busyId === l.id}
+                      onClick={() => onReject(l.id)}
+                      className="px-3 py-1.5 rounded-lg border text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  )}
                 </div>
               </div>
             </li>
@@ -134,7 +145,10 @@ export default function AdminReview() {
     <div className="min-h-screen bg-gray-50">
       <LibraryHeader />
       <div className="max-w-3xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between">
+        <Link to="/library" className="text-sm text-[#588233] hover:underline">
+          ← Back to Library
+        </Link>
+        <div className="mt-3 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Review queue</h1>
           {isAdmin && (
             <button
