@@ -7,7 +7,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLibraryAuth } from "./lib/libraryAuth";
-import { listQueue, publishListing, rejectListing } from "./lib/adminApi";
+import {
+  listQueue,
+  publishListing,
+  rejectListing,
+  deleteListing,
+} from "./lib/adminApi";
 import { fileUrl } from "./lib/libraryApi";
 import LibraryHeader from "./components/LibraryHeader";
 
@@ -52,6 +57,16 @@ export default function AdminReview() {
   const onReject = (id) => {
     const reason = window.prompt("Reason for rejection (optional):") ?? "";
     act(rejectListing, id, reason);
+  };
+
+  const onDelete = (id, title) => {
+    if (
+      window.confirm(
+        `Permanently delete "${title}"? This removes the listing and its files. This cannot be undone.`,
+      )
+    ) {
+      act(deleteListing, id);
+    }
   };
 
   let body;
@@ -132,6 +147,14 @@ export default function AdminReview() {
                       Reject
                     </button>
                   )}
+                  <button
+                    type="button"
+                    disabled={busyId === l.id}
+                    onClick={() => onDelete(l.id, l.title)}
+                    className="px-3 py-1.5 rounded-lg border border-red-200 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             </li>

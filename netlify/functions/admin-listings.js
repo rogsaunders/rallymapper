@@ -107,5 +107,55 @@ exports.handler = async (event) => {
     return json(200, { ok: true });
   }
 
+  // Regenerate / set the preview thumbnail (client renders it, we store it).
+  if (action === "set-preview") {
+    if (!body.previewBase64) return json(400, { error: "No preview" });
+    const { data: row } = await admin
+      .from("route_listings")
+      .select("author_id")
+      .eq("id", id)
+      .maybeSingle();
+    const previewPath = `${row?.author_id || user.id}/${id}/preview.png`;
+    const { error: upErr } = await admin.storage
+      .from("route-previews")
+      .upload(previewPath, Buffer.from(body.previewBase64, "base64"), {
+        contentType: "image/png",
+        upsert: true,
+      });
+    if (upErr) return json(500, { error: upErr.message });
+    const { error } = await admin
+      .from("route_listings")
+      .update({ preview_path: previewPath })
+      .eq("id", id);
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true });
+  }
+
+  // Hard delete (Phase A: free, no purchases). Removes the stored file(s) and
+  // preview so storage stays clean, then the row (versions/downloads cascade).
+  // PHASE B TODO: block (or soft-delete) when route_purchases reference it, so
+  // we never orphan a buyer's entitlement.
+  if (action === "delete") {
+    const { data: listing } = await admin
+      .from("route_listings")
+      .select("preview_path, route_versions(storage_path)")
+      .eq("id", id)
+      .maybeSingle();
+    // Best-effort storage cleanup — never block the row delete on it.
+    const filePaths = (listing?.route_versions || [])
+      .map((v) => v.storage_path)
+      .filter(Boolean);
+    try {
+      if (filePaths.length) await admin.storage.from("route-files").remove(filePaths);
+      if (listing?.preview_path)
+        await admin.storage.from("route-previews").remove([listing.preview_path]);
+    } catch (e) {
+      console.warn("admin-listings: storage cleanup failed", e?.message || e);
+    }
+    const { error } = await admin.from("route_listings").delete().eq("id", id);
+    if (error) return json(500, { error: error.message });
+    return json(200, { ok: true });
+  }
+
   return json(400, { error: "Unknown action" });
 };
