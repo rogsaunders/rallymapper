@@ -43,7 +43,7 @@ async function fileToBase64(file) {
  * creates a `submitted` listing, uploads the file, and records version 1.
  * Returns the new listing id. Throws on any failure.
  */
-export async function submitRoute({ file, fields, metadata }) {
+export async function submitRoute({ file, fields, metadata, previewBase64 }) {
   if (!file) throw new Error("No route file selected.");
   if (!fields?.title?.trim()) throw new Error("A title is required.");
 
@@ -65,6 +65,7 @@ export async function submitRoute({ file, fields, metadata }) {
       metadata,
       fileName: file.name,
       fileBase64,
+      previewBase64: previewBase64 || null,
     }),
   });
 

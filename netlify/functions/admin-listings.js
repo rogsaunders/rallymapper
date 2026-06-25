@@ -72,7 +72,7 @@ exports.handler = async (event) => {
           "distance_km,stage_count,waypoint_count,price_cents,created_at," +
           "route_versions(version,storage_path,file_bytes)",
       )
-      .in("status", ["submitted", "in_review"])
+      .in("status", ["submitted", "in_review", "unpublished"])
       .order("created_at", { ascending: true });
     if (error) return json(500, { error: error.message });
     return json(200, { listings: data ?? [] });

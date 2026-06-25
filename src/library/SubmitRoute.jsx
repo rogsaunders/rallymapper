@@ -10,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { parseRouteFile } from "../travel/lib/roadbookParse";
 import { deriveListingMetadata } from "./lib/deriveMetadata";
+import { generatePreviewBase64 } from "./lib/preview";
 import { getAuthorStatus, submitRoute } from "./lib/submitApi";
 import { useLibraryAuth } from "./lib/libraryAuth";
 import LibrarySignIn from "./components/LibrarySignIn";
@@ -48,6 +49,7 @@ export default function SubmitRoute() {
   const [file, setFile] = useState(null);
   const [parsing, setParsing] = useState(false);
   const [metadata, setMetadata] = useState(null);
+  const [previewBase64, setPreviewBase64] = useState(null);
   const [parseError, setParseError] = useState(null);
 
   // Editable descriptive fields
@@ -77,6 +79,7 @@ export default function SubmitRoute() {
     setParsing(true);
     setParseError(null);
     setMetadata(null);
+    setPreviewBase64(null);
     try {
       const parsed = await parseRouteFile(f);
       const meta = deriveListingMetadata(parsed);
@@ -84,6 +87,10 @@ export default function SubmitRoute() {
       if (meta.suggestedTitle && !fields.title) {
         setField("title", meta.suggestedTitle);
       }
+      // Best-effort map thumbnail (fetches OSM tiles); never blocks submit.
+      generatePreviewBase64(parsed)
+        .then(setPreviewBase64)
+        .catch((err) => console.warn("preview generation failed", err));
     } catch (err) {
       setParseError(err?.message || String(err));
       setFile(null);
@@ -111,6 +118,7 @@ export default function SubmitRoute() {
           tags,
         },
         metadata,
+        previewBase64,
       });
       setDoneId(id);
     } catch (err) {

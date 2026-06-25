@@ -67,7 +67,7 @@ exports.handler = async (event) => {
   } catch {
     return json(400, { error: "Invalid JSON" });
   }
-  const { fields, metadata, fileName, fileBase64 } = body || {};
+  const { fields, metadata, fileName, fileBase64, previewBase64 } = body || {};
   if (!fields?.title?.trim()) return json(400, { error: "A title is required." });
   if (!fileName || !fileBase64) return json(400, { error: "No route file." });
 
@@ -127,6 +127,29 @@ exports.handler = async (event) => {
     format_version: "1",
   });
   if (verr) return json(400, { error: verr.message });
+
+  // ── 4. Preview thumbnail (best-effort) ──────────────────────────────────────
+  // Generated client-side from the route's track. A failure here must not fail
+  // the submission — the listing is already complete without it.
+  if (previewBase64) {
+    try {
+      const previewPath = `${user.id}/${listing.id}/preview.png`;
+      const { error: perr } = await admin.storage
+        .from("route-previews")
+        .upload(previewPath, Buffer.from(previewBase64, "base64"), {
+          contentType: "image/png",
+          upsert: true,
+        });
+      if (!perr) {
+        await admin
+          .from("route_listings")
+          .update({ preview_path: previewPath })
+          .eq("id", listing.id);
+      }
+    } catch (e) {
+      console.warn("submit-route: preview upload failed", e?.message || e);
+    }
+  }
 
   return json(200, { listingId: listing.id });
 };

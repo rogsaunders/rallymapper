@@ -11,6 +11,8 @@ import {
   fileUrl,
 } from "./lib/libraryApi";
 import { setPendingRoute } from "./lib/handoff";
+import { useLibraryAuth } from "./lib/libraryAuth";
+import { unpublishListing } from "./lib/adminApi";
 import LibraryHeader from "./components/LibraryHeader";
 
 function meta(label, value) {
@@ -26,6 +28,7 @@ function meta(label, value) {
 export default function ListingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAdmin } = useLibraryAuth();
   const [listing, setListing] = useState(null); // null = loading
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -70,6 +73,22 @@ export default function ListingDetail() {
       });
       setPendingRoute(file);
       navigate("/");
+    } catch (e) {
+      setError(e?.message || String(e));
+      setBusy(false);
+    }
+  }
+
+  // Admin-only: pull a published route from the catalogue.
+  async function onUnpublish() {
+    if (!window.confirm("Unpublish this route? It will be removed from the catalogue.")) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await unpublishListing(id);
+      navigate("/library");
     } catch (e) {
       setError(e?.message || String(e));
       setBusy(false);
@@ -127,6 +146,16 @@ export default function ListingDetail() {
               >
                 Download ZIP
               </a>
+            )}
+            {isAdmin && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={onUnpublish}
+                className="mt-3 sm:mt-0 sm:ml-3 inline-block text-sm text-red-600 hover:underline disabled:opacity-50"
+              >
+                Unpublish
+              </button>
             )}
             {!version && (
               <p className="mt-3 text-sm text-amber-700">
