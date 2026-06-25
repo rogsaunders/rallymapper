@@ -14,6 +14,7 @@ const Ctx = createContext(null);
 export function LibraryAuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -31,10 +32,34 @@ export function LibraryAuthProvider({ children }) {
     };
   }, []);
 
+  // Resolve the admin flag from the user's own route_authors row (RLS allows
+  // reading your own row). Drives the Admin link + review page gate; the
+  // server re-checks is_admin authoritatively before any curation action.
+  useEffect(() => {
+    let active = true;
+    const userId = session?.user?.id;
+    if (!userId) {
+      setIsAdmin(false);
+      return;
+    }
+    supabase
+      .from("route_authors")
+      .select("is_admin")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setIsAdmin(!!data?.is_admin);
+      });
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id]);
+
   const value = {
     session,
     user: session?.user ?? null,
     loading,
+    isAdmin,
     signIn: (email, password) =>
       supabase.auth.signInWithPassword({ email, password }),
     signOut: () => supabase.auth.signOut(),
