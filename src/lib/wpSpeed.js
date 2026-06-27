@@ -59,6 +59,74 @@ function labelFor(wp) {
   return wp?.poi || wp?.notes || wp?.iconId || wp?.type || "(unnamed)";
 }
 
+// Speed below this counts a trackpoint segment as "stationary".
+// 1 km/h is well below walking pace (~5 km/h) so it cleanly captures
+// genuine stops while absorbing GPS jitter (a few metres of drift
+// while truly still still reads as low pseudo-speed). It also covers
+// "off-app" breaks where iOS suspends the tab and only one trackpoint
+// lands across a long pause — the segment's avg speed across that
+// span is ~zero so it gets credited as stationary even though no
+// per-second samples exist.
+const STATIONARY_SPEED_MPS = 1000 / 3600; // 1 km/h
+
+/**
+ * Total time the vehicle was effectively stationary between two
+ * waypoints. Walks the trackpoints in the from→to window and sums
+ * any segment whose average speed is below STATIONARY_SPEED_MPS.
+ *
+ * Same 1-based, order-independent indexing as computeWpSpeed.
+ *
+ * @returns {number|null} milliseconds (≥ 0), or null when inputs
+ *   are unusable (missing arrays, bad indices, missing timestamps).
+ */
+export function computeStationaryMs(stage, fromN, toN) {
+  const waypoints = stage?.waypoints;
+  const trackPoints = stage?.trackPoints;
+  if (!Array.isArray(waypoints) || !Array.isArray(trackPoints)) return null;
+
+  const a = Number(fromN);
+  const b = Number(toN);
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (lo < 1 || hi > waypoints.length || lo === hi) return null;
+
+  const fromT = parseT(waypoints[lo - 1]);
+  const toT = parseT(waypoints[hi - 1]);
+  if (fromT == null || toT == null) return null;
+
+  let stationaryMs = 0;
+  for (let i = 1; i < trackPoints.length; i++) {
+    const prev = trackPoints[i - 1];
+    const curr = trackPoints[i];
+    const prevT = parseT(prev);
+    const currT = parseT(curr);
+    if (prevT == null || currT == null) continue;
+
+    // Trackpoints are time-ordered, so once we pass `toT` we're done.
+    if (prevT >= toT) break;
+    if (currT <= fromT) continue;
+
+    const dtMs = currT - prevT;
+    if (dtMs <= 0) continue;
+
+    const prevDist = Number(prev.distanceFromStartM);
+    const currDist = Number(curr.distanceFromStartM);
+    if (!Number.isFinite(prevDist) || !Number.isFinite(currDist)) continue;
+    const segM = currDist - prevDist;
+
+    const speedMps = segM / (dtMs / 1000);
+    if (speedMps < STATIONARY_SPEED_MPS) {
+      // Clip the segment to the requested from→to window so a long
+      // stop that straddles a boundary doesn't double-count.
+      const segStart = Math.max(prevT, fromT);
+      const segEnd = Math.min(currT, toT);
+      stationaryMs += Math.max(0, segEnd - segStart);
+    }
+  }
+  return stationaryMs;
+}
+
 /**
  * Compute the average speed between two waypoints, 1-based indices,
  * order-independent.

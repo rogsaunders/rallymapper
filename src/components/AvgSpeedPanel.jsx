@@ -25,6 +25,7 @@
 import React, { useState } from "react";
 import {
   computeWpSpeed,
+  computeStationaryMs,
   formatDuration,
   formatClockTime,
 } from "../lib/wpSpeed";
@@ -52,6 +53,9 @@ export default function AvgSpeedPanel({
   }, [count, toN]);
 
   const calc = usable ? computeWpSpeed(stage, fromN, toN) : null;
+  // Only meaningful when the range is valid; null is treated as "—".
+  const stationaryMs =
+    usable && calc?.ok ? computeStationaryMs(stage, fromN, toN) : null;
 
   return (
     <div
@@ -163,6 +167,17 @@ export default function AvgSpeedPanel({
                   <span className="text-gray-500">Avg speed:</span>{" "}
                   <span className="font-semibold tabular-nums text-[#588233]">
                     {calc.result.speedKmh.toFixed(1)} km/h
+                  </span>
+                </span>
+                {/* Stationary time — sum of trackpoint segments in the
+                    From→To window whose avg speed is <1 km/h. Captures
+                    gates, floodway crossings, fuel stops, and any
+                    suspended-tab pauses where one trackpoint spans a
+                    long break with ~zero distance change. */}
+                <span>
+                  <span className="text-gray-500">Stationary:</span>{" "}
+                  <span className="font-semibold tabular-nums">
+                    {stationaryMs != null ? formatDuration(stationaryMs) : "—"}
                   </span>
                 </span>
               </div>
