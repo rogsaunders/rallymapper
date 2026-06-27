@@ -2,11 +2,12 @@
 //
 // Slide-in panel that lists saved stages and lets the user open one for review.
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   listSavedStages,
   loadSavedStage,
   deleteStagePermanently,
+  saveStageMutation,
   STAGE_HISTORY_LIMIT,
 } from "../lib/stageHistory.js";
 
@@ -186,6 +187,17 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
   // the user can't desync the in-flight set by toggling mid-loop.
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  // ── Import-from-file ───────────────────────────────────────────────
+  // Recovery path for the case where a user has deleted a stage from
+  // History (e.g. to free up iPhone storage mid-survey) but kept the
+  // exported stage.json on another device, and now wants it back in
+  // their History list. Re-import is idempotent — the underlying
+  // upsert keys on (user_id, local_id), so re-importing the same
+  // file merges cleanly rather than duplicating.
+  const fileInputRef = useRef(null);
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState(null);
+
   // Reset selection whenever the list refreshes (after a delete, or
   // when switching users). Prevents an id that just got deleted from
   // staying ticked.
@@ -326,6 +338,93 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
     setReloadNonce((n) => n + 1);
   }, [bulkDeleting, entries, owner, selectedIds, userId]);
 
+  // Accept either the full export wrapper `{app, version, stage, …}`
+  // (the shape produced by the in-app "Export Stage" action) or a bare
+  // `stage` object. Returns { payload, localId, meta } or null when
+  // the file doesn't look like a stage export.
+  const extractStagePayload = useCallback((parsed) => {
+    if (!parsed || typeof parsed !== "object") return null;
+    // If it has a top-level `stage` key shaped like our payload, peel it.
+    const candidate =
+      parsed.stage && typeof parsed.stage === "object" ? parsed.stage : parsed;
+    const meta = candidate.meta;
+    if (!meta || typeof meta !== "object") return null;
+    const localId = meta.local_id || candidate.local_id;
+    if (!localId || typeof localId !== "string") return null;
+    return { payload: candidate, localId, meta };
+  }, []);
+
+  const handleImportClick = useCallback(() => {
+    if (importing || bulkDeleting) return;
+    setError(null);
+    setNotice(null);
+    fileInputRef.current?.click();
+  }, [importing, bulkDeleting]);
+
+  const handleImportFile = useCallback(
+    async (event) => {
+      const input = event.target;
+      const file = input?.files?.[0];
+      // Reset the input value immediately so picking the same file
+      // twice in a row still fires onChange the second time.
+      if (input) input.value = "";
+      if (!file) return;
+
+      setImporting(true);
+      setError(null);
+      setNotice(null);
+      try {
+        const text = await file.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          setError(
+            "That file isn't valid JSON. Pick the stage.json file exported from RouteMapper.",
+          );
+          return;
+        }
+        const extracted = extractStagePayload(parsed);
+        if (!extracted) {
+          setError(
+            "That file doesn't look like a RouteMapper stage export (missing meta or local_id).",
+          );
+          return;
+        }
+        const { payload, localId, meta } = extracted;
+        // Authenticated users get a cloud restore; guests fall back to
+        // local-only so the feature still works offline / pre-signup.
+        const source = userId ? "supabase" : "local";
+        const result = await saveStageMutation({
+          userId,
+          owner,
+          source,
+          localId,
+          payload,
+          meta,
+        });
+        if (!result.ok) {
+          setError(
+            `Import failed: ${result.error?.message || "unknown error"}.`,
+          );
+          return;
+        }
+        setNotice(
+          `Imported "${stageSummary(meta)}"${
+            source === "supabase" ? " to History." : " to this device."
+          }`,
+        );
+        setReloadNonce((n) => n + 1);
+      } catch (err) {
+        console.error("StageHistoryPanel: import failed", err);
+        setError(`Import failed: ${err?.message || "unknown error"}.`);
+      } finally {
+        setImporting(false);
+      }
+    },
+    [extractStagePayload, owner, userId],
+  );
+
   const handleDelete = useCallback(
     async (entry) => {
       const name = stageSummary(entry.meta);
@@ -379,22 +478,74 @@ export default function StageHistoryPanel({ userId, owner, onOpenStage, onClose 
           </svg>
           <span className="text-sm font-semibold text-gray-700">Stage History</span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
-          aria-label="Close history"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Import-from-file — recovery path when a stage has been
+              deleted from History (e.g. to free iPhone storage during
+              a multi-day survey) but the user kept the exported
+              stage.json on another device. Re-import is idempotent. */}
+          <button
+            type="button"
+            onClick={handleImportClick}
+            disabled={importing || bulkDeleting}
+            className="p-1 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors"
+            aria-label="Import stage from file"
+            title={importing ? "Importing…" : "Import stage from file"}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0l-4 4m4-4l4 4"
+              />
+            </svg>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+            aria-label="Close history"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Error banner */}
       {error && (
         <div className="px-4 py-2 bg-red-50 text-red-600 text-xs border-b border-red-100">
           {error}
+        </div>
+      )}
+
+      {/* Notice banner — success / informational feedback (e.g. import
+          succeeded). Separate from `error` so styling stays clearly
+          green-for-good without conditional CSS gymnastics. */}
+      {notice && (
+        <div className="px-4 py-2 bg-emerald-50 text-emerald-700 text-xs border-b border-emerald-100 flex items-center justify-between gap-2">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="shrink-0 text-emerald-600 hover:text-emerald-800"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
 
