@@ -13,6 +13,8 @@ import { exportCombinedGpx } from "./exporters/exportCombinedGpx";
 import { exportRallyNavCsv } from "./exporters/exportRallyNavCsv";
 import { exportRoadbookHtml } from ".././roadbook/roadbookHtmlExport";
 import { exportRoadbookDocx } from "./exporters/exportRoadbookDocx";
+import { generateRoadbook } from "../roadbook";
+import { snapWaypointsForDisplay } from "../lib/roadbook/snapWaypoints";
 import {
   renderMapToCanvas,
   computeBounds,
@@ -46,10 +48,50 @@ import {
  * The README.txt at the root tells the user which file to pick for which
  * tool, so casual users never need to read the folder structure.
  */
-export async function buildRoutePackage(stage, options = {}) {
-  validateStage(stage);
+export async function buildRoutePackage(stageInput, options = {}) {
+  validateStage(stageInput);
 
-  const roadbook = stage?.roadbook ?? null;
+  // ── Snap waypoints + regenerate the roadbook at export time ──────────
+  //
+  // Stages saved before the display-side snap landed (PR #96, 2026-06-28)
+  // carry a `stage.roadbook` that was built from raw tap-time waypoints.
+  // The GPX exporters already snap on their own (since PR #43), so the
+  // bundled GPX agrees with Rally Navigator — but the DOCX/HTML/CSV/JSON
+  // outputs are derived from the baked `stage.roadbook` and would still
+  // show pre-snap coords for those historical stages, making the bundle
+  // internally inconsistent.
+  //
+  // Regenerating here, every time, ensures every artefact in the zip
+  // (GPX, DOCX, HTML, CSV, JSON) reflects the same snapped waypoints.
+  // snapWaypointToTrack is idempotent (re-snapping an already-snapped
+  // waypoint lands at the same trackpoint-interpolated position), so
+  // passing snapped waypoints into the GPX path that snaps again is safe.
+  //
+  // If regeneration throws (corrupt data, missing trackPoints, etc.) we
+  // fall back to whatever was baked at end-of-stage time — better a
+  // slightly-off coord than a failed export.
+  const snappedWaypoints = snapWaypointsForDisplay(
+    stageInput.waypoints || [],
+    stageInput.trackPoints || [],
+  );
+  let regeneratedRoadbook = stageInput?.roadbook ?? null;
+  try {
+    regeneratedRoadbook = generateRoadbook({
+      ...stageInput,
+      waypoints: snappedWaypoints,
+    });
+  } catch (err) {
+    console.warn(
+      "buildRoutePackage: roadbook regeneration failed, using baked roadbook",
+      err,
+    );
+  }
+  const stage = {
+    ...stageInput,
+    waypoints: snappedWaypoints,
+    roadbook: regeneratedRoadbook,
+  };
+  const roadbook = regeneratedRoadbook;
 
   const config = {
     includeHema: true,
