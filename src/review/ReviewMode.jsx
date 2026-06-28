@@ -37,7 +37,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import MapView from "../components/MapView";
+import MapView, { mapboxSatelliteAvailable } from "../components/MapView";
 import RoadbookView from "../components/roadbook/RoadbookView";
 import { generateRoadbook } from "../roadbook";
 import AvgSpeedPanel from "../components/AvgSpeedPanel";
@@ -73,10 +73,17 @@ const STAGE_DRAFT_KEY = "routemapper_stage_draft_v1";
 // file behind this guard, so it's a one-line revert.
 const ENABLE_HISTORICAL_STAGES = true;
 
+// Build the source list at module load. "Satellite HD" (Mapbox) only
+// appears when VITE_MAPBOX_TOKEN is set — without it the layer would
+// silently fall back to OSM, which would be more confusing than not
+// offering the choice in the first place.
 const MAP_SOURCES = [
   { id: "osm", label: "OSM" },
   { id: "opentopo", label: "Terrain" },
   { id: "esri_imagery", label: "Satellite" },
+  ...(mapboxSatelliteAvailable()
+    ? [{ id: "mapbox_satellite", label: "Satellite HD" }]
+    : []),
 ];
 
 // Mirror of getGuestOwnerId() in RouteMapperLayout — duplicated here
