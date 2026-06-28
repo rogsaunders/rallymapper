@@ -315,6 +315,7 @@ export default function MapView({
   // leave it at 0 so the in-vehicle view stays at native sharpness.
   extraZoom = 0,
 }) {
+  // (mapboxSatelliteAvailable is exported below the component.)
   const tile = useMemo(() => {
     switch (mapSource) {
       case "esri_imagery":
@@ -323,6 +324,33 @@ export default function MapView({
           attribution: "Tiles © Esri",
           maxZoom: 19,
         };
+      case "mapbox_satellite": {
+        // Mapbox Satellite ("HD") — sharper than Esri in built-up
+        // areas and goes to z22 natively. Requires a public access
+        // token (VITE_MAPBOX_TOKEN); missing token falls back to OSM
+        // so the map still renders. The picker should hide this
+        // option pre-token anyway via mapboxSatelliteAvailable().
+        const token = import.meta.env.VITE_MAPBOX_TOKEN;
+        if (!token) {
+          return {
+            url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            attribution: "&copy; OpenStreetMap contributors",
+            maxZoom: 19,
+          };
+        }
+        // @2x retina tiles are 512px-wide images covering the same
+        // ground as standard 256px tiles, so Leaflet needs tileSize
+        // and zoomOffset to keep its zoom maths right. Without these
+        // labels/detail render at half scale.
+        return {
+          url: `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+          attribution:
+            '© <a href="https://www.mapbox.com/about/maps/" target="_blank" rel="noopener noreferrer">Mapbox</a> © <a href="https://www.openstreetmap.org/about/" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
+          maxZoom: 22,
+          tileSize: 512,
+          zoomOffset: -1,
+        };
+      }
       case "opentopo":
         return {
           url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
@@ -489,6 +517,11 @@ export default function MapView({
           // requesting non-existent ones (which would 404).
           maxNativeZoom={tile.maxZoom}
           maxZoom={tile.maxZoom + extraZoom}
+          // Retina/HiDPI providers like Mapbox @2x serve 512px tiles;
+          // tileSize+zoomOffset keep Leaflet's zoom maths aligned.
+          // Falls back to Leaflet defaults (256 / 0) for normal providers.
+          tileSize={tile.tileSize ?? 256}
+          zoomOffset={tile.zoomOffset ?? 0}
           crossOrigin="anonymous"
         />
 
@@ -634,4 +667,13 @@ export default function MapView({
       </MapContainer>
     </div>
   );
+}
+
+// Lets callers (e.g. Review's source picker) hide the Mapbox option
+// when no token is configured, so users never see a layer that would
+// silently fall back to OSM. Read once at module load — the env var
+// is baked at build time by Vite, so re-checking per render is wasted.
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+export function mapboxSatelliteAvailable() {
+  return Boolean(MAPBOX_TOKEN);
 }
