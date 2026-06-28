@@ -40,6 +40,7 @@ import { Link } from "react-router-dom";
 import MapView, { mapboxSatelliteAvailable } from "../components/MapView";
 import RoadbookView from "../components/roadbook/RoadbookView";
 import { generateRoadbook } from "../roadbook";
+import { snapWaypointsForDisplay } from "../lib/roadbook/snapWaypoints";
 import AvgSpeedPanel from "../components/AvgSpeedPanel";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -268,11 +269,23 @@ export default function ReviewMode() {
   const waypoints = stage?.waypoints ?? [];
   const startGPS = stage?.startGPS ?? null;
 
+  // Snap waypoints to the recorded track for display. The exporter
+  // already does this (so RallyNavigator / Hema / etc. see snapped
+  // coords); applying the same snap here means the in-app roadbook and
+  // map markers agree with what the exported GPX carries, instead of
+  // showing raw tap-time coords that disagree by 100-200 m. Edits
+  // continue to write back against stage.waypoints (the unsnapped
+  // canonical store) via onSaveEdit, so this is a display-only view.
+  const displayedWaypoints = useMemo(
+    () => snapWaypointsForDisplay(waypoints, trackPoints),
+    [waypoints, trackPoints],
+  );
+
   // Build the roadbook from whichever stage is loaded. Same engine
   // the export pipeline uses, so what the organiser sees here matches
   // what ends up in the .docx.
   const roadbook = useMemo(() => {
-    if (!trackPoints.length && !waypoints.length) return null;
+    if (!trackPoints.length && !displayedWaypoints.length) return null;
     try {
       return generateRoadbook({
         meta: {
@@ -283,13 +296,13 @@ export default function ReviewMode() {
           stageNumber: stage?.stageNumber ?? stage?.meta?.stageNumber,
         },
         trackPoints,
-        waypoints,
+        waypoints: displayedWaypoints,
       });
     } catch (err) {
       console.warn("[ReviewMode] generateRoadbook failed:", err);
       return null;
     }
-  }, [stage, trackPoints, waypoints]);
+  }, [stage, trackPoints, displayedWaypoints]);
 
   // viewMode is declared up near the other useState calls (above the
   // reset-selection effect) to avoid the TDZ crash. See the block
@@ -631,7 +644,7 @@ export default function ReviewMode() {
           <MapView
             currentGPS={null}
             startGPS={startGPS}
-            waypoints={waypoints}
+            waypoints={displayedWaypoints}
             trackPoints={trackPoints}
             followMap={false}
             showMap={true}
