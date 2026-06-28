@@ -29,6 +29,7 @@ import { readPendingQueue, enqueueStage } from "./lib/pendingQueue";
 import { stageFilenameBase } from "./lib/stageNaming";
 import { buildRoutePackage } from "./export";
 import { generateRoadbook, renderTulipSvg } from "./roadbook";
+import { snapWaypointsForDisplay } from "./lib/roadbook/snapWaypoints";
 import { createVoiceCommandHandler } from "./voice/voiceCommandHandler";
 import { createRecordTrigger } from "./voice/recordTrigger";
 import StageHistoryPanel from "./components/StageHistoryPanel";
@@ -1857,7 +1858,14 @@ export default function RouteMapperLayout() {
     }
 
     try {
-      roadbook = generateRoadbook(stage);
+      // Snap waypoints to the recorded track for display so the saved
+      // roadbook (and anything that reads it later — Review, exports,
+      // map markers) carries the same coords the exported GPX will.
+      // See src/lib/roadbook/snapWaypoints.js.
+      roadbook = generateRoadbook({
+        ...stage,
+        waypoints: snapWaypointsForDisplay(stage.waypoints, stage.trackPoints),
+      });
     } catch (err) {
       console.error("Roadbook generation failed", err);
     }
@@ -2498,7 +2506,15 @@ export default function RouteMapperLayout() {
     if (!hasEnoughData) return null;
 
     try {
-      return generateRoadbook(roadbookPreviewStage);
+      // Same display-side snap as the end-of-stage path above, so the
+      // live preview shows what the exported GPX will carry.
+      return generateRoadbook({
+        ...roadbookPreviewStage,
+        waypoints: snapWaypointsForDisplay(
+          roadbookPreviewStage.waypoints,
+          roadbookPreviewStage.trackPoints,
+        ),
+      });
     } catch (err) {
       console.error("Roadbook preview generation failed", err);
       return null;

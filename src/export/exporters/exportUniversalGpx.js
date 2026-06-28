@@ -1,4 +1,7 @@
-import { haversineMeters } from "../../lib/roadbook/math";
+import {
+  readWaypointLookbackMs,
+  snapWaypointToTrack,
+} from "../../lib/roadbook/snapWaypoints";
 import {
   gpxFooter,
   gpxHeader,
@@ -85,167 +88,14 @@ export function getRegularWaypoints(stage) {
     .sort((a, b) => waypointTimeMs(a) - waypointTimeMs(b));
 }
 
-// ── Lookback offset ──────────────────────────────────────────────────
-//
-// After PR #43's interpolation snap, waypoints land at the user's
-// actual GPS position at the moment they tapped Record. If the user
-// taps right at a landmark, the pin lands at the landmark. If they
-// tap 1-2 s after passing it (typical human reaction: see landmark →
-// decide → look at iPad → tap), the pin lands 20-50 m past it.
-//
-// The lookback offset is a user-tunable setting that shifts the snap
-// target backwards in time by N seconds — effectively asking "where
-// was I N seconds before I tapped?". For a surveyor with a consistent
-// reaction-time gap, dialling in 1-1.5 s lands pins close to their
-// intended landmarks without changing how they tap.
-//
-// Default 0 preserves the strict PR #43 behaviour. Range capped at
-// 5 s to prevent absurd values; the slider in the UI is constrained to
-// 0-3 s.
-
-const WAYPOINT_LOOKBACK_KEY = "rm_waypoint_lookback_s";
-const WAYPOINT_LOOKBACK_MAX_MS = 5_000;
-
-function readWaypointLookbackMs() {
-  if (typeof localStorage === "undefined") return 0;
-  try {
-    const raw = localStorage.getItem(WAYPOINT_LOOKBACK_KEY);
-    if (raw == null) return 0;
-    const seconds = Number(raw);
-    if (!Number.isFinite(seconds) || seconds <= 0) return 0;
-    return Math.min(seconds, WAYPOINT_LOOKBACK_MAX_MS / 1000) * 1000;
-  } catch {
-    return 0;
-  }
-}
+// snapWaypointToTrack + readWaypointLookbackMs live in
+// src/lib/roadbook/snapWaypoints.js so the in-app roadbook display
+// (Review, RouteMapperLayout) can apply the same snap and show coords
+// that agree with what ends up in the exported GPX.
 
 function waypointTimeMs(w) {
   const t = Date.parse(w.timestamp || w.time || "");
   return Number.isFinite(t) ? t : Infinity;
-}
-
-// ── Snap-to-track ────────────────────────────────────────────────────
-//
-// iOS occasionally delivers a stale GPS fix when an app polls — so the
-// position read at the moment the user taps Record can be 5-15 s behind
-// where they actually were. When a stage's waypoints are exported and
-// rendered by a tool that draws straight connectors between consecutive
-// <wpt> entries (e.g. Rally Navigator's free tier), the inconsistent
-// staleness across waypoints turns a smooth descent into a saw-tooth
-// zigzag — a waypoint with fresh GPS sits where the user was, the next
-// one with stale GPS sits 100 m behind, the one after that sits where
-// it should, and so on.
-//
-// The trackpoint stream is recorded continuously via watchPosition and
-// represents the canonical "where the user actually was at time T"
-// history. We interpolate the user's position at the waypoint's
-// timestamp from the two trackpoints that bracket it in time, and
-// replace the waypoint's coords with that interpolated value.
-//
-// Interpolation (rather than the previous nearest-by-time snap) avoids
-// a subtle forward/backward bias: trackpoints sample every 5-10 s, so
-// the "nearest in time" trackpoint can be ~2-5 s after the waypoint,
-// which at highway speed places the snap target 40-100 m forward of
-// where the user actually was. The visible symptom is "waypoints appear
-// past their landmarks." Linear interpolation between bracketing points
-// gives the position at the exact waypoint timestamp, with no time-
-// direction bias.
-//
-// Defensive gates:
-//   - SNAP_TIME_WINDOW_MS (15 s): if the bracketing trackpoints span
-//     more than this, we treat it as a GPS dropout and leave the
-//     waypoint alone.
-//   - SNAP_DISTANCE_MAX_M (400 m): if the waypoint is farther than this
-//     from the interpolated track position, it's likely a deliberate
-//     off-track waypoint (a landmark observed from a layby, etc.) and
-//     we leave it alone. Raised from 200 m to catch the freeway-speed
-//     case where 6+ s of iOS staleness can put a tap-time read ~250 m
-//     behind the true position.
-//
-// Lookback offset (lookbackMs): subtract from the waypoint timestamp
-// before interpolation, so the snap target is "where the user was N
-// seconds before they tapped". Compensates for human reaction time
-// between seeing a landmark and tapping Record. Default 0 preserves
-// strict PR #43 behaviour. See readWaypointLookbackMs.
-//
-// Verified against two real user-submitted stages:
-//   - 2026-05-31 (Lachie's freeway descent): the 167 m wrong-direction
-//     zigzag at WP 14 "steep left hander" reduces to a smooth curve.
-//   - 2026-06-01 (Roger's 18 km Mylor→Bunnings): WP "css station" no
-//     longer overshoots forward; WP "speed 80 roadworks" (253 m off
-//     under the old 200 m gate) now snaps correctly to the recorded
-//     freeway track.
-
-const SNAP_TIME_WINDOW_MS = 15_000;
-const SNAP_DISTANCE_MAX_M = 400;
-
-function snapWaypointToTrack(waypoint, trackPoints, lookbackMs = 0) {
-  if (!trackPoints || trackPoints.length === 0) return waypoint;
-  const rawWpMs = Date.parse(waypoint.timestamp || waypoint.time || "");
-  if (!Number.isFinite(rawWpMs)) return waypoint;
-  // Target time is shifted backwards by the lookback amount, so the
-  // interpolation lands where the user was BEFORE they tapped (closer
-  // to where they saw the landmark, not where they ended up after
-  // reaction-time delay).
-  const wpMs = rawWpMs - Math.max(0, Number(lookbackMs) || 0);
-
-  // Find the bracketing trackpoints: the latest one with time <= wpMs
-  // and the earliest one with time >= wpMs. Most trackpoint streams
-  // are time-monotonic, but we don't assume that — scan once.
-  let beforeIdx = -1;
-  let beforeMs = -Infinity;
-  let afterIdx = -1;
-  let afterMs = Infinity;
-  for (let i = 0; i < trackPoints.length; i++) {
-    const tpMs = Date.parse(trackPoints[i].time || trackPoints[i].timestamp || "");
-    if (!Number.isFinite(tpMs)) continue;
-    if (tpMs <= wpMs && tpMs > beforeMs) {
-      beforeMs = tpMs;
-      beforeIdx = i;
-    }
-    if (tpMs >= wpMs && tpMs < afterMs) {
-      afterMs = tpMs;
-      afterIdx = i;
-    }
-  }
-
-  // Compute the interpolated position at the waypoint's timestamp.
-  // Edge cases:
-  //   - waypoint timestamp lies outside the trackpoint span (e.g. a
-  //     waypoint captured before the first trackpoint arrived): fall
-  //     back to the single available bracket if within the time window,
-  //     otherwise leave the waypoint alone.
-  let interpLat;
-  let interpLon;
-  if (beforeIdx >= 0 && afterIdx >= 0 && beforeIdx !== afterIdx) {
-    // Normal case: two distinct brackets.
-    if (afterMs - beforeMs > SNAP_TIME_WINDOW_MS) return waypoint;
-    const span = afterMs - beforeMs;
-    const frac = span > 0 ? (wpMs - beforeMs) / span : 0;
-    const before = trackPoints[beforeIdx];
-    const after = trackPoints[afterIdx];
-    interpLat = Number(before.lat) + frac * (Number(after.lat) - Number(before.lat));
-    interpLon = Number(before.lon) + frac * (Number(after.lon) - Number(before.lon));
-  } else {
-    // Only one side has a bracket, or both indices coincide (waypoint
-    // timestamp matches a trackpoint exactly). Use whichever single
-    // trackpoint is available, gated by the time window.
-    const idx = beforeIdx >= 0 ? beforeIdx : afterIdx;
-    if (idx < 0) return waypoint;
-    const tpMs = beforeIdx >= 0 ? beforeMs : afterMs;
-    if (Math.abs(tpMs - wpMs) > SNAP_TIME_WINDOW_MS) return waypoint;
-    interpLat = Number(trackPoints[idx].lat);
-    interpLon = Number(trackPoints[idx].lon);
-  }
-
-  // Distance gate — preserve deliberately off-track waypoints.
-  const distance = haversineMeters(
-    { lat: Number(waypoint.lat), lon: Number(waypoint.lon) },
-    { lat: interpLat, lon: interpLon },
-  );
-  if (distance > SNAP_DISTANCE_MAX_M) return waypoint;
-
-  return { ...waypoint, lat: interpLat, lon: interpLon };
 }
 
 export function buildStartWaypoint(startGPS) {
