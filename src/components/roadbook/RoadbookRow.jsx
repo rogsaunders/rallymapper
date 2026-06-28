@@ -52,6 +52,20 @@ function fmtCap(bearing) {
   return `${Math.round(b)}°`;
 }
 
+// Degrees-decimal-minutes (DMM) — matches the format the DOCX/HTML
+// roadbook exports use, so the in-app Review readout reads identically
+// to the printed page and to what Rally Navigator / Hema show after
+// importing the exported GPX. Example: 27°31.850'S, 135°25.863'E.
+function fmtCoord(value, kind) {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const v = Number(value);
+  const hemi = kind === "lat" ? (v >= 0 ? "N" : "S") : v >= 0 ? "E" : "W";
+  const abs = Math.abs(v);
+  const deg = Math.floor(abs);
+  const min = (abs - deg) * 60;
+  return `${deg}°${min.toFixed(3)}'${hemi}`;
+}
+
 // SVG icons used by the edit-affordance buttons. Kept inline to match
 // the rest of the codebase's no-icon-library convention.
 function PencilIcon({ size = 14 }) {
@@ -337,6 +351,12 @@ const RoadbookRow = forwardRef(function RoadbookRow(
         </div>
         <div>tot {fmtKmFromKm(row.kmTotal)} km</div>
         <div className="mt-1">CAP {fmtCap(row.bearingOut)}</div>
+        {(Number.isFinite(Number(row.lat)) || Number.isFinite(Number(row.lon))) && (
+          <div className="mt-1 text-[10px] leading-tight text-gray-500">
+            <div>{fmtCoord(row.lat, "lat")}</div>
+            <div>{fmtCoord(row.lon, "lon")}</div>
+          </div>
+        )}
         {selected && (
           <button
             type="button"
