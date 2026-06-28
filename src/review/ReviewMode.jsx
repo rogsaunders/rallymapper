@@ -652,6 +652,13 @@ export default function ReviewMode() {
             // waypoints array. Fixes "WP 8 on map / Row 23 in list"
             // for the same physical waypoint.
             waypointNumberOverride={waypointRowNumberMap}
+            // Post-survey analysis benefits from zooming past the
+            // provider's native ceiling — esp. on Esri Imagery in
+            // outback AU where the survey detail you're scrutinising
+            // (washouts, dip lips, exact line through a gateway) sits
+            // below z19. Leaflet stretches the deepest available
+            // tiles; pixels get blurry but features stay legible.
+            extraZoom={2}
           />
         </div>
 

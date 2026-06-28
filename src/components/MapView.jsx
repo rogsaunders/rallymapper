@@ -306,6 +306,14 @@ export default function MapView({
   // missing from the map fall back to the default 1-based-in-array
   // numbering. Record/Travel don't pass this and keep the default.
   waypointNumberOverride = null,
+  // Allow the user to zoom in past the tile provider's native
+  // resolution. Leaflet keeps fetching the deepest native tiles and
+  // stretches them on screen — pixels get blurry but you can still
+  // pick out road-scale features. Currently used by Review Mode
+  // (extraZoom={2}) so post-survey analysis can scrutinise outback
+  // satellite imagery beyond the z19 Esri ceiling. Record/Travel
+  // leave it at 0 so the in-vehicle view stays at native sharpness.
+  extraZoom = 0,
 }) {
   const tile = useMemo(() => {
     switch (mapSource) {
@@ -464,6 +472,10 @@ export default function MapView({
       <MapContainer
         center={[defaultCenter.lat, defaultCenter.lon]}
         zoom={14}
+        // Raise the container ceiling to match the overzoom budget,
+        // otherwise Leaflet caps user zoom-in at its default of 18 no
+        // matter what the TileLayer permits.
+        maxZoom={tile.maxZoom + extraZoom}
         style={{ height: "100%", width: "100%" }}
       >
         <FixResize resizeKey={resizeKey} />
@@ -471,7 +483,12 @@ export default function MapView({
         <TileLayer
           attribution={tile.attribution}
           url={tile.url}
-          maxZoom={tile.maxZoom}
+          // maxNativeZoom = deepest level the provider actually serves;
+          // maxZoom may exceed it when extraZoom > 0, in which case
+          // Leaflet stretches the deepest tiles on screen rather than
+          // requesting non-existent ones (which would 404).
+          maxNativeZoom={tile.maxZoom}
+          maxZoom={tile.maxZoom + extraZoom}
           crossOrigin="anonymous"
         />
 
