@@ -2,6 +2,7 @@ import { getIconExportMeta } from "./iconMappings";
 import {
   bearingBetweenPoints,
   circularMeanDeg,
+  haversineM,
   normalizeAngle,
 } from "./geo";
 
@@ -24,6 +25,19 @@ export function mergeWithWaypoints(events, waypoints, preprocessedTrack, config)
     const waypoint = normalizeWaypoint(rawWaypoint);
     if (!Number.isFinite(waypoint.lat) || !Number.isFinite(waypoint.lon)) {
       continue;
+    }
+
+    // Replace the tap-time `distanceFromStartM` (captured live at the
+    // moment the user tapped Record, before any snap correction) with a
+    // freshly-computed along-track distance to the waypoint's snapped
+    // position. Auto-detected events already use preprocessedTrack's
+    // cumulative distance; doing the same for waypoints means the
+    // engine's km totals are uniformly track-following, which is what
+    // Rally Navigator and other downstream tools compute. Without this,
+    // RM's km values are straight-line waypoint-to-waypoint and disagree
+    // with RN's by ~5-15% on winding tracks. See PR #99.
+    if (track.length > 1) {
+      waypoint.distanceM = snapWaypointDistanceToTrack(waypoint, track);
     }
 
     // Compute the turn angle from the track points either side of the
@@ -299,6 +313,72 @@ function averageBearing(points, index, fromOffset, toOffset) {
   }
   if (!bearings.length) return NaN;
   return circularMeanDeg(bearings);
+}
+
+// Returns the along-track distance (in metres) to the position on the
+// preprocessed track that best matches the waypoint — preferring a
+// time-based interpolation (the waypoint's timestamp lies between two
+// trackpoints' timestamps) and falling back to the geographically
+// nearest trackpoint when timestamps aren't available.
+//
+// Why time-first: it mirrors the lat/lon snap used at display + export
+// time (src/lib/roadbook/snapWaypoints.js), so the distance reported in
+// the roadbook lines up with the snapped coords the user sees. Geo
+// snap is a fallback for stages where waypoint timestamps were lost
+// (older formats, manual edits) — it's less accurate on a track that
+// loops back on itself but is correct on a single-pass route.
+function snapWaypointDistanceToTrack(waypoint, track) {
+  if (!track.length) return waypoint.distanceM;
+
+  const wpMs = Date.parse(waypoint.timestamp || "");
+  if (Number.isFinite(wpMs)) {
+    let beforeIdx = -1;
+    let beforeMs = -Infinity;
+    let afterIdx = -1;
+    let afterMs = Infinity;
+    for (let i = 0; i < track.length; i++) {
+      const tpMs = Date.parse(track[i].time || track[i].timestamp || "");
+      if (!Number.isFinite(tpMs)) continue;
+      if (tpMs <= wpMs && tpMs > beforeMs) {
+        beforeMs = tpMs;
+        beforeIdx = i;
+      }
+      if (tpMs >= wpMs && tpMs < afterMs) {
+        afterMs = tpMs;
+        afterIdx = i;
+      }
+    }
+    if (beforeIdx >= 0 && afterIdx >= 0 && beforeIdx !== afterIdx) {
+      const span = afterMs - beforeMs;
+      const frac = span > 0 ? (wpMs - beforeMs) / span : 0;
+      const dBefore = track[beforeIdx].distanceFromStartM ?? 0;
+      const dAfter = track[afterIdx].distanceFromStartM ?? dBefore;
+      return dBefore + frac * (dAfter - dBefore);
+    }
+    if (beforeIdx >= 0) {
+      return track[beforeIdx].distanceFromStartM ?? waypoint.distanceM;
+    }
+    if (afterIdx >= 0) {
+      return track[afterIdx].distanceFromStartM ?? waypoint.distanceM;
+    }
+  }
+
+  if (!Number.isFinite(waypoint.lat) || !Number.isFinite(waypoint.lon)) {
+    return waypoint.distanceM;
+  }
+  let bestIdx = -1;
+  let bestM = Infinity;
+  for (let i = 0; i < track.length; i++) {
+    const tp = track[i];
+    if (!Number.isFinite(tp?.lat) || !Number.isFinite(tp?.lon)) continue;
+    const d = haversineM(waypoint.lat, waypoint.lon, tp.lat, tp.lon);
+    if (d < bestM) {
+      bestM = d;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx < 0) return waypoint.distanceM;
+  return track[bestIdx].distanceFromStartM ?? waypoint.distanceM;
 }
 
 function normalizeWaypoint(wp) {
