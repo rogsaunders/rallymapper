@@ -12,3 +12,15 @@
   to = "https://routemapper.notion.site/RouteMapper-User-Guide-37c87469a8ea80ca82a9c6d135909322"
   status = 302
   force = true
+
+[[redirects]]
+  from = "/travel-guide"
+  to = "https://routemapper.notion.site/go-routemapper-net-guide-38f87469a8ea80a6aea2ec9f022189c5"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/go-guide"
+  to = "https://routemapper.notion.site/go-routemapper-net-guide-38f87469a8ea80a6aea2ec9f022189c5"
+  status = 302
+  force = true
