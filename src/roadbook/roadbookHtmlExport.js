@@ -1,5 +1,5 @@
 import { renderTulipSvg } from "./tulipRenderer";
-import logoUrl from "../assets/fullLogo_transparent.png";
+import logoUrl from "../assets/routemapper-logo.png";
 import manifest from "../icons/iconManifest.json";
 
 // Load all icon SVGs at build time via Vite
