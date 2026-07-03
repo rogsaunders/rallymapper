@@ -26,6 +26,7 @@ import React, { useState } from "react";
 import {
   computeWpSpeed,
   computeStationaryMs,
+  computeMovingSpeedKmh,
   formatDuration,
   formatClockTime,
 } from "../lib/wpSpeed";
@@ -56,6 +57,12 @@ export default function AvgSpeedPanel({
   // Only meaningful when the range is valid; null is treated as "—".
   const stationaryMs =
     usable && calc?.ok ? computeStationaryMs(stage, fromN, toN) : null;
+  // Moving average — speed over just the moving time (duration minus
+  // stationary). Null when the whole window was stationary or the
+  // stationary figure is unavailable.
+  const movingKmh = calc?.ok
+    ? computeMovingSpeedKmh(calc.result.distanceM, calc.result.durationMs, stationaryMs)
+    : null;
 
   return (
     <div
@@ -178,6 +185,15 @@ export default function AvgSpeedPanel({
                   <span className="text-gray-500">Stationary:</span>{" "}
                   <span className="font-semibold tabular-nums">
                     {stationaryMs != null ? formatDuration(stationaryMs) : "—"}
+                  </span>
+                </span>
+                {/* Moving average — avg speed over just the moving time
+                    (duration − stationary). Excludes stops so it reflects
+                    the pace held on the moving parts of the stage. */}
+                <span>
+                  <span className="text-gray-500">Moving avg:</span>{" "}
+                  <span className="font-semibold tabular-nums text-[#588233]">
+                    {movingKmh != null ? `${movingKmh.toFixed(1)} km/h` : "—"}
                   </span>
                 </span>
               </div>
