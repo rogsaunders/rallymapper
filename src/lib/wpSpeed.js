@@ -128,6 +128,28 @@ export function computeStationaryMs(stage, fromN, toN) {
 }
 
 /**
+ * Moving average speed — average speed over only the time the vehicle
+ * was actually moving, i.e. distance / (duration − stationary). This is
+ * higher than the overall average whenever there were stops, and is the
+ * figure that best reflects the pace a participant can expect to hold on
+ * the moving parts of a stage.
+ *
+ * @param {number} distanceM     Distance along track (metres)
+ * @param {number} durationMs    Elapsed wall-clock time (ms)
+ * @param {number|null} stationaryMs  Stationary time (ms) from
+ *   computeStationaryMs, or null when it couldn't be computed.
+ * @returns {number|null} km/h, or null when the moving time is
+ *   unknown or non-positive (e.g. the whole window was stationary).
+ */
+export function computeMovingSpeedKmh(distanceM, durationMs, stationaryMs) {
+  if (!Number.isFinite(distanceM) || !Number.isFinite(durationMs)) return null;
+  if (stationaryMs == null || !Number.isFinite(stationaryMs)) return null;
+  const movingMs = durationMs - stationaryMs;
+  if (movingMs <= 0) return null;
+  return (distanceM / (movingMs / 1000)) * 3.6;
+}
+
+/**
  * Compute the average speed between two waypoints, 1-based indices,
  * order-independent.
  *

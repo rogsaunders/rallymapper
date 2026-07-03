@@ -21,6 +21,10 @@
  *     ÷ (timestamp_to − timestamp_from), then converted to km/h.
  *     This is the AVERAGE — instantaneous speeds at any point in
  *     between can be much higher or lower.
+ *   • Stationary = time within the window spent effectively stopped
+ *     (trackpoint segments under 1 km/h). Moving avg = distance ÷
+ *     (duration − stationary) — the pace held while actually moving.
+ *     Both need `trackPoints`; they print "—" if it's absent.
  *   • If the stage.json was exported by an older RouteMapper that
  *     didn't record distanceFromStartM on waypoints, the script
  *     falls back to summing the segmentMeters in `routePoints`.
@@ -100,6 +104,52 @@ function parseT(wp) {
   return Number.isFinite(t) ? t : null;
 }
 
+// Speed below this counts a trackpoint segment as "stationary".
+// 1 km/h is well below walking pace so it cleanly captures genuine
+// stops while absorbing GPS jitter. Mirrors src/lib/wpSpeed.js — keep
+// the two in lockstep.
+const STATIONARY_SPEED_MPS = 1000 / 3600; // 1 km/h
+
+// Total time the vehicle was effectively stationary between two
+// timestamps. Walks the trackpoints and sums any segment whose average
+// speed is below STATIONARY_SPEED_MPS, clipped to the from→to window.
+// Returns milliseconds (≥ 0), or null when trackpoints are unavailable.
+function computeStationaryMs(fromT, toT) {
+  const trackPoints = stage.trackPoints;
+  if (!Array.isArray(trackPoints)) return null;
+
+  let stationaryMs = 0;
+  for (let i = 1; i < trackPoints.length; i++) {
+    const prev = trackPoints[i - 1];
+    const curr = trackPoints[i];
+    const prevT = parseT(prev);
+    const currT = parseT(curr);
+    if (prevT == null || currT == null) continue;
+
+    // Trackpoints are time-ordered, so once we pass `toT` we're done.
+    if (prevT >= toT) break;
+    if (currT <= fromT) continue;
+
+    const dtMs = currT - prevT;
+    if (dtMs <= 0) continue;
+
+    const prevDist = Number(prev.distanceFromStartM);
+    const currDist = Number(curr.distanceFromStartM);
+    if (!Number.isFinite(prevDist) || !Number.isFinite(currDist)) continue;
+    const segM = currDist - prevDist;
+
+    const segSpeedMps = segM / (dtMs / 1000);
+    if (segSpeedMps < STATIONARY_SPEED_MPS) {
+      // Clip to the requested window so a stop straddling a boundary
+      // doesn't double-count.
+      const segStart = Math.max(prevT, fromT);
+      const segEnd = Math.min(currT, toT);
+      stationaryMs += Math.max(0, segEnd - segStart);
+    }
+  }
+  return stationaryMs;
+}
+
 function formatDuration(ms) {
   if (!Number.isFinite(ms) || ms < 0) return "—";
   const totalS = Math.round(ms / 1000);
@@ -171,6 +221,14 @@ const distanceM = db - da;
 const speedMps = durationMs > 0 ? distanceM / (durationMs / 1000) : 0;
 const speedKmh = speedMps * 3.6;
 
+// Stationary time and the moving average (speed over just the moving
+// time = duration − stationary). Both null when trackpoints are absent
+// or the whole window was stationary.
+const stationaryMs = computeStationaryMs(ta, tb);
+const movingMs = stationaryMs != null ? durationMs - stationaryMs : null;
+const movingKmh =
+  movingMs != null && movingMs > 0 ? (distanceM / (movingMs / 1000)) * 3.6 : null;
+
 // ─── Print ───────────────────────────────────────────────────────────────────
 
 const meta = stage.meta || {};
@@ -196,5 +254,11 @@ console.log(`Duration:    ${formatDuration(durationMs)}`);
 console.log(`Distance:    ${(distanceM / 1000).toFixed(2)} km  (${distanceM.toFixed(0)} m)`);
 console.log(
   `Avg speed:   ${speedKmh.toFixed(1)} km/h  (${speedMps.toFixed(2)} m/s)`,
+);
+console.log(
+  `Stationary:  ${stationaryMs != null ? formatDuration(stationaryMs) : "— (no trackpoints)"}`,
+);
+console.log(
+  `Moving avg:  ${movingKmh != null ? `${movingKmh.toFixed(1)} km/h` : "—"}`,
 );
 console.log("");
