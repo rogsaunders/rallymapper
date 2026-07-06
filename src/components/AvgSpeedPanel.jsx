@@ -118,7 +118,7 @@ export default function AvgSpeedPanel({
               <input
                 type="number"
                 min={1}
-                max={count}
+                max={Math.max(count, 100)}
                 value={fromN}
                 onChange={(e) => setFromN(Number(e.target.value) || 1)}
                 className="w-16 px-2 py-1 rounded border border-gray-300 bg-white text-right tabular-nums"
@@ -130,7 +130,7 @@ export default function AvgSpeedPanel({
               <input
                 type="number"
                 min={1}
-                max={count}
+                max={Math.max(count, 100)}
                 value={toN}
                 onChange={(e) => setToN(Number(e.target.value) || 1)}
                 className="w-16 px-2 py-1 rounded border border-gray-300 bg-white text-right tabular-nums"
