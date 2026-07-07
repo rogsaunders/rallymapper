@@ -251,6 +251,236 @@ export function computeWpSpeed(stage, fromN, toN) {
   };
 }
 
+// ── Row-index variants (Review Mode) ────────────────────────────────
+//
+// The panel in Review is scoped to the SAME numbering the map markers
+// and roadbook list show — those are ROADBOOK ROWS, which include
+// auto-detected turns interleaved with manual waypoints. Row index N
+// on the map is what the user sees; feeding "N" straight into
+// computeWpSpeed would silently address waypoints[N-1] — a different
+// physical point.
+//
+// These row-based siblings mirror computeWpSpeed / computeStationaryMs
+// but index into the caller-supplied rows array (typically the driver
+// view — roadbook.views.driver — or the raw rows). Nothing about the
+// waypoint versions changes; Record Mode continues to use them.
+//
+// Row → timestamp:
+//   1. If the row is linked to a stored waypoint (linkedWaypointIds),
+//      use that waypoint's timestamp. Manual taps have the most
+//      accurate time.
+//   2. Otherwise, interpolate from the trackpoint stream at the row's
+//      along-track distance (row.kmTotal * 1000). Auto-detected turns
+//      fall through this branch.
+//
+// Row → distance-from-start: row.kmTotal * 1000, which is
+// track-following since PR #99 (waypointMerger's
+// snapWaypointDistanceToTrack).
+
+function findLinkedWaypoint(stage, row) {
+  const linkedIds = row?.linkedWaypointIds;
+  if (!Array.isArray(linkedIds) || linkedIds.length === 0) return null;
+  const waypoints = stage?.waypoints;
+  if (!Array.isArray(waypoints)) return null;
+  for (const id of linkedIds) {
+    if (id == null) continue;
+    const found = waypoints.find((w) => w?.id === id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function interpolateTimestampAtDistance(trackPoints, distanceM) {
+  if (!Array.isArray(trackPoints) || !Number.isFinite(distanceM)) return null;
+  let beforeIdx = -1;
+  let beforeD = -Infinity;
+  let afterIdx = -1;
+  let afterD = Infinity;
+  for (let i = 0; i < trackPoints.length; i++) {
+    const d = Number(trackPoints[i]?.distanceFromStartM);
+    if (!Number.isFinite(d)) continue;
+    if (d <= distanceM && d > beforeD) {
+      beforeD = d;
+      beforeIdx = i;
+    }
+    if (d >= distanceM && d < afterD) {
+      afterD = d;
+      afterIdx = i;
+    }
+  }
+  if (beforeIdx < 0 && afterIdx < 0) return null;
+  if (beforeIdx < 0) return parseT(trackPoints[afterIdx]);
+  if (afterIdx < 0) return parseT(trackPoints[beforeIdx]);
+  if (beforeIdx === afterIdx) return parseT(trackPoints[beforeIdx]);
+
+  const beforeT = parseT(trackPoints[beforeIdx]);
+  const afterT = parseT(trackPoints[afterIdx]);
+  if (beforeT == null || afterT == null) return null;
+
+  const span = afterD - beforeD;
+  const frac = span > 0 ? (distanceM - beforeD) / span : 0;
+  return beforeT + frac * (afterT - beforeT);
+}
+
+function resolveRowTimestampMs(stage, row) {
+  const linked = findLinkedWaypoint(stage, row);
+  if (linked) {
+    const t = parseT(linked);
+    if (t != null) return t;
+  }
+  const distanceM = Number(row?.kmTotal) * 1000;
+  if (!Number.isFinite(distanceM)) return null;
+  return interpolateTimestampAtDistance(stage?.trackPoints, distanceM);
+}
+
+function labelForRow(row) {
+  return (
+    row?.notes ||
+    row?.poi ||
+    row?.eventType ||
+    row?.icon ||
+    "(unnamed)"
+  );
+}
+
+/**
+ * Row-based sibling of computeWpSpeed. Indexes into the caller-supplied
+ * rows array (1-based, order-independent), so the panel's "From row 2 →
+ * To row 25" agrees with what the map marker and the roadbook list show
+ * next to those numbers.
+ */
+export function computeRowSpeed(stage, rows, fromN, toN) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return {
+      ok: false,
+      error: { code: "no_rows", message: "No roadbook rows to compute." },
+    };
+  }
+  const a = Number(fromN);
+  const b = Number(toN);
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 1 || b < 1) {
+    return {
+      ok: false,
+      error: {
+        code: "bad_input",
+        message: "Row numbers must be positive whole numbers.",
+      },
+    };
+  }
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (hi > rows.length) {
+    return {
+      ok: false,
+      error: {
+        code: "out_of_range",
+        message: `Only ${rows.length} rows — ${hi} is out of range.`,
+      },
+    };
+  }
+  if (lo === hi) {
+    return {
+      ok: false,
+      error: { code: "same_row", message: "From and To are the same row." },
+    };
+  }
+
+  const fromRow = rows[lo - 1];
+  const toRow = rows[hi - 1];
+
+  const fromM = Number(fromRow?.kmTotal) * 1000;
+  const toM = Number(toRow?.kmTotal) * 1000;
+  if (!Number.isFinite(fromM) || !Number.isFinite(toM)) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_distance",
+        message: `Row ${!Number.isFinite(fromM) ? lo : hi} is missing its distance-from-start.`,
+      },
+    };
+  }
+
+  const fromT = resolveRowTimestampMs(stage, fromRow);
+  const toT = resolveRowTimestampMs(stage, toRow);
+  if (fromT == null || toT == null) {
+    return {
+      ok: false,
+      error: {
+        code: "missing_timestamp",
+        message: `Row ${fromT == null ? lo : hi} has no derivable timestamp.`,
+      },
+    };
+  }
+
+  const durationMs = toT - fromT;
+  const distanceM = Math.abs(toM - fromM);
+  const speedMps = durationMs > 0 ? distanceM / (durationMs / 1000) : 0;
+
+  return {
+    ok: true,
+    result: {
+      fromIdx: lo - 1,
+      toIdx: hi - 1,
+      fromLabel: labelForRow(fromRow),
+      toLabel: labelForRow(toRow),
+      from: { timestamp: new Date(fromT).toISOString() },
+      to: { timestamp: new Date(toT).toISOString() },
+      durationMs,
+      distanceM,
+      speedMps,
+      speedKmh: speedMps * 3.6,
+    },
+  };
+}
+
+/**
+ * Row-based sibling of computeStationaryMs. Same trackpoint scan
+ * bounded by the two row timestamps (linked-waypoint time preferred,
+ * interpolated from trackpoints otherwise).
+ */
+export function computeRowStationaryMs(stage, rows, fromN, toN) {
+  const trackPoints = stage?.trackPoints;
+  if (!Array.isArray(rows) || !Array.isArray(trackPoints)) return null;
+
+  const a = Number(fromN);
+  const b = Number(toN);
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (lo < 1 || hi > rows.length || lo === hi) return null;
+
+  const fromT = resolveRowTimestampMs(stage, rows[lo - 1]);
+  const toT = resolveRowTimestampMs(stage, rows[hi - 1]);
+  if (fromT == null || toT == null) return null;
+
+  let stationaryMs = 0;
+  for (let i = 1; i < trackPoints.length; i++) {
+    const prev = trackPoints[i - 1];
+    const curr = trackPoints[i];
+    const prevT = parseT(prev);
+    const currT = parseT(curr);
+    if (prevT == null || currT == null) continue;
+    if (prevT >= toT) break;
+    if (currT <= fromT) continue;
+
+    const dtMs = currT - prevT;
+    if (dtMs <= 0) continue;
+
+    const prevDist = Number(prev.distanceFromStartM);
+    const currDist = Number(curr.distanceFromStartM);
+    if (!Number.isFinite(prevDist) || !Number.isFinite(currDist)) continue;
+    const segM = currDist - prevDist;
+
+    const speedMps = segM / (dtMs / 1000);
+    if (speedMps < STATIONARY_SPEED_MPS) {
+      const segStart = Math.max(prevT, fromT);
+      const segEnd = Math.min(currT, toT);
+      stationaryMs += Math.max(0, segEnd - segStart);
+    }
+  }
+  return stationaryMs;
+}
+
 /** "1 h 22 min 22 s" — used by both Record / Review panels. */
 export function formatDuration(ms) {
   if (!Number.isFinite(ms) || ms < 0) return "—";
