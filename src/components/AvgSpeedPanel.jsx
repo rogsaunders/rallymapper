@@ -1,31 +1,45 @@
 // src/components/AvgSpeedPanel.jsx
 //
-// Inline "average speed between two waypoints" panel. Shared by:
+// Inline "average speed between two points" panel. Shared by:
 //   • Record Mode (controls strip, default closed) — quick mid-survey
-//     check on the in-progress stage.
+//     check on the in-progress stage. Uses raw waypoints (rows don't
+//     exist yet — the roadbook engine only runs at end-of-stage).
 //   • Review Mode (sub-header, default open) — Lachie's post-survey
-//     workflow: load a historical stage and iterate through WP pairs
-//     to plan stage lengths for the participants.
+//     workflow: load a historical stage and iterate through pairs to
+//     plan stage lengths for the participants. Uses ROADBOOK ROWS so
+//     the numbers here match the map markers and the roadbook list
+//     (both of which show row indices, not waypoint indices).
+//
+// Mode is controlled by whether the caller passes a `rows` prop:
+//   • rows omitted / empty → waypoint mode  (raw stage.waypoints)
+//   • rows non-empty       → row mode       (indexes into that array)
+//
+// The underlying maths lives in src/lib/wpSpeed.js —
+// computeWpSpeed / computeStationaryMs for waypoints;
+// computeRowSpeed / computeRowStationaryMs for rows. Both variants
+// return the same result shape so this component only branches at the
+// call site.
 //
 // UX choices:
 //   • Two <input type="number"> boxes for From / To. Better than a
-//     dropdown of 30+ WP labels — iPad keyboards expose the number
-//     pad and arrow-key stepping is fast for "scan many pairs"
-//     workflows.
+//     dropdown of 30+ labels — iPad keyboards expose the number pad
+//     and arrow-key stepping is fast for "scan many pairs" workflows.
 //   • Result line below the inputs updates LIVE as either input
 //     changes (no Calculate button). Errors surface inline in the
 //     same line so the user always sees one piece of feedback per
 //     state.
 //   • Tap the header to expand/collapse. Header always shows the
-//     waypoint-count hint so the user knows the valid range without
+//     item-count hint so the user knows the valid range without
 //     having to expand.
 //   • The whole panel disabled (greyed, no clicks) when there aren't
-//     yet ≥ 2 waypoints. Mid-stage or post-stage both supported.
+//     yet ≥ 2 items. Mid-stage or post-stage both supported.
 
 import React, { useState } from "react";
 import {
   computeWpSpeed,
   computeStationaryMs,
+  computeRowSpeed,
+  computeRowStationaryMs,
   computeMovingSpeedKmh,
   formatDuration,
   formatClockTime,
@@ -33,36 +47,58 @@ import {
 
 export default function AvgSpeedPanel({
   stage,
+  rows = null,
   defaultOpen = false,
   className = "",
 }) {
-  const waypoints = stage?.waypoints || [];
-  const count = waypoints.length;
+  // Row mode is opt-in: any non-empty rows array flips the panel to
+  // row-based indexing. Record Mode never passes rows, so it keeps its
+  // existing waypoint semantics.
+  const useRows = Array.isArray(rows) && rows.length > 0;
+  const items = useRows ? rows : stage?.waypoints || [];
+  const count = items.length;
   const usable = count >= 2;
+
+  // Short noun used everywhere in the UI copy so a mode switch changes
+  // consistently. "WP 2" / "row 2".
+  const noun = useRows ? "row" : "WP";
+  const nounPlural = useRows ? "rows" : "waypoints";
 
   const [open, setOpen] = useState(defaultOpen);
   // Default to "whole stage" — From=1, To=last. The common-case tap.
   const [fromN, setFromN] = useState(1);
   const [toN, setToN] = useState(count >= 2 ? count : 2);
 
-  // Re-clamp To when the stage's waypoint count changes (e.g. live
-  // capture in Record adds another WP, or the user switches stages
-  // in Review). Keeps the form sensible without resetting the user's
-  // chosen From.
+  // Re-clamp To when the count changes (live-capture in Record adds a
+  // WP, or the user switches stages in Review). Keeps the form
+  // sensible without resetting the user's chosen From.
   React.useEffect(() => {
     if (count >= 2 && toN > count) setToN(count);
   }, [count, toN]);
 
-  const calc = usable ? computeWpSpeed(stage, fromN, toN) : null;
-  // Only meaningful when the range is valid; null is treated as "—".
-  const stationaryMs =
-    usable && calc?.ok ? computeStationaryMs(stage, fromN, toN) : null;
-  // Moving average — speed over just the moving time (duration minus
-  // stationary). Null when the whole window was stationary or the
-  // stationary figure is unavailable.
-  const movingKmh = calc?.ok
-    ? computeMovingSpeedKmh(calc.result.distanceM, calc.result.durationMs, stationaryMs)
+  const calc = usable
+    ? useRows
+      ? computeRowSpeed(stage, rows, fromN, toN)
+      : computeWpSpeed(stage, fromN, toN)
     : null;
+  const stationaryMs =
+    usable && calc?.ok
+      ? useRows
+        ? computeRowStationaryMs(stage, rows, fromN, toN)
+        : computeStationaryMs(stage, fromN, toN)
+      : null;
+  const movingKmh = calc?.ok
+    ? computeMovingSpeedKmh(
+        calc.result.distanceM,
+        calc.result.durationMs,
+        stationaryMs,
+      )
+    : null;
+
+  // Row mode is naturally bounded (rows exists as a real array); WP
+  // mode gets a raised ceiling per PR #107 so future large stages
+  // aren't capped by the spinner.
+  const maxAllowed = useRows ? count : Math.max(count, 100);
 
   return (
     <div
@@ -81,7 +117,7 @@ export default function AvgSpeedPanel({
             ? open
               ? "Hide Avg Speed"
               : "Show Avg Speed"
-            : "Need at least 2 waypoints"
+            : `Need at least 2 ${nounPlural}`
         }
       >
         <span className="text-base" aria-hidden="true">
@@ -90,10 +126,10 @@ export default function AvgSpeedPanel({
         <span>Avg Speed</span>
         <span className="ml-auto text-xs text-gray-500">
           {count === 0
-            ? "no waypoints yet"
+            ? `no ${nounPlural} yet`
             : count === 1
-              ? "1 waypoint — need at least 2"
-              : `${count} waypoints`}
+              ? `1 ${noun} — need at least 2`
+              : `${count} ${nounPlural}`}
         </span>
         {usable && (
           <span
@@ -114,11 +150,11 @@ export default function AvgSpeedPanel({
         <div className="px-3 pb-3 pt-1 border-t border-gray-100 space-y-2">
           <div className="flex items-center gap-2 text-sm">
             <label className="flex items-center gap-1 text-gray-700">
-              From WP
+              From {noun}
               <input
                 type="number"
                 min={1}
-                max={Math.max(count, 100)}
+                max={maxAllowed}
                 value={fromN}
                 onChange={(e) => setFromN(Number(e.target.value) || 1)}
                 className="w-16 px-2 py-1 rounded border border-gray-300 bg-white text-right tabular-nums"
@@ -126,11 +162,11 @@ export default function AvgSpeedPanel({
             </label>
             <span className="text-gray-400">→</span>
             <label className="flex items-center gap-1 text-gray-700">
-              To WP
+              To {noun}
               <input
                 type="number"
                 min={1}
-                max={Math.max(count, 100)}
+                max={maxAllowed}
                 value={toN}
                 onChange={(e) => setToN(Number(e.target.value) || 1)}
                 className="w-16 px-2 py-1 rounded border border-gray-300 bg-white text-right tabular-nums"
@@ -142,7 +178,7 @@ export default function AvgSpeedPanel({
             <div className="text-xs text-gray-800 space-y-0.5 leading-snug">
               <div className="text-gray-500">
                 <span className="font-medium text-gray-700">
-                  WP {calc.result.fromIdx + 1}
+                  {noun} {calc.result.fromIdx + 1}
                 </span>{" "}
                 "{calc.result.fromLabel}"{" "}
                 <span className="tabular-nums">
@@ -150,7 +186,7 @@ export default function AvgSpeedPanel({
                 </span>{" "}
                 →{" "}
                 <span className="font-medium text-gray-700">
-                  WP {calc.result.toIdx + 1}
+                  {noun} {calc.result.toIdx + 1}
                 </span>{" "}
                 "{calc.result.toLabel}"{" "}
                 <span className="tabular-nums">
@@ -200,7 +236,8 @@ export default function AvgSpeedPanel({
             </div>
           ) : (
             <div className="text-xs text-red-700">
-              {calc?.error?.message || "Choose two different waypoints."}
+              {calc?.error?.message ||
+                `Choose two different ${nounPlural}.`}
             </div>
           )}
         </div>

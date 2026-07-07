@@ -618,8 +618,14 @@ export default function ReviewMode() {
             roadbook list scrolls. */}
         {stage && (
           <div className="px-3 pb-2">
+            {/* Pass the currently-displayed roadbook rows (driver view
+                by default, raw view when toggled) so the panel's "From
+                row / To row" numbering matches the map markers and the
+                roadbook list — no mental mapping between "row 30 on the
+                map" and "WP 22 in the panel". */}
             <AvgSpeedPanel
               stage={stage}
+              rows={rows}
               defaultOpen={true}
               className="text-xs"
             />
