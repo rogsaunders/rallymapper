@@ -12,9 +12,13 @@
 //      top-level *_stage.json), and applies an edited Printable/roadbook.docx
 //      overlay if present (M5 note patches).
 //   2. A bare JSON file — stage.json or raw roadbook shape.
+//   3. A GPX file (e.g. a Rally Navigator export) — the track is run through
+//      generateRoadbook() to build a roadbook with real tulips. See gpxImport.js.
 
 import JSZip from "jszip";
 import { extractDocxNotePatches, applyNotePatches } from "./docxPatch";
+import { parseGpxToStage } from "../../roadbook/gpxImport";
+import { generateRoadbook } from "../../roadbook/roadbookEngine";
 
 const STAGE_JSON_LEGACY = /_stage\.json$/;
 const DOCX_PATH_PRIMARY = "Printable/roadbook.docx";
@@ -194,9 +198,29 @@ export async function parseRouteFile(file) {
     }
   } else if (lower.endsWith(".json")) {
     parsed = JSON.parse(await file.text());
+  } else if (lower.endsWith(".gpx")) {
+    // GPX (e.g. a Rally Navigator export): parse to a stage, then run the same
+    // recording engine a live capture uses so the import gets real tulips and
+    // turn detection. Shape it like a parsed stage so normalise() picks it up.
+    //
+    // We build the roadbook from the TRACK ONLY — deliberately not injecting the
+    // RN <wpt>s. Their instruction content is a rendered PNG tulip we can't read
+    // (no symbol codes), and in practice they're sparse route-shaping vertices;
+    // feeding them in floods the turn-by-turn with generic "Note" rows on long
+    // straights. The dense track gives a clean, real roadbook. parseGpxToStage
+    // still returns them (schema documentation + waypoint count) for future use.
+    const stage = parseGpxToStage(await file.text());
+    parsed = {
+      roadbook: generateRoadbook({
+        trackPoints: stage.trackPoints,
+        meta: stage.meta,
+      }),
+      trackPoints: stage.trackPoints,
+      meta: stage.meta,
+    };
   } else {
     throw new Error(
-      "Unsupported file type. Drop a RouteMapper export ZIP or a stage.json file.",
+      "Unsupported file type. Drop a RouteMapper export ZIP, a stage.json, or a GPX file.",
     );
   }
 

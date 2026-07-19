@@ -44,13 +44,13 @@ export default function SourcePicker({ onPick, error, isLoading, libraryHref }) 
           className="w-full px-4 py-3 rounded-xl text-white font-semibold disabled:opacity-50"
           style={{ backgroundColor: "#588233" }}
         >
-          {isLoading ? "Loading…" : "📂 Load roadbook (ZIP or JSON)"}
+          {isLoading ? "Loading…" : "📂 Load roadbook (ZIP, JSON or GPX)"}
         </button>
 
         <input
           ref={inputRef}
           type="file"
-          accept=".zip,.json,application/zip,application/json"
+          accept=".zip,.json,.gpx,application/zip,application/json,application/gpx+xml"
           onChange={onFileSelected}
           className="hidden"
         />
