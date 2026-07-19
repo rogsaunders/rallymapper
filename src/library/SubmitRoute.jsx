@@ -231,8 +231,9 @@ export default function SubmitRoute() {
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-gray-900">Submit a route</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Upload a RouteMapper export ZIP (or <code>stage.json</code>). We'll
-          read its stats automatically — you add the details.
+          Upload a RouteMapper export ZIP (or <code>stage.json</code>, or a
+          Rally Navigator <code>.gpx</code>). We'll read its stats
+          automatically — you add the details.
         </p>
 
         <div className="mt-5">
@@ -241,7 +242,7 @@ export default function SubmitRoute() {
             {parsing ? "Reading…" : file ? "📂 Choose a different file" : "📂 Choose route file"}
             <input
               type="file"
-              accept=".zip,.json,application/zip,application/json"
+              accept=".zip,.json,.gpx,application/zip,application/json,application/gpx+xml"
               onChange={onFile}
               className="hidden"
               disabled={parsing}

@@ -115,6 +115,7 @@ export default defineConfig({
             accept: {
               "application/zip": [".zip"],
               "application/json": [".json"],
+              "application/gpx+xml": [".gpx"],
             },
           },
         ],

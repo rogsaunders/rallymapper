@@ -81,6 +81,6 @@ export function deriveListingMetadata({ roadbook, trackPoints, stageMeta } = {})
     waypoint_count,
     ...bbox,
     // Suggestions to pre-fill the form (not stored directly):
-    suggestedTitle: stageMeta?.stageName || stageMeta?.routeName || "",
+    suggestedTitle: stageMeta?.stageName || stageMeta?.routeName || stageMeta?.title || "",
   };
 }

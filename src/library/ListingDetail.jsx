@@ -170,7 +170,7 @@ export default function ListingDetail() {
                 download
                 className="mt-3 sm:mt-0 sm:ml-3 inline-block text-sm text-gray-600 hover:underline"
               >
-                Download ZIP
+                Download file
               </a>
             )}
             {isAdmin && (

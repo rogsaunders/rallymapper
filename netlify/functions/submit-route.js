@@ -109,9 +109,15 @@ exports.handler = async (event) => {
   const buffer = Buffer.from(fileBase64, "base64");
   const safeName = String(fileName).replace(/[^\w.-]+/g, "_");
   const path = `${user.id}/${listing.id}/${safeName}`;
+  const lowerName = safeName.toLowerCase();
+  const contentType = lowerName.endsWith(".gpx")
+    ? "application/gpx+xml"
+    : lowerName.endsWith(".json")
+      ? "application/json"
+      : "application/zip";
   const { error: uerr } = await admin.storage
     .from("route-files")
-    .upload(path, buffer, { contentType: "application/zip", upsert: true });
+    .upload(path, buffer, { contentType, upsert: true });
   if (uerr) {
     // Roll back the orphaned listing so a failed upload leaves nothing behind.
     await admin.from("route_listings").delete().eq("id", listing.id);
