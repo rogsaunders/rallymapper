@@ -51,15 +51,79 @@ const TRK_NAME_RE = /<trk\b[\s\S]*?<name>([\s\S]*?)<\/name>/;
 
 const UNTITLED_RE = /^untitled[_\s-]*\d+$/i;
 
+// ── Naming ───────────────────────────────────────────────────────────────────
+// A GPX carries no stage identity worth showing: RN's <trk><name> is whatever
+// the logger wrote ("ACTIVE LOG 001"). The filename is far better, because a
+// RouteMapper export is named by stageFilenameBase() as
+// `Trip_DayN_Route_Stage` — so we can recover most of the identity from it.
+
+/**
+ * Collapse an immediately-repeated block of underscore-separated tokens.
+ *
+ * Seen in the field: a stage named after its route yields
+ *   `ERCA_2026_Day7_Route07_01_Tanami_to_Wolfe_Creek_1_Route07_01_Tanami_to_Wolfe_Creek_1_-_Stage_2`
+ * because stageFilenameBase() concatenates route + stage and the author had put
+ * the route name inside the stage name too. That's valid input, not a bug — but
+ * the doubled run makes a poor title, so fold `X_X` back to `X`.
+ *
+ * Only blocks of 2+ tokens are collapsed: a lone repeated token is far more
+ * likely to be meaningful (`..._Creek_1_1`) than an accident.
+ */
+export function collapseRepeatedBlock(stem) {
+  const t = String(stem).split("_");
+  for (let len = Math.floor(t.length / 2); len >= 2; len--) {
+    for (let i = 0; i + 2 * len <= t.length; i++) {
+      const a = t.slice(i, i + len).join("_");
+      const b = t.slice(i + len, i + 2 * len).join("_");
+      if (a === b) {
+        return [...t.slice(0, i + len), ...t.slice(i + 2 * len)].join("_");
+      }
+    }
+  }
+  return String(stem);
+}
+
+/** Underscored slug → readable text. Mirrors safeName()'s transform in reverse. */
+function humanise(s) {
+  return String(s).replace(/_+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Derive stage-identity fields from a GPX filename, so Travel's header shows
+ * the label the navigator used to find the file rather than "Untitled".
+ *
+ * Recognises the RouteMapper export shape `Trip_DayN_<rest>`; `<rest>` is
+ * route+stage, which can't be split unambiguously, so it becomes the stage
+ * name (Travel renders that as the headline). Anything else → whole stem as
+ * the stage name. Returns fields consumed by stageDisplayParts().
+ */
+export function metaFromFilename(filename) {
+  if (!filename) return {};
+  const stem = collapseRepeatedBlock(
+    String(filename).replace(/\.[^.]+$/, ""),
+  );
+  if (!stem) return {};
+  const m = /^(.+?)_Day(\d+)_(.+)$/.exec(stem);
+  if (m) {
+    return {
+      tripName: humanise(m[1]),
+      dayNumber: Number(m[2]),
+      stageName: humanise(m[3]),
+    };
+  }
+  return { stageName: humanise(stem) };
+}
+
 /**
  * Parse GPX text into { trackPoints, waypoints, meta }.
  *   trackPoints: [{ lat, lon, ele? }]           — dense recorded path
  *   waypoints:   [{ lat, lon, icon, note?, cap?, distanceFromStartM }]
  *                (empty unless the file carries openrally waypoint extensions)
- *   meta:        { title, source, creator, units, format, totalDistanceKm }
+ *   meta:        { title, source, creator, units, format, totalDistanceKm,
+ *                  + tripName/dayNumber/stageName when `filename` is given }
  * Throws if the file has no usable track.
  */
-export function parseGpxToStage(text) {
+export function parseGpxToStage(text, filename = "") {
   if (typeof text !== "string" || !text.includes("<gpx")) {
     throw new Error("Not a GPX file.");
   }
@@ -116,8 +180,16 @@ export function parseGpxToStage(text) {
   const creator = CREATOR_RE.exec(text);
   const trkName = TRK_NAME_RE.exec(text);
 
+  // Filename-derived identity beats <trk><name>, which is logger noise
+  // ("ACTIVE LOG 001") rather than anything the author chose.
+  const named = metaFromFilename(filename);
+
   const meta = {
-    title: (trkName ? trkName[1].trim() : "") || "Imported GPX route",
+    ...named,
+    title:
+      named.stageName ||
+      (trkName ? trkName[1].trim() : "") ||
+      "Imported GPX route",
     source: "gpx-import",
     creator: creator ? creator[1] : null,
     units: units ? units[1].trim() : "metric",
