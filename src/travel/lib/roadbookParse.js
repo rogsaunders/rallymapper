@@ -105,13 +105,20 @@ function buildReaderRoadbook(roadbook) {
   return { ...roadbook, rows: displayRows };
 }
 
+// A real coordinate. Guards the Number() coercion traps: Number(null) and
+// Number("") are both 0, which would otherwise sail through isFinite() and
+// place a stage's start at 0°,0° (the synthetic START row carries lat/lon null).
+function isCoord(v) {
+  return v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
+}
+
 function extractStartCoords(parsed) {
   const candidates = [parsed?.startGPS, parsed?.stage?.startGPS];
   for (const c of candidates) {
     if (!c) continue;
-    const lat = Number(c.lat);
-    const lon = Number(c.lon);
-    if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+    if (isCoord(c.lat) && isCoord(c.lon)) {
+      return { lat: Number(c.lat), lon: Number(c.lon) };
+    }
   }
   return null;
 }
@@ -155,11 +162,11 @@ function normalise(parsed) {
 export function pickStartCoords(startCoords, roadbookRows, trackPoints) {
   if (startCoords) return startCoords;
   const firstRow = (roadbookRows || []).find(
-    (r) => Number.isFinite(Number(r?.lat)) && Number.isFinite(Number(r?.lon)),
+    (r) => isCoord(r?.lat) && isCoord(r?.lon),
   );
   if (firstRow) return { lat: Number(firstRow.lat), lon: Number(firstRow.lon) };
   const firstTrack = (trackPoints || []).find(
-    (p) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lon)),
+    (p) => isCoord(p?.lat) && isCoord(p?.lon),
   );
   if (firstTrack) {
     return { lat: Number(firstTrack.lat), lon: Number(firstTrack.lon) };
@@ -209,7 +216,7 @@ export async function parseRouteFile(file) {
     // feeding them in floods the turn-by-turn with generic "Note" rows on long
     // straights. The dense track gives a clean, real roadbook. parseGpxToStage
     // still returns them (schema documentation + waypoint count) for future use.
-    const stage = parseGpxToStage(await file.text());
+    const stage = parseGpxToStage(await file.text(), file.name);
     parsed = {
       roadbook: generateRoadbook({
         trackPoints: stage.trackPoints,
@@ -217,6 +224,9 @@ export async function parseRouteFile(file) {
       }),
       trackPoints: stage.trackPoints,
       meta: stage.meta,
+      // The first track point IS the recorded start line. Without this the
+      // PreStart map has no explicit start and has to fall back.
+      startGPS: stage.trackPoints[0] ?? null,
     };
   } else {
     throw new Error(
