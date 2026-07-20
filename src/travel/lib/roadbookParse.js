@@ -216,7 +216,7 @@ export async function parseRouteFile(file) {
     // feeding them in floods the turn-by-turn with generic "Note" rows on long
     // straights. The dense track gives a clean, real roadbook. parseGpxToStage
     // still returns them (schema documentation + waypoint count) for future use.
-    const stage = parseGpxToStage(await file.text());
+    const stage = parseGpxToStage(await file.text(), file.name);
     parsed = {
       roadbook: generateRoadbook({
         trackPoints: stage.trackPoints,
