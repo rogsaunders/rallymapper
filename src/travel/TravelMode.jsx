@@ -227,6 +227,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
         />
         <PreStart
           startCoords={startCoords}
+          trackPoints={trackPoints}
           gps={gps}
           gpsError={gpsError}
           triggerRadiusM={triggerRadiusM}
