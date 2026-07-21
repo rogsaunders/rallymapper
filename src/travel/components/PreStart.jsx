@@ -21,7 +21,7 @@
 //     the parent (DriveMode) skips PreStart entirely and drops into
 //     the regular Drive UI.  PreStart assumes startCoords is non-null.
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   renderMapToCanvas,
   computeBounds,
@@ -38,6 +38,17 @@ const MAP_HEIGHT = 480;
 // the user-position dot disappearing off-screen for normal approaches.
 // At ~zoom 16 this fits a typical staging-area neighbourhood.
 const MAP_PADDING_M = 500;
+
+// Ceiling on the "fit start + user" frame. Fitting both is genuinely useful in
+// the same region (e.g. driving in from a nearby town — the ~10 km case looks
+// great). But the common planning case is loading a stage the night before from
+// home, often interstate (start 1000s of km away), where fitting both zooms out
+// to the whole continent and the start is a meaningless dot. Past this span we
+// drop the user and frame the start locally; the "N km to start · <dir>" line
+// conveys the far-away relationship. ~40 km keeps the near-region view while
+// killing the continental one. (Below MAP_PADDING_M*2 we floor the zoom-in
+// instead — user effectively on the start.)
+const MAX_FIT_SPAN_M = 40000;
 
 // Pad a single point into a bbox the renderer can fit.  Approximation:
 // 1 deg lat ≈ 111 km, 1 deg lon ≈ 111 km · cos(lat).  Good enough for
@@ -62,6 +73,7 @@ const STATUS_DISC = {
 
 export default function PreStart({
   startCoords,
+  trackPoints,
   gps,
   gpsError,
   triggerRadiusM,
@@ -75,9 +87,19 @@ export default function PreStart({
   const { status, distanceM, octant } = proximity;
   const disc = STATUS_DISC[status] || STATUS_DISC["no-gps"];
 
+  // The recorded track, as {lat,lon} for the renderer. Drawn as a polyline
+  // under the Start marker so the navigator can see which way the stage heads
+  // out of the start. The frame stays local to the start (see bbox logic
+  // below), so only the first stretch of route shows — the rest clips off-frame.
+  const routePositions = useMemo(() => {
+    return (trackPoints || [])
+      .map((p) => ({ lat: Number(p?.lat), lon: Number(p?.lon) }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+  }, [trackPoints]);
+
   // ── One-shot map render ────────────────────────────────────────────
-  // Renders ONCE at mount: tiles + a Start marker.  Live GPS is
-  // overlaid as a CSS-positioned dot on top so we don't re-fetch
+  // Renders ONCE at mount: tiles + a route polyline + a Start marker.  Live
+  // GPS is overlaid as a CSS-positioned dot on top so we don't re-fetch
   // tiles every GPS tick.
   const [mapDataUrl, setMapDataUrl] = useState(null);
   const [mapBounds, setMapBounds] = useState(null);
@@ -93,28 +115,33 @@ export default function PreStart({
         // a wider range of staging-area starts.
         let bbox;
         if (gps) {
-          bbox = computeBounds([
+          const fit = computeBounds([
             [startCoords.lat, startCoords.lon],
             [gps.lat, gps.lon],
           ]);
-          // Floor at MAP_PADDING_M so the map isn't absurdly zoomed
-          // in when the user is already standing on the start.
-          const minSpanM = MAP_PADDING_M * 2;
-          const spanLatM =
-            (bbox[1][0] - bbox[0][0]) * 111_000;
+          const spanLatM = (fit[1][0] - fit[0][0]) * 111_000;
           const spanLonM =
-            (bbox[1][1] - bbox[0][1]) *
+            (fit[1][1] - fit[0][1]) *
             111_000 *
             Math.cos((startCoords.lat * Math.PI) / 180);
-          if (spanLatM < minSpanM || spanLonM < minSpanM) {
-            bbox = bboxAround(startCoords, MAP_PADDING_M);
-          }
+          // Include the user only in a sensible mid-range. Too tight (< 2·pad):
+          // they're on the start. Too wide (> MAX_FIT_SPAN_M): they're far away
+          // (typically planning from home). Either way, frame the start locally
+          // so its surroundings are legible; otherwise fit both.
+          const tooTight =
+            spanLatM < MAP_PADDING_M * 2 || spanLonM < MAP_PADDING_M * 2;
+          const tooWide =
+            spanLatM > MAX_FIT_SPAN_M || spanLonM > MAX_FIT_SPAN_M;
+          bbox =
+            tooTight || tooWide
+              ? bboxAround(startCoords, MAP_PADDING_M)
+              : fit;
         } else {
           bbox = bboxAround(startCoords, MAP_PADDING_M);
         }
 
         const canvas = await renderMapToCanvas({
-          routePositions: [],
+          routePositions,
           waypoints: [
             {
               lat: startCoords.lat,
@@ -147,7 +174,7 @@ export default function PreStart({
     // does influence the bbox, but subsequent fixes only move the
     // overlay dot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startCoords?.lat, startCoords?.lon, tileSource]);
+  }, [startCoords?.lat, startCoords?.lon, tileSource, routePositions]);
 
   // ── Voice announcement on green transition ─────────────────────────
   // useRef tracks the previous status so we fire the "At start" voice
