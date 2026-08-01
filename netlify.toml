@@ -14,5 +14,16 @@
   command = "npm run ${RM_BUILD_CMD:-build}"
   publish = "dist"
 
+# Pin the build (and function-runtime) Node version. Netlify's Noble build image
+# now defaults to Node 24, and on 24 the Git build's function bundling produced
+# functions that crashed at runtime with 502s (Cannot-find-module), even though
+# package.json already declares their deps (stripe, @supabase/supabase-js). The
+# same code deployed via `netlify deploy --functions` (bundled locally on Node
+# 22) worked. Pinning to 22 — which matches the function runtime (nodejs22.x)
+# and our local/tested builds — restores that known-good behaviour for Git
+# deploys. Both sites share this file, so this fixes app + go alike.
+[build.environment]
+  NODE_VERSION = "22"
+
 [functions]
   directory = "netlify/functions"
