@@ -12,6 +12,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "4178", "--directory", "dist-travel"],
       "port": 4178
+    },
+    {
+      "name": "travel-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--config", "vite.travel.config.js", "--port", "5174", "--host"],
+      "port": 5174
     }
   ]
 }

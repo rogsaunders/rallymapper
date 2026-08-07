@@ -32,12 +32,14 @@ import FooterBar from "./components/FooterBar";
 import RoadbookView from "../components/roadbook/RoadbookView";
 import SettingsPanel from "./components/SettingsPanel";
 import PreStart from "./components/PreStart";
+import DebugHud from "./components/DebugHud";
 
 // localStorage keys — settings persist across sessions
 const LS_AUTO_ADVANCE = "rm_drive_auto_advance";
 const LS_TRIGGER_RADIUS = "rm_drive_trigger_radius_m";
 const LS_OVERRIDE_MS = "rm_drive_override_ms";
 const LS_VOICE_ENABLED = "rm_drive_voice_enabled";
+const LS_SHOW_DEBUG = "rm_drive_show_debug";
 
 function readBool(key, fallback) {
   const v = localStorage.getItem(key);
@@ -95,6 +97,9 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   const [voiceEnabled, setVoiceEnabled] = useState(() =>
     readBool(LS_VOICE_ENABLED, true),
   );
+  const [showDebug, setShowDebug] = useState(() =>
+    readBool(LS_SHOW_DEBUG, false),
+  );
 
   // Persist on change
   useEffect(() => {
@@ -109,6 +114,9 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   useEffect(() => {
     localStorage.setItem(LS_VOICE_ENABLED, String(voiceEnabled));
   }, [voiceEnabled]);
+  useEffect(() => {
+    localStorage.setItem(LS_SHOW_DEBUG, String(showDebug));
+  }, [showDebug]);
 
   // Annotate rows with their nearest-track-index ONCE per roadbook
   // load. Without this, computeAlongTrackDistance can't find the
@@ -251,6 +259,8 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
           voiceTest={() =>
             voiceSpeak("Voice readout test. Next row in 0.4 kilometres.")
           }
+          showDebug={showDebug}
+          setShowDebug={setShowDebug}
         />
       </div>
     );
@@ -287,6 +297,21 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
         canPrev={currentIndex != null && currentIndex > 0}
         canNext={currentIndex != null && currentIndex < annotatedRows.length - 1}
       />
+      {showDebug && (
+        <DebugHud
+          gps={gps}
+          nextDistance={nextDistance}
+          currentIndex={currentIndex}
+          targetTrackIdx={
+            currentIndex != null
+              ? annotatedRows[currentIndex]?._trackIdx
+              : null
+          }
+          rowCount={annotatedRows.length}
+          isPaused={isPaused}
+          isOverriding={isOverriding}
+        />
+      )}
       <SettingsPanel
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

@@ -24,6 +24,8 @@ export default function SettingsPanel({
   setVoiceEnabled,
   voiceSupported,
   voiceTest,
+  showDebug,
+  setShowDebug,
 }) {
   if (!open) return null;
 
@@ -153,6 +155,26 @@ export default function SettingsPanel({
               🔊 Test voice
             </button>
           )}
+        </div>
+
+        {/* Diagnostics (debug HUD) */}
+        <div className="mb-5 pt-4 border-t border-gray-200">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!!showDebug}
+              onChange={(e) => setShowDebug?.(e.target.checked)}
+              className="w-5 h-5 accent-[#588233]"
+            />
+            <span className="font-medium text-gray-800">
+              🛠 Show diagnostics
+            </span>
+          </label>
+          <p className="text-xs text-gray-500 mt-1 ml-8 leading-snug">
+            Overlay live GPS, track offset and auto-advance state while
+            driving. For troubleshooting why the current row does or
+            doesn't keep up — leave off for normal use.
+          </p>
         </div>
 
         <button
