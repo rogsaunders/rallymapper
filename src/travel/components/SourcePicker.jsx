@@ -33,8 +33,8 @@ export default function SourcePicker({ onPick, error, isLoading, libraryHref }) 
         </h1>
         <p className="text-sm text-gray-600 mb-6">
           Load a roadbook to follow on the road, trail, or track.
-          RouteMapper export ZIP, or a standalone{" "}
-          <code>stage.json</code>.
+          RouteMapper export ZIP, a standalone <code>stage.json</code>,
+          or a <code>.gpx</code> track.
         </p>
 
         <button

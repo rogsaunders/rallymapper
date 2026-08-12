@@ -3,14 +3,18 @@
 // Announce row-change events using the Web Speech API's
 // speechSynthesis. Fires on every currentIndex change while enabled.
 //
-// Format:  "<icon/event words>. <user notes>. then <km> to the next."
+// Format:  "Next. <icon/event words>. In <km> kilometres. <user notes>."
+//   - fires when a waypoint becomes current — i.e. just as you reach the
+//     previous one — so it names the turn you're now heading to.
 //   - icon/event words come from a small dictionary mapping the row's
 //     icon ID or eventType to a plain spoken phrase ("left", "keep
 //     left", "T-junction right", "danger two", etc.)
+//   - the distance is THIS row's own kmPartial: the leg leading into it,
+//     i.e. how far to reach the turn just named. (Earlier versions spoke
+//     the FOLLOWING leg's distance — the right turn but the wrong number
+//     — which read as confusing in the field.)
 //   - user notes are appended only if they add information beyond the
 //     icon word (avoids "left. left.")
-//   - distance-to-next is the next row's kmPartial (the navigator's
-//     standard lead-in distance)
 //
 // iOS Safari quirk: the very first speechSynthesis.speak() call after
 // page load must originate from a user gesture. If a row auto-advances
@@ -110,25 +114,32 @@ function wordsFor(row) {
   return "next";
 }
 
-function composeAnnouncement(row, nextRow) {
+function composeAnnouncement(row) {
   if (!row) return "";
-  const headline = wordsFor(row);
-  const parts = [headline];
+
+  // Lead with "Next," and pair the instruction with the distance to
+  // REACH it — this row's own kmPartial, the leg from the previous
+  // waypoint into this one. So the driver hears the upcoming action and
+  // how far to it: "Next. Turn right. In 3.2 kilometres."
+  let instruction = wordsFor(row);
+  // Bare turn words read more naturally with a verb ("turn right").
+  if (instruction === "left" || instruction === "right") {
+    instruction = `turn ${instruction}`;
+  }
+  const parts = [`Next. ${instruction}`];
+
+  const km = Number(row.kmPartial);
+  if (Number.isFinite(km) && km >= 0.1) {
+    parts.push(`In ${km.toFixed(1)} kilometres`);
+  }
 
   const notes = (row.notes || "").trim();
-  if (notes && notes.toLowerCase() !== headline.toLowerCase()) {
+  if (notes && notes.toLowerCase() !== instruction.toLowerCase()) {
     // Cap at 100 chars to keep the utterance bounded
     parts.push(notes.length > 100 ? notes.slice(0, 100) + "…" : notes);
   }
 
-  if (nextRow && Number.isFinite(Number(nextRow.kmPartial))) {
-    const km = Number(nextRow.kmPartial);
-    if (km >= 0.1) {
-      parts.push(`then ${km.toFixed(1)} to the next`);
-    }
-  }
-
-  return parts.join(". ");
+  return parts.join(". ") + ".";
 }
 
 export function useVoiceReadout({ enabled, currentIndex, rows }) {
@@ -146,8 +157,7 @@ export function useVoiceReadout({ enabled, currentIndex, rows }) {
 
     const row = rows?.[currentIndex];
     if (!row) return;
-    const nextRow = rows?.[currentIndex + 1] || null;
-    const text = composeAnnouncement(row, nextRow);
+    const text = composeAnnouncement(row);
     if (!text) return;
 
     try {
