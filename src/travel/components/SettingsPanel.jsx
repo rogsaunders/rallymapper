@@ -141,7 +141,7 @@ export default function SettingsPanel({
           </label>
           <p className="text-xs text-gray-500 mt-1 ml-8 leading-snug">
             {voiceSupported
-              ? "Announce each row as it becomes current. Format: instruction, your note, then distance to the next row."
+              ? "Announce the next turn as you reach each waypoint. Format: “Next, turn right, in 3.2 kilometres” — the upcoming instruction and how far to reach it."
               : "Not supported in this browser. Try Safari on iOS / iPadOS, or Chrome on desktop / Android."}
           </p>
           {voiceSupported && (
