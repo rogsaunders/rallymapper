@@ -106,10 +106,15 @@ const RoadbookRow = forwardRef(function RoadbookRow(
 
   const isCurrent = position === "current";
 
+  // Travel Mode's "you are here" band. Field testing (moving vehicle,
+  // daylight) showed the old amber-50 fill was too faint to pick out at
+  // a glance, so the current row now gets a solid amber-200 fill, a
+  // heavier amber-600 accent bar and a soft ring to lift it off the
+  // list. Review Mode's yellow "selected" band is left as-is.
   const containerCls = selected
     ? "bg-yellow-50 border-l-4 border-yellow-500 pl-3"
     : isCurrent
-      ? "bg-amber-50 border-l-4 border-amber-500 pl-3"
+      ? "bg-amber-200 border-l-4 border-amber-600 pl-3 ring-1 ring-amber-400 ring-inset"
       : position === "above"
         ? "opacity-60"
         : "";
@@ -265,7 +270,11 @@ const RoadbookRow = forwardRef(function RoadbookRow(
         />
 
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-gray-900 break-words">
+          <div
+            className={`text-sm text-gray-900 break-words ${
+              isCurrent ? "font-bold" : "font-medium"
+            }`}
+          >
             {row.notes || row.eventType || "—"}
           </div>
           {row.icon && (

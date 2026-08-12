@@ -145,7 +145,7 @@ export function computeAlongTrackDistance(
     targetTrackIdx < 0 ||
     !userPos
   ) {
-    return { distance: NaN, method: "straight-line", userIdx: -1 };
+    return { distance: NaN, method: "straight-line", userIdx: -1, offsetM: NaN };
   }
 
   const { idx: userIdx, distance: userOffsetM } = findNearestTrackIndex(
@@ -154,23 +154,42 @@ export function computeAlongTrackDistance(
     userHintIdx,
   );
 
-  // User is way off the recorded track — straight-line it
+  // Passed detection FIRST — deliberately ahead of the off-track check.
+  //
+  // Field testing (2026-08) showed the active row stranding "after a
+  // while": once the live GPS sat >OFF_TRACK_THRESHOLD_M from the
+  // recorded line (separated carriageway, a survey-line offset, GPS
+  // bounce in terrain), the old ordering returned "straight-line" and
+  // never reached this check, so auto-advance could only fire within
+  // the tight trigger radius. Drive past a waypoint off-track and the
+  // pointer got left behind — and everything after it read wrong.
+  //
+  // The user's nearest-track index (kept roughly monotonic by the
+  // hint-windowed search in findNearestTrackIndex) is a usable progress
+  // signal even when the perpendicular offset is large, so we treat
+  // "past this waypoint's point on the track" as passed regardless of
+  // offset. Trade-off: on a track that doubles back near itself the
+  // nearest index can jump, so this leans on the hint window to stay
+  // local; the debug HUD surfaces userIdx/offset to confirm in the
+  // field before we lean on it further.
+  if (userIdx >= targetTrackIdx) {
+    return {
+      distance: distanceM(userPos, trackPoints[targetTrackIdx]),
+      method: "passed",
+      userIdx,
+      offsetM: userOffsetM,
+    };
+  }
+
+  // Still short of the target but way off the recorded track — we can't
+  // trust along-track summing, so straight-line it.
   if (userOffsetM > OFF_TRACK_THRESHOLD_M) {
     const target = trackPoints[targetTrackIdx];
     return {
       distance: distanceM(userPos, target),
       method: "straight-line",
       userIdx,
-    };
-  }
-
-  // User has passed the target (drove on without manual advance, or
-  // the user manually went back to look at a prior row)
-  if (userIdx >= targetTrackIdx) {
-    return {
-      distance: distanceM(userPos, trackPoints[targetTrackIdx]),
-      method: "passed",
-      userIdx,
+      offsetM: userOffsetM,
     };
   }
 
@@ -182,5 +201,5 @@ export function computeAlongTrackDistance(
   for (let i = userIdx; i < targetTrackIdx; i++) {
     total += distanceM(trackPoints[i], trackPoints[i + 1]);
   }
-  return { distance: total, method: "along-track", userIdx };
+  return { distance: total, method: "along-track", userIdx, offsetM: userOffsetM };
 }
