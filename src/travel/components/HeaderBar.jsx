@@ -20,6 +20,9 @@ export default function HeaderBar({
   voiceEnabled,
   voiceSupported,
   onToggleVoice,
+  mapAvailable = false,
+  mapOpen = false,
+  onToggleMap,
 }) {
   // Derive the same four-part identifier the ZIP filename uses so the
   // navigator's eye lands on the label they used to find the file off
@@ -63,6 +66,23 @@ export default function HeaderBar({
           >
             📝 {docxPatchCount} edit{docxPatchCount === 1 ? "" : "s"}
           </div>
+        )}
+
+        {/* Map quick toggle — only when the stage has a track to draw */}
+        {mapAvailable && (
+          <button
+            type="button"
+            onClick={onToggleMap}
+            className={`p-2 rounded-lg border text-base leading-none ${
+              mapOpen
+                ? "border-[#588233] bg-[#588233]/10 text-[#588233]"
+                : "border-gray-300 text-gray-400 bg-white hover:bg-gray-50"
+            }`}
+            title={mapOpen ? "Hide route map" : "Show route map"}
+            aria-label={mapOpen ? "Hide route map" : "Show route map"}
+          >
+            🗺
+          </button>
         )}
 
         {/* Voice quick toggle — hidden if the browser has no

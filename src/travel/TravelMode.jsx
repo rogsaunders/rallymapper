@@ -33,6 +33,8 @@ import RoadbookView from "../components/roadbook/RoadbookView";
 import SettingsPanel from "./components/SettingsPanel";
 import PreStart from "./components/PreStart";
 import DebugHud from "./components/DebugHud";
+import RouteMap from "./components/RouteMap";
+import { primeChime, playOffRouteChime } from "./lib/chime";
 
 // localStorage keys — settings persist across sessions
 const LS_AUTO_ADVANCE = "rm_drive_auto_advance";
@@ -40,6 +42,15 @@ const LS_TRIGGER_RADIUS = "rm_drive_trigger_radius_m";
 const LS_OVERRIDE_MS = "rm_drive_override_ms";
 const LS_VOICE_ENABLED = "rm_drive_voice_enabled";
 const LS_SHOW_DEBUG = "rm_drive_show_debug";
+const LS_MAP_OPEN = "rm_drive_map_open";
+
+// Perpendicular distance from the recorded line past which we call it
+// "off route" — matches the along-track engine's off-track threshold.
+const OFF_ROUTE_THRESHOLD_M = 100;
+
+function isFiniteCoord(p) {
+  return p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon));
+}
 
 function readBool(key, fallback) {
   const v = localStorage.getItem(key);
@@ -100,6 +111,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   const [showDebug, setShowDebug] = useState(() =>
     readBool(LS_SHOW_DEBUG, false),
   );
+  const [mapOpen, setMapOpen] = useState(() => readBool(LS_MAP_OPEN, true));
 
   // Persist on change
   useEffect(() => {
@@ -117,6 +129,9 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   useEffect(() => {
     localStorage.setItem(LS_SHOW_DEBUG, String(showDebug));
   }, [showDebug]);
+  useEffect(() => {
+    localStorage.setItem(LS_MAP_OPEN, String(mapOpen));
+  }, [mapOpen]);
 
   // Annotate rows with their nearest-track-index ONCE per roadbook
   // load. Without this, computeAlongTrackDistance can't find the
@@ -132,6 +147,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
     isPaused,
     isOverriding,
     nextDistance,
+    userTrackIdx,
     goPrev,
     goNext,
     jumpTo,
@@ -195,6 +211,37 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
     setHasStarted(false);
   }, [roadbook]);
 
+  // Off-route detection — drives the map badge, the position-dot colour,
+  // and a one-shot attention chime. offsetM is the live perpendicular
+  // distance from the recorded line (from the along-track computation).
+  const offsetM = nextDistance?.offsetM;
+  const isOffTrack =
+    Number.isFinite(Number(offsetM)) && Number(offsetM) > OFF_ROUTE_THRESHOLD_M;
+
+  // Chime once on each on->off transition, only while actually driving.
+  const wasOffRouteRef = useRef(false);
+  useEffect(() => {
+    if (!hasStarted) {
+      wasOffRouteRef.current = false;
+      return;
+    }
+    if (isOffTrack && !wasOffRouteRef.current) playOffRouteChime();
+    wasOffRouteRef.current = isOffTrack;
+  }, [isOffTrack, hasStarted]);
+
+  // Follow-mode centre for the map: normally you (gps), but while a
+  // manual override is active (you tapped a row or stepped Prev/Next)
+  // centre on the selected waypoint so the map flies to it, then returns
+  // to following you when the override lapses.
+  const followCoords =
+    isOverriding && isFiniteCoord(annotatedRows[currentIndex])
+      ? {
+          lat: Number(annotatedRows[currentIndex].lat),
+          lon: Number(annotatedRows[currentIndex].lon),
+        }
+      : gps;
+  const mapAvailable = Array.isArray(trackPoints) && trackPoints.length >= 2;
+
   // Hold the source picker back while the one-shot IndexedDB restore is
   // still resolving, so a resumable stage doesn't flash the picker first.
   if (restoring && !roadbook) {
@@ -239,7 +286,12 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
           gps={gps}
           gpsError={gpsError}
           triggerRadiusM={triggerRadiusM}
-          onBegin={() => setHasStarted(true)}
+          onBegin={() => {
+            // Unlock the audio context from this real user gesture so the
+            // off-route chime can play later without one (iOS requirement).
+            primeChime();
+            setHasStarted(true);
+          }}
           onCancel={clear}
           voiceSpeak={voiceSpeak}
           voiceEnabled={voiceEnabled && voiceSupported}
@@ -277,13 +329,37 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
         voiceEnabled={voiceEnabled}
         voiceSupported={voiceSupported}
         onToggleVoice={() => toggleVoice()}
+        mapAvailable={mapAvailable}
+        mapOpen={mapOpen}
+        onToggleMap={() => setMapOpen((o) => !o)}
       />
-      <RoadbookView
-        rows={annotatedRows}
-        currentIndex={currentIndex}
-        onRowTap={jumpTo}
-        scrollNonce={scrollNonce}
-      />
+      {/* Map + roadbook. Stacked on phones (collapsible map on top);
+          side-by-side on wide screens / iPad (persistent split). */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+        {mapAvailable && mapOpen && (
+          <div className="h-[40vh] lg:h-auto lg:w-[44%] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200">
+            <RouteMap
+              trackPoints={trackPoints}
+              rows={annotatedRows}
+              currentIndex={currentIndex}
+              userTrackIdx={userTrackIdx}
+              gps={gps}
+              followCoords={followCoords}
+              isOffTrack={isOffTrack}
+              offsetM={offsetM}
+              onSelectRow={jumpTo}
+            />
+          </div>
+        )}
+        <div className="flex-1 min-h-0 min-w-0 flex flex-col">
+          <RoadbookView
+            rows={annotatedRows}
+            currentIndex={currentIndex}
+            onRowTap={jumpTo}
+            scrollNonce={scrollNonce}
+          />
+        </div>
+      </div>
       <FooterBar
         gps={gps}
         gpsError={gpsError}
