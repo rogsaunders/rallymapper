@@ -41,6 +41,7 @@ const LS_AUTO_ADVANCE = "rm_drive_auto_advance";
 const LS_TRIGGER_RADIUS = "rm_drive_trigger_radius_m";
 const LS_OVERRIDE_MS = "rm_drive_override_ms";
 const LS_VOICE_ENABLED = "rm_drive_voice_enabled";
+const LS_VOICE_DELAY_MS = "rm_drive_voice_delay_ms";
 const LS_SHOW_DEBUG = "rm_drive_show_debug";
 const LS_MAP_OPEN = "rm_drive_map_open";
 
@@ -108,6 +109,14 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   const [voiceEnabled, setVoiceEnabled] = useState(() =>
     readBool(LS_VOICE_ENABLED, true),
   );
+  // Settle delay (ms) after passing a waypoint before announcing the next.
+  // 0 is a valid choice (immediate), so read it directly rather than via
+  // readNum (which treats 0 / missing as "use fallback").
+  const [voiceDelayMs, setVoiceDelayMs] = useState(() => {
+    const raw = localStorage.getItem(LS_VOICE_DELAY_MS);
+    const v = raw === null ? NaN : Number(raw);
+    return Number.isFinite(v) && v >= 0 ? v : 2500;
+  });
   const [showDebug, setShowDebug] = useState(() =>
     readBool(LS_SHOW_DEBUG, false),
   );
@@ -126,6 +135,9 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   useEffect(() => {
     localStorage.setItem(LS_VOICE_ENABLED, String(voiceEnabled));
   }, [voiceEnabled]);
+  useEffect(() => {
+    localStorage.setItem(LS_VOICE_DELAY_MS, String(voiceDelayMs));
+  }, [voiceDelayMs]);
   useEffect(() => {
     localStorage.setItem(LS_SHOW_DEBUG, String(showDebug));
   }, [showDebug]);
@@ -169,6 +181,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
     enabled: voiceEnabled,
     currentIndex,
     rows: annotatedRows,
+    announceDelayMs: voiceDelayMs,
   });
 
   // Toggle wrapper that also primes iOS Safari's speech synth on
@@ -311,6 +324,8 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
           voiceTest={() =>
             voiceSpeak("Voice readout test. Next row in 0.4 kilometres.")
           }
+          voiceDelayMs={voiceDelayMs}
+          setVoiceDelayMs={setVoiceDelayMs}
           showDebug={showDebug}
           setShowDebug={setShowDebug}
         />
