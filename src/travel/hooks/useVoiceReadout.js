@@ -142,14 +142,26 @@ function composeAnnouncement(row) {
   return parts.join(". ") + ".";
 }
 
-export function useVoiceReadout({ enabled, currentIndex, rows }) {
+export function useVoiceReadout({
+  enabled,
+  currentIndex,
+  rows,
+  announceDelayMs = 0,
+}) {
   const supported =
     typeof window !== "undefined" && "speechSynthesis" in window;
 
   const synthRef = useRef(supported ? window.speechSynthesis : null);
   const lastSpokenIdxRef = useRef(null);
 
-  // Announce on currentIndex change (when enabled and a real row)
+  // Announce on currentIndex change (when enabled and a real row).
+  //
+  // A settle delay (announceDelayMs) waits a beat AFTER you clear a
+  // waypoint before naming the next one — field feedback was that the
+  // next instruction arrived too abruptly the instant you passed a
+  // point. The timer is cleared whenever currentIndex changes again, so
+  // passing several waypoints inside the window reschedules and only the
+  // settled one speaks (no backlog of stale announcements).
   useEffect(() => {
     if (!enabled || !supported) return;
     if (currentIndex == null) return;
@@ -160,33 +172,38 @@ export function useVoiceReadout({ enabled, currentIndex, rows }) {
     const text = composeAnnouncement(row);
     if (!text) return;
 
-    try {
-      synthRef.current.cancel(); // drop any pending utterance
-      const u = new window.SpeechSynthesisUtterance(text);
-      u.lang = "en-AU";
-      u.rate = 1.0;
-      u.pitch = 1.0;
-      u.volume = 1.0;
-      synthRef.current.speak(u);
-      lastSpokenIdxRef.current = currentIndex;
-    } catch (e) {
-      console.warn("useVoiceReadout: speak failed", e);
-    }
-  }, [enabled, supported, currentIndex, rows]);
+    const idx = currentIndex;
+    const timer = setTimeout(() => {
+      try {
+        synthRef.current.cancel(); // drop any pending utterance
+        const u = new window.SpeechSynthesisUtterance(text);
+        u.lang = "en-AU";
+        u.rate = 1.0;
+        u.pitch = 1.0;
+        u.volume = 1.0;
+        synthRef.current.speak(u);
+        lastSpokenIdxRef.current = idx;
+      } catch (e) {
+        console.warn("useVoiceReadout: speak failed", e);
+      }
+    }, Math.max(0, announceDelayMs));
+
+    return () => clearTimeout(timer);
+  }, [enabled, supported, currentIndex, rows, announceDelayMs]);
 
   // Stop any pending utterance when disabled / on unmount
   useEffect(() => {
     if (!enabled && supported) {
       try {
         synthRef.current?.cancel();
-      } catch (_) {
+      } catch {
         /* ignore */
       }
     }
     return () => {
       try {
         synthRef.current?.cancel();
-      } catch (_) {
+      } catch {
         /* ignore */
       }
     };
@@ -211,7 +228,7 @@ export function useVoiceReadout({ enabled, currentIndex, rows }) {
     if (!supported) return;
     try {
       synthRef.current?.cancel();
-    } catch (_) {
+    } catch {
       /* ignore */
     }
   };

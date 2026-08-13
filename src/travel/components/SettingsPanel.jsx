@@ -24,6 +24,8 @@ export default function SettingsPanel({
   setVoiceEnabled,
   voiceSupported,
   voiceTest,
+  voiceDelayMs,
+  setVoiceDelayMs,
   showDebug,
   setShowDebug,
 }) {
@@ -154,6 +156,36 @@ export default function SettingsPanel({
             >
               🔊 Test voice
             </button>
+          )}
+
+          {voiceSupported && setVoiceDelayMs && (
+            <div className="mt-4 ml-8">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium text-gray-800">
+                  Delay before next instruction
+                </label>
+                <span className="text-sm text-gray-600 tabular-nums">
+                  {(Number(voiceDelayMs) / 1000).toFixed(1)} s
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={6000}
+                step={500}
+                value={voiceDelayMs}
+                onChange={(e) => setVoiceDelayMs(Number(e.target.value))}
+                className="w-full accent-[#588233]"
+              />
+              <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                <span>0 s (immediate)</span>
+                <span>6 s</span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1 leading-snug">
+                Wait a beat after you pass a waypoint before announcing the
+                next instruction.
+              </p>
+            </div>
           )}
         </div>
 
