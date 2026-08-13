@@ -1,34 +1,41 @@
 // src/travel/components/RouteMap.jsx
 //
-// Live vector route map for Travel Mode. Draws the recorded track as a
-// line (road ahead bold, behind faded), your live position with a
-// heading arrow, and the next-waypoint marker — all in SVG, no map
-// tiles, so it works offline in no-signal terrain. See project_travel_
-// livemap for the locked design decisions.
+// Live route map for Travel Mode.
 //
-// North-up. Two framings:
-//   • follow (default) — frames you together with the next waypoint, so
-//     both stay on screen; re-centres as you drive.
-//   • overview — the whole stage at once (tap the ⤢ button).
+// Layers (bottom to top):
+//   1. TileLayer  — optional raster backdrop (satellite / street / topo),
+//      shown when online; Phase 2. Off/offline → nothing, vector shows.
+//   2. SVG vector — the recorded track (ahead bold, behind faded, white
+//      casing so it reads over imagery), your live position + heading, the
+//      next-waypoint marker, tappable dots for every row.
+//
+// Web Mercator throughout (see mapProjection) so tiles + vectors align.
+// North-up. Follow framing (you + next waypoint) by default; a corner
+// button toggles the whole-stage overview. See project_travel_livemap.
 //
 // Map ↔ list link: every roadbook row with coords is a tappable dot;
-// tapping selects that row (onSelectRow). The current row is drawn as an
-// amber numbered marker matching the highlighted row in the list.
-//
-// Off-route: when the parent says you've drifted (isOffTrack), the
-// position dot turns amber and an "Off route · N m" badge shows. The
-// audible cue is fired by the parent (chime.js), not here.
+// tapping selects that row. Off-route (isOffTrack from the parent) turns
+// the position dot amber and shows an "Off route · N m" badge.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  fitProjector,
+  fitView,
   decimateTrack,
   headingAlongTrack,
 } from "../lib/mapProjection";
+import { tileSourceAttribution } from "../../export/staticMapRenderer";
+import TileLayer from "./TileLayer";
 
-const FOLLOW_MIN_SPAN_M = 700; // don't zoom in tighter than this
-const FOLLOW_MAX_SPAN_M = 8000; // don't zoom out wider than this
-const RENDER_MAX_POINTS = 500; // decimation ceiling for the line
+const RENDER_MAX_POINTS = 500;
+const FOLLOW_MIN_ZOOM = 13;
+const FOLLOW_MAX_ZOOM = 18;
+const OVERVIEW_MIN_ZOOM = 3;
+const OVERVIEW_MAX_ZOOM = 18;
+
+const LS_TILE_MODE = "rm_drive_tile_mode";
+const TILE_CYCLE = ["satellite", "street", "topo", "off"];
+const TILE_LABEL = { satellite: "🛰 Satellite", street: "🗺 Street", topo: "⛰ Topo", off: "▨ Vector" };
+const SOURCE_KEY = { satellite: "esri_imagery", street: "osm", topo: "opentopo" };
 
 function useElementSize() {
   const ref = useRef(null);
@@ -64,23 +71,26 @@ export default function RouteMap({
   onSelectRow,
 }) {
   const [followMode, setFollowMode] = useState(true);
+  const [tileMode, setTileMode] = useState(() => {
+    const v = typeof localStorage !== "undefined" && localStorage.getItem(LS_TILE_MODE);
+    return v && TILE_CYCLE.includes(v) ? v : "satellite";
+  });
+  useEffect(() => {
+    localStorage.setItem(LS_TILE_MODE, tileMode);
+  }, [tileMode]);
+
   const [wrapRef, { w: measuredW, h: measuredH }] = useElementSize();
   const w = measuredW || 400;
   const h = measuredH || 300;
 
   const hasTrack = Array.isArray(trackPoints) && trackPoints.length >= 2;
 
-  // Decimate the dense recorded track once per load — the line doesn't
-  // need 5 m resolution and 20 k SVG points would be too heavy to redraw.
   const decTrack = useMemo(
     () => (hasTrack ? decimateTrack(trackPoints, RENDER_MAX_POINTS) : []),
     [trackPoints, hasTrack],
   );
 
-  const currentRow =
-    currentIndex != null && rows ? rows[currentIndex] : null;
-  // Memoised so the projector useMemo below doesn't recompute every
-  // render on a fresh object identity.
+  const currentRow = currentIndex != null && rows ? rows[currentIndex] : null;
   const nextWp = useMemo(
     () =>
       isFiniteCoord(currentRow)
@@ -89,24 +99,28 @@ export default function RouteMap({
     [currentRow],
   );
 
-  // Choose the projector. Follow: frame [centre, next waypoint] so both
-  // stay visible, clamped so it never zooms absurdly. Overview: the whole
-  // stage. Falls back to the track when there's nothing to follow yet.
-  const { project } = useMemo(() => {
-    if (!hasTrack || w === 0) return { project: null };
+  // Web Mercator view: follow frames [centre, next waypoint]; overview
+  // frames the whole stage. Returns project() + fractional zoom + centre
+  // (the tile layer reuses the zoom/centre so it stays aligned).
+  const view = useMemo(() => {
+    if (!hasTrack || w === 0) return null;
     if (followMode) {
       const center =
         (isFiniteCoord(followCoords) && followCoords) ||
         (isFiniteCoord(gps) && gps) ||
         null;
       const focus = [center, nextWp].filter(isFiniteCoord);
-      return fitProjector(focus.length ? focus : decTrack, w, h, {
-        padding: 36,
-        minSpanM: FOLLOW_MIN_SPAN_M,
-        maxSpanM: FOLLOW_MAX_SPAN_M,
+      return fitView(focus.length ? focus : decTrack, w, h, {
+        padding: 40,
+        minZoom: FOLLOW_MIN_ZOOM,
+        maxZoom: FOLLOW_MAX_ZOOM,
       });
     }
-    return fitProjector(decTrack, w, h, { padding: 28 });
+    return fitView(decTrack, w, h, {
+      padding: 28,
+      minZoom: OVERVIEW_MIN_ZOOM,
+      maxZoom: OVERVIEW_MAX_ZOOM,
+    });
   }, [hasTrack, w, h, followMode, followCoords, gps, nextWp, decTrack]);
 
   if (!hasTrack) {
@@ -120,13 +134,10 @@ export default function RouteMap({
     );
   }
 
-  // Project the decimated track, then split into travelled (behind) and
-  // ahead of the user's position along the track.
+  const project = view?.project;
   const pts = project ? decTrack.map((p) => project(p.lat, p.lon)) : [];
   const frac =
-    Number.isFinite(userTrackIdx) &&
-    userTrackIdx >= 0 &&
-    trackPoints.length > 1
+    Number.isFinite(userTrackIdx) && userTrackIdx >= 0 && trackPoints.length > 1
       ? userTrackIdx / (trackPoints.length - 1)
       : 0;
   const splitIdx = Math.round(frac * (decTrack.length - 1));
@@ -136,10 +147,7 @@ export default function RouteMap({
 
   const startP = project ? project(trackPoints[0].lat, trackPoints[0].lon) : null;
   const endP = project
-    ? project(
-        trackPoints[trackPoints.length - 1].lat,
-        trackPoints[trackPoints.length - 1].lon,
-      )
+    ? project(trackPoints[trackPoints.length - 1].lat, trackPoints[trackPoints.length - 1].lon)
     : null;
 
   const userP = project && isFiniteCoord(gps) ? project(gps.lat, gps.lon) : null;
@@ -149,9 +157,21 @@ export default function RouteMap({
   const userColor = isOffTrack ? "#d97706" : "#16a34a";
 
   const wpP = project && nextWp ? project(nextWp.lat, nextWp.lon) : null;
+  const tilesOn = tileMode !== "off";
 
   return (
-    <div ref={wrapRef} className="relative w-full h-full bg-[#edf1f5]">
+    <div ref={wrapRef} className="relative w-full h-full bg-[#edf1f5] overflow-hidden">
+      {tilesOn && view && (
+        <TileLayer
+          tileSource={SOURCE_KEY[tileMode]}
+          centerLat={view.centerLat}
+          centerLon={view.centerLon}
+          zoom={view.zoom}
+          width={w}
+          height={h}
+        />
+      )}
+
       <svg
         width="100%"
         height="100%"
@@ -159,26 +179,19 @@ export default function RouteMap({
         preserveAspectRatio="xMidYMid meet"
         className="absolute inset-0"
       >
-        {/* travelled (faded) then ahead (bold), so ahead draws on top */}
+        {/* travelled (faded) — white casing + muted core */}
         {behind.length >= 2 && (
-          <polyline
-            points={toPolyline(behind)}
-            fill="none"
-            stroke="#b6c2d1"
-            strokeWidth={4}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <>
+            <polyline points={toPolyline(behind)} fill="none" stroke="#ffffff" strokeOpacity={0.85} strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={toPolyline(behind)} fill="none" stroke="#94a3b8" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          </>
         )}
+        {/* ahead — white casing + bold dark core, reads over any backdrop */}
         {ahead.length >= 2 && (
-          <polyline
-            points={toPolyline(ahead)}
-            fill="none"
-            stroke="#334155"
-            strokeWidth={4}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <>
+            <polyline points={toPolyline(ahead)} fill="none" stroke="#ffffff" strokeOpacity={0.9} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={toPolyline(ahead)} fill="none" stroke="#1e293b" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+          </>
         )}
 
         {/* every roadbook row with coords = a subtle, tappable dot */}
@@ -189,7 +202,7 @@ export default function RouteMap({
             return (
               <g key={r.index ?? i} onClick={() => onSelectRow?.(i)} style={{ cursor: "pointer" }}>
                 <circle cx={p.x} cy={p.y} r={11} fill="transparent" />
-                <circle cx={p.x} cy={p.y} r={2.6} fill="#64748b" />
+                <circle cx={p.x} cy={p.y} r={2.6} fill="#475569" stroke="#fff" strokeWidth={0.75} />
               </g>
             );
           })}
@@ -203,7 +216,7 @@ export default function RouteMap({
         )}
         {endP && (
           <g>
-            <circle cx={endP.x} cy={endP.y} r={5.5} fill="#111827" />
+            <circle cx={endP.x} cy={endP.y} r={5.5} fill="#111827" stroke="#fff" strokeWidth={1.5} />
             <text x={endP.x} y={endP.y + 2.5} fontSize={7} textAnchor="middle" fill="#fff" fontWeight="bold">F</text>
           </g>
         )}
@@ -222,19 +235,34 @@ export default function RouteMap({
         {/* live position + heading arrow */}
         {userOnScreen && (
           <g transform={`translate(${userP.x} ${userP.y})${heading != null ? ` rotate(${heading})` : ""}`}>
-            {heading != null && (
-              <polygon points="0,-15 5.5,-6 -5.5,-6" fill={userColor} />
-            )}
+            {heading != null && <polygon points="0,-15 5.5,-6 -5.5,-6" fill={userColor} />}
             <circle r={8} fill={userColor} stroke="#fff" strokeWidth={2.5} />
           </g>
         )}
       </svg>
 
       {/* compass (north-up, static) */}
-      <div className="absolute left-2 top-2 flex flex-col items-center text-[10px] leading-none text-slate-500 select-none pointer-events-none">
+      <div className="absolute left-2 top-2 flex flex-col items-center text-[10px] leading-none text-slate-700 select-none pointer-events-none drop-shadow">
         <span className="text-xs">↑</span>
         <span>N</span>
       </div>
+
+      {/* tile-style switcher (cycles satellite → street → topo → vector) */}
+      <button
+        type="button"
+        onClick={() => setTileMode((m) => TILE_CYCLE[(TILE_CYCLE.indexOf(m) + 1) % TILE_CYCLE.length])}
+        className="absolute right-2 top-2 rounded-lg bg-white/95 border border-gray-300 text-gray-700 shadow-sm px-2 py-1 text-[11px] font-medium hover:bg-white"
+        title="Change map style"
+      >
+        {TILE_LABEL[tileMode]}
+      </button>
+
+      {/* attribution (required when tiles are shown) */}
+      {tilesOn && (
+        <div className="absolute right-2 bottom-11 text-[9px] text-gray-700 bg-white/70 rounded px-1 leading-tight pointer-events-none max-w-[70%] text-right">
+          {tileSourceAttribution(SOURCE_KEY[tileMode])}
+        </div>
+      )}
 
       {/* on/off route badge */}
       {isFiniteCoord(gps) && (
