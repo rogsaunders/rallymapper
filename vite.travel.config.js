@@ -139,16 +139,45 @@ export default defineConfig({
         globIgnores: ["**/LibraryApp-*.js"],
         runtimeCaching: [
           {
-            // Cache OSM tiles so PreStart's static map and any future map
-            // view work offline in-vehicle. Mirrors the editor config.
+            // OSM street tiles.
             urlPattern: ({ url }) =>
               url.origin.includes("tile.openstreetmap.org"),
             handler: "CacheFirst",
             options: {
               cacheName: "osm-tiles",
               expiration: {
-                maxEntries: 1500,
-                maxAgeSeconds: 60 * 60 * 24 * 14, // 14 days
+                maxEntries: 2500,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Esri World Imagery (satellite — the default source), and the
+            // target of Phase 2b offline corridor pre-caching. Larger cap
+            // since a whole stage's corridor is pre-fetched here.
+            urlPattern: ({ url }) =>
+              url.origin.includes("server.arcgisonline.com"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "esri-imagery-tiles",
+              expiration: {
+                maxEntries: 3500,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // OpenTopoMap (topographic).
+            urlPattern: ({ url }) =>
+              url.origin.includes("tile.opentopomap.org"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "opentopo-tiles",
+              expiration: {
+                maxEntries: 2500,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
               },
               cacheableResponse: { statuses: [0, 200] },
             },
