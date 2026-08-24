@@ -122,10 +122,24 @@ export function fitView(points, width, height, opts = {}) {
   if (!Number.isFinite(zoom)) zoom = maxZoom;
   zoom = Math.max(minZoom, Math.min(maxZoom, zoom));
 
+  return {
+    project: makeProjector(centerLat, centerLon, zoom, width, height),
+    zoom,
+    centerLat,
+    centerLon,
+  };
+}
+
+/**
+ * A projector at a FIXED centre/zoom (no fitting) into a width×height box —
+ * lat/lon → px, centred at (width/2, height/2). Used by track-up, which
+ * pins the centre on the user and renders onto an oversized square that the
+ * caller then rotates.
+ */
+export function makeProjector(centerLat, centerLon, zoom, width, height) {
   const cw = lonLatToWorldPixel(centerLat, centerLon, zoom);
-  function project(lat, lon) {
+  return function project(lat, lon) {
     const p = lonLatToWorldPixel(lat, lon, zoom);
     return { x: p.x - cw.x + width / 2, y: p.y - cw.y + height / 2 };
-  }
-  return { project, zoom, centerLat, centerLon };
+  };
 }
