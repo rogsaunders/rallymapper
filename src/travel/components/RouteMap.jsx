@@ -20,6 +20,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   fitView,
+  makeProjector,
   decimateTrack,
   headingAlongTrack,
 } from "../lib/mapProjection";
@@ -33,6 +34,7 @@ const OVERVIEW_MIN_ZOOM = 3;
 const OVERVIEW_MAX_ZOOM = 18;
 
 const LS_TILE_MODE = "rm_drive_tile_mode";
+const LS_ORIENT = "rm_drive_map_orient";
 const TILE_CYCLE = ["satellite", "street", "topo", "off"];
 const TILE_LABEL = { satellite: "🛰 Satellite", street: "🗺 Street", topo: "⛰ Topo", off: "▨ Vector" };
 const SOURCE_KEY = { satellite: "esri_imagery", street: "osm", topo: "opentopo" };
@@ -78,6 +80,18 @@ export default function RouteMap({
   useEffect(() => {
     localStorage.setItem(LS_TILE_MODE, tileMode);
   }, [tileMode]);
+
+  // Orientation: north-up (default) or track-up. Opt-in, persisted.
+  const [trackUp, setTrackUp] = useState(() => {
+    const v = typeof localStorage !== "undefined" && localStorage.getItem(LS_ORIENT);
+    return v === "track";
+  });
+  useEffect(() => {
+    localStorage.setItem(LS_ORIENT, trackUp ? "track" : "north");
+  }, [trackUp]);
+  // Continuous rotation accumulator (deg) so the CSS transition always takes
+  // the short way round when heading crosses 0°/360°.
+  const rotAccumRef = useRef(0);
 
   const [wrapRef, { w: measuredW, h: measuredH }] = useElementSize();
   const w = measuredW || 400;
@@ -134,7 +148,42 @@ export default function RouteMap({
     );
   }
 
-  const project = view?.project;
+  const heading = headingAlongTrack(trackPoints, userTrackIdx);
+
+  // Track-up: rotate the whole map so heading points up. Only in follow mode
+  // with a heading and a fix. Render onto an oversized square (the viewport
+  // diagonal) centred on the user, then CSS-rotate it by −heading about the
+  // centre so the corners stay covered and the user stays pinned centre.
+  const rotating =
+    trackUp && followMode && heading != null && isFiniteCoord(gps) && !!view;
+  const RS = Math.ceil(Math.hypot(w, h)) + 2;
+  const renderW = rotating ? RS : w;
+  const renderH = rotating ? RS : h;
+
+  const rotCenter =
+    (isFiniteCoord(gps) && gps) || (isFiniteCoord(followCoords) && followCoords) || null;
+  const project =
+    rotating && rotCenter
+      ? makeProjector(rotCenter.lat, rotCenter.lon, view.zoom, RS, RS)
+      : view?.project;
+
+  // Unwrap the target rotation onto the accumulator so transitions never spin
+  // the long way round.
+  if (rotating) {
+    const targetRot = -heading;
+    const prev = rotAccumRef.current;
+    const delta = ((((targetRot - prev) % 360) + 540) % 360) - 180;
+    rotAccumRef.current = prev + delta;
+  }
+  const displayRot = rotating ? rotAccumRef.current : 0;
+  // Counter-rotation to keep a text label upright inside the rotated stage.
+  const upright = (x, y) =>
+    rotating ? `rotate(${-displayRot} ${x} ${y})` : undefined;
+
+  const tileCenterLat = rotating ? rotCenter.lat : view?.centerLat;
+  const tileCenterLon = rotating ? rotCenter.lon : view?.centerLon;
+  const tileZoom = rotating ? view.zoom : view?.zoom;
+
   const pts = project ? decTrack.map((p) => project(p.lat, p.lon)) : [];
   const frac =
     Number.isFinite(userTrackIdx) && userTrackIdx >= 0 && trackPoints.length > 1
@@ -152,8 +201,11 @@ export default function RouteMap({
 
   const userP = project && isFiniteCoord(gps) ? project(gps.lat, gps.lon) : null;
   const userOnScreen =
-    userP && userP.x >= -8 && userP.x <= w + 8 && userP.y >= -8 && userP.y <= h + 8;
-  const heading = headingAlongTrack(trackPoints, userTrackIdx);
+    userP &&
+    userP.x >= -8 &&
+    userP.x <= renderW + 8 &&
+    userP.y >= -8 &&
+    userP.y <= renderH + 8;
   const userColor = isOffTrack ? "#d97706" : "#16a34a";
 
   const wpP = project && nextWp ? project(nextWp.lat, nextWp.lon) : null;
@@ -161,24 +213,43 @@ export default function RouteMap({
 
   return (
     <div ref={wrapRef} className="relative w-full h-full bg-[#edf1f5] overflow-hidden">
-      {tilesOn && view && (
-        <TileLayer
-          tileSource={SOURCE_KEY[tileMode]}
-          centerLat={view.centerLat}
-          centerLon={view.centerLon}
-          zoom={view.zoom}
-          width={w}
-          height={h}
-        />
-      )}
-
-      <svg
-        width="100%"
-        height="100%"
-        viewBox={`0 0 ${w} ${h}`}
-        preserveAspectRatio="xMidYMid meet"
-        className="absolute inset-0"
+      {/* Rotating stage: in track-up it's an oversized square centred on the
+          user, CSS-rotated by −heading. Overlays below stay screen-fixed. */}
+      <div
+        className="absolute"
+        style={
+          rotating
+            ? {
+                width: RS,
+                height: RS,
+                left: (w - RS) / 2,
+                top: (h - RS) / 2,
+                transform: `rotate(${displayRot}deg)`,
+                transformOrigin: "center",
+                transition: "transform 0.25s linear",
+                willChange: "transform",
+              }
+            : { inset: 0 }
+        }
       >
+        {tilesOn && view && (
+          <TileLayer
+            tileSource={SOURCE_KEY[tileMode]}
+            centerLat={tileCenterLat}
+            centerLon={tileCenterLon}
+            zoom={tileZoom}
+            width={renderW}
+            height={renderH}
+          />
+        )}
+
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${renderW} ${renderH}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="absolute inset-0"
+        >
         {/* travelled (faded) — white casing + muted core */}
         {behind.length >= 2 && (
           <>
@@ -211,13 +282,13 @@ export default function RouteMap({
         {startP && (
           <g>
             <circle cx={startP.x} cy={startP.y} r={5} fill="#fff" stroke="#16a34a" strokeWidth={2.5} />
-            <text x={startP.x} y={startP.y + 2.5} fontSize={7} textAnchor="middle" fill="#16a34a" fontWeight="bold">S</text>
+            <text x={startP.x} y={startP.y + 2.5} fontSize={7} textAnchor="middle" fill="#16a34a" fontWeight="bold" transform={upright(startP.x, startP.y)}>S</text>
           </g>
         )}
         {endP && (
           <g>
             <circle cx={endP.x} cy={endP.y} r={5.5} fill="#111827" stroke="#fff" strokeWidth={1.5} />
-            <text x={endP.x} y={endP.y + 2.5} fontSize={7} textAnchor="middle" fill="#fff" fontWeight="bold">F</text>
+            <text x={endP.x} y={endP.y + 2.5} fontSize={7} textAnchor="middle" fill="#fff" fontWeight="bold" transform={upright(endP.x, endP.y)}>F</text>
           </g>
         )}
 
@@ -226,7 +297,7 @@ export default function RouteMap({
           <g onClick={() => onSelectRow?.(currentIndex)} style={{ cursor: "pointer" }}>
             <circle cx={wpP.x} cy={wpP.y} r={13} fill="transparent" />
             <circle cx={wpP.x} cy={wpP.y} r={7.5} fill="#d97706" stroke="#fff" strokeWidth={1.5} />
-            <text x={wpP.x} y={wpP.y + 2.8} fontSize={8} textAnchor="middle" fill="#fff" fontWeight="bold">
+            <text x={wpP.x} y={wpP.y + 2.8} fontSize={8} textAnchor="middle" fill="#fff" fontWeight="bold" transform={upright(wpP.x, wpP.y)}>
               {currentRow?.index ?? ""}
             </text>
           </g>
@@ -240,12 +311,24 @@ export default function RouteMap({
           </g>
         )}
       </svg>
-
-      {/* compass (north-up, static) */}
-      <div className="absolute left-2 top-2 flex flex-col items-center text-[10px] leading-none text-slate-700 select-none pointer-events-none drop-shadow">
-        <span className="text-xs">↑</span>
-        <span>N</span>
       </div>
+
+      {/* compass — tap to toggle north-up / track-up; needle points to true north */}
+      <button
+        type="button"
+        onClick={() => setTrackUp((t) => !t)}
+        className="absolute left-2 top-2 w-9 h-9 rounded-lg bg-white/95 border border-gray-300 shadow-sm flex items-center justify-center hover:bg-white"
+        title={trackUp ? "Track-up — tap for north-up" : "North-up — tap for track-up"}
+        aria-label={trackUp ? "Switch to north-up" : "Switch to track-up"}
+      >
+        <span
+          className="flex flex-col items-center leading-none text-[10px] text-slate-700"
+          style={{ transform: `rotate(${displayRot}deg)` }}
+        >
+          <span className="text-xs text-red-600">↑</span>
+          <span>N</span>
+        </span>
+      </button>
 
       {/* tile-style switcher (cycles satellite → street → topo → vector) */}
       <button
