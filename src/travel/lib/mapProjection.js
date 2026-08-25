@@ -32,6 +32,18 @@ export function lonLatToWorldPixel(lat, lon, zoom) {
   return { x, y };
 }
 
+/**
+ * Inverse of lonLatToWorldPixel: world-pixel (x,y) at `zoom` → {lat, lon}.
+ * Used by the pan/pinch gestures to turn screen movement into a new centre.
+ */
+export function worldPixelToLonLat(x, y, zoom) {
+  const scale = TILE_SIZE * Math.pow(2, zoom);
+  const lon = (x / scale) * 360 - 180;
+  const n = Math.PI - (2 * Math.PI * y) / scale;
+  const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  return { lat, lon };
+}
+
 // Zoom-independent normalised Mercator coords in [0,1], used only to pick
 // the fit zoom.
 function mercNorm(lat, lon) {
