@@ -281,7 +281,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   // still resolving, so a resumable stage doesn't flash the picker first.
   if (restoring && !roadbook) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 text-gray-500 text-sm">
+      <div className="flex items-center justify-center min-h-[100dvh] bg-gray-50 text-gray-500 text-sm">
         Loading…
       </div>
     );
@@ -304,7 +304,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   // stages where pickStartCoords couldn't recover any coords.
   if (startCoords && !hasStarted) {
     return (
-      <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex flex-col h-[100dvh] bg-gray-50">
         <HeaderBar
           stageMeta={stageMeta}
           rowCount={annotatedRows.length}
@@ -363,7 +363,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-[100dvh] bg-gray-50">
       <HeaderBar
         stageMeta={stageMeta}
         rowCount={annotatedRows.length}
@@ -381,7 +381,7 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
           side-by-side on wide screens / iPad (persistent split). */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
         {mapAvailable && mapOpen && (
-          <div className="h-[40vh] lg:h-auto lg:w-[44%] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200">
+          <div className="h-[40dvh] lg:h-auto lg:w-[44%] shrink-0 border-b lg:border-b-0 lg:border-r border-gray-200">
             <RouteMap
               trackPoints={trackPoints}
               rows={annotatedRows}

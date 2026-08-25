@@ -17,7 +17,7 @@ export default function SourcePicker({ onPick, error, isLoading, libraryHref }) 
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="flex items-center justify-center min-h-[100dvh] bg-gray-50 p-4">
       <div className="bg-white rounded-2xl shadow-sm border max-w-md w-full p-6">
         {/* RouteMapper brand lockup — gives the standalone landing screen
             (the first thing a go.routemapper.net visitor sees) a clear
