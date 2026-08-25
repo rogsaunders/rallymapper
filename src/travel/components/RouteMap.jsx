@@ -21,6 +21,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   fitView,
   makeProjector,
+  lonLatToWorldPixel,
+  worldPixelToLonLat,
   decimateTrack,
   headingAlongTrack,
 } from "../lib/mapProjection";
@@ -32,6 +34,9 @@ const FOLLOW_MIN_ZOOM = 13;
 const FOLLOW_MAX_ZOOM = 18;
 const OVERVIEW_MIN_ZOOM = 3;
 const OVERVIEW_MAX_ZOOM = 18;
+const MANUAL_MIN_ZOOM = 3;
+const MANUAL_MAX_ZOOM = 19;
+const PAN_THRESHOLD_PX = 3; // movement before a press becomes a drag (vs a tap)
 
 const LS_TILE_MODE = "rm_drive_tile_mode";
 const LS_ORIENT = "rm_drive_map_orient";
@@ -93,6 +98,15 @@ export default function RouteMap({
   // the short way round when heading crosses 0°/360°.
   const rotAccumRef = useRef(0);
 
+  // Manual view: once the user pans/pinches, this {centerLat,centerLon,zoom}
+  // takes over from the auto follow/overview framing (north-up). Recenter
+  // clears it. Reset on a new stage.
+  const [manualView, setManualView] = useState(null);
+  const gestureRef = useRef(null);
+  useEffect(() => {
+    setManualView(null);
+  }, [trackPoints]);
+
   const [wrapRef, { w: measuredW, h: measuredH }] = useElementSize();
   const w = measuredW || 400;
   const h = measuredH || 300;
@@ -149,23 +163,50 @@ export default function RouteMap({
   }
 
   const heading = headingAlongTrack(trackPoints, userTrackIdx);
+  const manual = !!manualView;
 
   // Track-up: rotate the whole map so heading points up. Only in follow mode
-  // with a heading and a fix. Render onto an oversized square (the viewport
-  // diagonal) centred on the user, then CSS-rotate it by −heading about the
-  // centre so the corners stay covered and the user stays pinned centre.
+  // with a heading and a fix, and NOT while manually panned (manual is always
+  // north-up). Render onto an oversized square (the viewport diagonal) centred
+  // on the user, then CSS-rotate it by −heading so the corners stay covered
+  // and the user stays pinned centre.
   const rotating =
-    trackUp && followMode && heading != null && isFiniteCoord(gps) && !!view;
+    !manual &&
+    trackUp &&
+    followMode &&
+    heading != null &&
+    isFiniteCoord(gps) &&
+    !!view;
   const RS = Math.ceil(Math.hypot(w, h)) + 2;
   const renderW = rotating ? RS : w;
   const renderH = rotating ? RS : h;
 
   const rotCenter =
     (isFiniteCoord(gps) && gps) || (isFiniteCoord(followCoords) && followCoords) || null;
-  const project =
-    rotating && rotCenter
-      ? makeProjector(rotCenter.lat, rotCenter.lon, view.zoom, RS, RS)
-      : view?.project;
+
+  // Effective centre/zoom/projector across the three modes: manual (a panned
+  // north-up view), rotating (track-up, oversized+rotated), or auto (the
+  // follow/overview fitView).
+  let project;
+  let tileCenterLat;
+  let tileCenterLon;
+  let tileZoom;
+  if (manual) {
+    project = makeProjector(manualView.centerLat, manualView.centerLon, manualView.zoom, w, h);
+    tileCenterLat = manualView.centerLat;
+    tileCenterLon = manualView.centerLon;
+    tileZoom = manualView.zoom;
+  } else if (rotating && rotCenter) {
+    project = makeProjector(rotCenter.lat, rotCenter.lon, view.zoom, RS, RS);
+    tileCenterLat = rotCenter.lat;
+    tileCenterLon = rotCenter.lon;
+    tileZoom = view.zoom;
+  } else {
+    project = view?.project;
+    tileCenterLat = view?.centerLat;
+    tileCenterLon = view?.centerLon;
+    tileZoom = view?.zoom;
+  }
 
   // Unwrap the target rotation onto the accumulator so transitions never spin
   // the long way round.
@@ -180,9 +221,115 @@ export default function RouteMap({
   const upright = (x, y) =>
     rotating ? `rotate(${-displayRot} ${x} ${y})` : undefined;
 
-  const tileCenterLat = rotating ? rotCenter.lat : view?.centerLat;
-  const tileCenterLon = rotating ? rotCenter.lon : view?.centerLon;
-  const tileZoom = rotating ? view.zoom : view?.zoom;
+  // Live centre/zoom for a gesture starting right now (whichever mode we're in).
+  const currentCenterZoom = () => {
+    if (manualView) {
+      return { lat: manualView.centerLat, lon: manualView.centerLon, zoom: manualView.zoom };
+    }
+    if (rotating && rotCenter) {
+      return { lat: rotCenter.lat, lon: rotCenter.lon, zoom: view.zoom };
+    }
+    if (view) return { lat: view.centerLat, lon: view.centerLon, zoom: view.zoom };
+    return null;
+  };
+
+  const relPoint = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
+  const beginPhase = (g) => {
+    const ids = [...g.pointers.keys()];
+    g.baseCenter = { ...g.cur };
+    if (ids.length === 1) {
+      g.mode = "pan";
+      g.startPtr = { ...g.pointers.get(ids[0]) };
+    } else if (ids.length >= 2) {
+      g.mode = "pinch";
+      const a = g.pointers.get(ids[0]);
+      const b = g.pointers.get(ids[1]);
+      g.startDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      g.startMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+  };
+
+  const onPointerDown = (e) => {
+    if (e.target.closest("button, a")) return; // let controls handle their own taps
+    let g = gestureRef.current;
+    if (!g || g.pointers.size === 0) {
+      const cz = currentCenterZoom();
+      if (!cz) return;
+      g = { pointers: new Map(), cur: cz, moved: false, captured: false };
+      gestureRef.current = g;
+    }
+    g.pointers.set(e.pointerId, relPoint(e));
+    beginPhase(g);
+  };
+
+  const onPointerMove = (e) => {
+    const g = gestureRef.current;
+    if (!g || !g.pointers.has(e.pointerId) || !g.baseCenter) return;
+    g.pointers.set(e.pointerId, relPoint(e));
+    const ids = [...g.pointers.keys()];
+    const vp = { x: w / 2, y: h / 2 };
+    let nc = null;
+    let nz = g.baseCenter.zoom;
+    if (g.mode === "pan" && ids.length === 1) {
+      const p = g.pointers.get(ids[0]);
+      const dx = p.x - g.startPtr.x;
+      const dy = p.y - g.startPtr.y;
+      if (Math.abs(dx) + Math.abs(dy) > PAN_THRESHOLD_PX) g.moved = true;
+      const cw = lonLatToWorldPixel(g.baseCenter.lat, g.baseCenter.lon, g.baseCenter.zoom);
+      nc = worldPixelToLonLat(cw.x - dx, cw.y - dy, g.baseCenter.zoom);
+    } else if (g.mode === "pinch" && ids.length >= 2) {
+      g.moved = true;
+      const a = g.pointers.get(ids[0]);
+      const b = g.pointers.get(ids[1]);
+      const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      nz = Math.max(
+        MANUAL_MIN_ZOOM,
+        Math.min(MANUAL_MAX_ZOOM, g.baseCenter.zoom + Math.log2(dist / g.startDist)),
+      );
+      // Keep the geo point under the start-midpoint pinned under the current
+      // midpoint (zoom + two-finger pan about the fingers).
+      const cwBase = lonLatToWorldPixel(g.baseCenter.lat, g.baseCenter.lon, g.baseCenter.zoom);
+      const anchorBase = {
+        x: cwBase.x + (g.startMid.x - vp.x),
+        y: cwBase.y + (g.startMid.y - vp.y),
+      };
+      const ag = worldPixelToLonLat(anchorBase.x, anchorBase.y, g.baseCenter.zoom);
+      const an = lonLatToWorldPixel(ag.lat, ag.lon, nz);
+      nc = worldPixelToLonLat(an.x - (mid.x - vp.x), an.y - (mid.y - vp.y), nz);
+    }
+    if (nc) {
+      g.cur = { lat: nc.lat, lon: nc.lon, zoom: nz };
+      if (g.moved) {
+        if (!g.captured) {
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          g.captured = true;
+        }
+        setManualView({ centerLat: nc.lat, centerLon: nc.lon, zoom: nz });
+      }
+    }
+  };
+
+  const onPointerUp = (e) => {
+    const g = gestureRef.current;
+    if (!g) return;
+    g.pointers.delete(e.pointerId);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    if (g.pointers.size >= 1) beginPhase(g);
+    else g.mode = null;
+  };
 
   const pts = project ? decTrack.map((p) => project(p.lat, p.lon)) : [];
   const frac =
@@ -212,7 +359,15 @@ export default function RouteMap({
   const tilesOn = tileMode !== "off";
 
   return (
-    <div ref={wrapRef} className="relative w-full h-full bg-[#edf1f5] overflow-hidden">
+    <div
+      ref={wrapRef}
+      className="relative w-full h-full bg-[#edf1f5] overflow-hidden"
+      style={{ touchAction: "none" }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
       {/* Rotating stage: in track-up it's an oversized square centred on the
           user, CSS-rotated by −heading. Overlays below stay screen-fixed. */}
       <div
@@ -362,15 +517,34 @@ export default function RouteMap({
         </div>
       )}
 
-      {/* follow ↔ whole-stage toggle */}
+      {/* recenter (when panned) · follow ↔ whole-stage toggle otherwise */}
       <button
         type="button"
-        onClick={() => setFollowMode((m) => !m)}
+        onClick={() => {
+          if (manual) {
+            setManualView(null);
+            setFollowMode(true);
+          } else {
+            setFollowMode((m) => !m);
+          }
+        }}
         className="absolute right-2 bottom-2 w-9 h-9 rounded-lg bg-white/95 border border-gray-300 text-gray-700 shadow-sm flex items-center justify-center text-base hover:bg-white"
-        title={followMode ? "Show whole stage" : "Follow my position"}
-        aria-label={followMode ? "Show whole stage" : "Follow my position"}
+        title={
+          manual
+            ? "Recenter on route"
+            : followMode
+              ? "Show whole stage"
+              : "Follow my position"
+        }
+        aria-label={
+          manual
+            ? "Recenter on route"
+            : followMode
+              ? "Show whole stage"
+              : "Follow my position"
+        }
       >
-        {followMode ? "⤢" : "◎"}
+        {manual ? "◎" : followMode ? "⤢" : "◎"}
       </button>
     </div>
   );
