@@ -144,7 +144,8 @@ export default defineConfig({
             // cache of tiles actually viewed, which Esri's terms explicitly
             // permit (and don't even meter). This is NOT bulk pre-fetching.
             urlPattern: ({ url }) =>
-              url.origin.includes("static-map-tiles-api.arcgis.com"),
+              url.origin.includes("static-map-tiles-api.arcgis.com") ||
+              url.origin.includes("ibasemaps-api.arcgis.com"),
             handler: "CacheFirst",
             options: {
               cacheName: "arcgis-basemap-tiles",

@@ -48,10 +48,19 @@ const TILE_SIZE = 256;
 // Fallback (no key — e.g. the editor's PDF export build): the original
 // token-free endpoints, unchanged, so nothing that lacks the key breaks.
 const ARCGIS_KEY = import.meta.env.VITE_ARCGIS_API_KEY;
+// Street + topo come from the Static Basemap Tiles service (512px PNG).
 const ARCGIS_TILES =
   "https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1";
 const arcgisTemplate = (style) =>
   `${ARCGIS_TILES}/${style}/static/tile/{z}/{y}/{x}?token=${ARCGIS_KEY}`;
+// Satellite photos come from the licensed World Imagery raster (256px JPEG).
+// The Static Basemap Tiles "satellite" styles (arcgis/imagery/labels,
+// open/hybrid/detail) are transparent LABEL overlays / go blank at driving
+// zooms in remote areas — verified — so they're unusable for us; World
+// Imagery is opaque at every zoom (the same imagery, now licensed via the
+// ibasemaps host + token).
+const ARCGIS_IMAGERY =
+  "https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer";
 
 export const TILE_SOURCES = ARCGIS_KEY
   ? {
@@ -62,9 +71,8 @@ export const TILE_SOURCES = ARCGIS_KEY
         attribution: "Powered by Esri — HERE, Garmin, © OpenStreetMap contributors",
       },
       esri_imagery: {
-        template: arcgisTemplate("arcgis/imagery/labels"),
+        template: `${ARCGIS_IMAGERY}/tile/{z}/{y}/{x}?token=${ARCGIS_KEY}`,
         maxZoom: 19,
-        tileSize: 512,
         attribution: "Powered by Esri — Maxar, Earthstar Geographics",
       },
       opentopo: {
