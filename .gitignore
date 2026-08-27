@@ -37,3 +37,6 @@ dist-ssr
 *.crt
 Website.zip
 
+
+# Local secret note — never commit
+ARCGIS API Key.rtf

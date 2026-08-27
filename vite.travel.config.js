@@ -139,6 +139,24 @@ export default defineConfig({
         globIgnores: ["**/LibraryApp-*.js"],
         runtimeCaching: [
           {
+            // ArcGIS Static Basemap Tiles (the licensed source once
+            // VITE_ARCGIS_API_KEY is set). CacheFirst = a per-user browser
+            // cache of tiles actually viewed, which Esri's terms explicitly
+            // permit (and don't even meter). This is NOT bulk pre-fetching.
+            urlPattern: ({ url }) =>
+              url.origin.includes("static-map-tiles-api.arcgis.com") ||
+              url.origin.includes("ibasemaps-api.arcgis.com"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "arcgis-basemap-tiles",
+              expiration: {
+                maxEntries: 3000,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // OSM street tiles.
             urlPattern: ({ url }) =>
               url.origin.includes("tile.openstreetmap.org"),

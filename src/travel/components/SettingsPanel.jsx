@@ -28,13 +28,6 @@ export default function SettingsPanel({
   setVoiceDelayMs,
   showDebug,
   setShowDebug,
-  offlineAvailable,
-  offlineEstimateLabel,
-  offlineState,
-  offlineProgress,
-  offlineCached,
-  onOfflineStart,
-  onOfflineCancel,
 }) {
   if (!open) return null;
 
@@ -215,75 +208,6 @@ export default function SettingsPanel({
             doesn't keep up — leave off for normal use.
           </p>
         </div>
-
-        {/* Offline map (Phase 2b) — pre-cache this stage's tiles */}
-        {offlineAvailable && offlineEstimateLabel && (
-          <div className="mb-5 pt-4 border-t border-gray-200">
-            <span className="font-medium text-gray-800">🗺 Offline map</span>
-            <p className="text-xs text-gray-500 mt-1 mb-2 leading-snug">
-              Download this stage's map tiles so the route map works without a
-              signal. {offlineEstimateLabel}.
-            </p>
-
-            {offlineState === "downloading" ? (
-              <div>
-                <div className="w-full h-2 rounded-full bg-gray-200 overflow-hidden">
-                  <div
-                    className="h-full bg-[#588233]"
-                    style={{
-                      width: `${
-                        offlineProgress?.total
-                          ? Math.round(
-                              (offlineProgress.done / offlineProgress.total) *
-                                100,
-                            )
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-1.5">
-                  <span className="text-[11px] text-gray-500 tabular-nums">
-                    {offlineProgress?.done ?? 0} / {offlineProgress?.total ?? 0}{" "}
-                    tiles
-                  </span>
-                  <button
-                    type="button"
-                    onClick={onOfflineCancel}
-                    className="px-3 py-1 text-xs font-medium rounded border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={onOfflineStart}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-                  style={{ backgroundColor: "#588233" }}
-                >
-                  {offlineCached ? "↻ Refresh offline tiles" : "⬇ Save for offline"}
-                </button>
-                {offlineState === "error" ? (
-                  <span className="text-xs text-red-700 font-medium">
-                    Some tiles failed — try again
-                  </span>
-                ) : offlineState === "done" || offlineCached ? (
-                  <span className="text-xs text-green-700 font-medium">
-                    ✓ Saved
-                    {offlineCached?.count ? ` (${offlineCached.count} tiles)` : ""}
-                  </span>
-                ) : null}
-              </div>
-            )}
-            <p className="text-[10px] text-gray-400 mt-2 leading-snug">
-              Uses your data connection now; tiles are kept ~30 days. Free-tier
-              map tiles — for personal use.
-            </p>
-          </div>
-        )}
 
         <button
           type="button"
