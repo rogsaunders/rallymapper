@@ -36,25 +36,63 @@ const TILE_SIZE = 256;
 // integer zoom the source supports, and the attribution string we'll print in
 // the PDF footer.
 
-export const TILE_SOURCES = {
-  osm: {
-    template: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-    maxZoom: 19,
-    attribution: "© OpenStreetMap contributors",
-  },
-  esri_imagery: {
-    template:
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    maxZoom: 19,
-    attribution: "Tiles © Esri",
-  },
-  opentopo: {
-    template: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    maxZoom: 17,
-    subdomains: ["a", "b", "c"],
-    attribution: "© OpenTopoMap (CC-BY-SA)",
-  },
-};
+// When an ArcGIS Location Platform API key is configured (VITE_ARCGIS_API_KEY —
+// set in the Travel/go.routemapper.net Netlify env), all three styles are
+// served from Esri's Static Basemap Tiles service. Its free tier carries a
+// COMMERCIAL deployment licence, unlike the raw OSM/Esri/OpenTopo endpoints
+// whose usage policies forbid commercial/bulk use — so this is the compliant
+// source for the paid product. The key is referrer-locked (go.routemapper.net
+// + *.netlify.app) so shipping it in the client bundle is safe. Style ids and
+// the 512px {z}/{y}/{x} format were verified live against the service.
+//
+// Fallback (no key — e.g. the editor's PDF export build): the original
+// token-free endpoints, unchanged, so nothing that lacks the key breaks.
+const ARCGIS_KEY = import.meta.env.VITE_ARCGIS_API_KEY;
+const ARCGIS_TILES =
+  "https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1";
+const arcgisTemplate = (style) =>
+  `${ARCGIS_TILES}/${style}/static/tile/{z}/{y}/{x}?token=${ARCGIS_KEY}`;
+
+export const TILE_SOURCES = ARCGIS_KEY
+  ? {
+      osm: {
+        template: arcgisTemplate("arcgis/navigation"),
+        maxZoom: 19,
+        tileSize: 512,
+        attribution: "Powered by Esri — HERE, Garmin, © OpenStreetMap contributors",
+      },
+      esri_imagery: {
+        template: arcgisTemplate("arcgis/imagery/labels"),
+        maxZoom: 19,
+        tileSize: 512,
+        attribution: "Powered by Esri — Maxar, Earthstar Geographics",
+      },
+      opentopo: {
+        template: arcgisTemplate("arcgis/outdoor"),
+        maxZoom: 19,
+        tileSize: 512,
+        attribution: "Powered by Esri — © OpenStreetMap contributors",
+      },
+    }
+  : {
+      osm: {
+        template: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        maxZoom: 19,
+        attribution: "© OpenStreetMap contributors",
+      },
+      esri_imagery: {
+        template:
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        maxZoom: 19,
+        attribution: "Tiles © Esri",
+      },
+      opentopo: {
+        template: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        maxZoom: 17,
+        subdomains: ["a", "b", "c"],
+        attribution: "© OpenTopoMap (CC-BY-SA)",
+      },
+    };
 
 export function tileSourceAttribution(source) {
   return (TILE_SOURCES[source] || TILE_SOURCES.osm).attribution;
@@ -402,7 +440,9 @@ export async function renderMapToCanvas({
     if (!tile.img) continue;
     const tx = tile.x * TILE_SIZE - originX;
     const ty = tile.y * TILE_SIZE - originY;
-    ctx.drawImage(tile.img, tx, ty);
+    // Draw into the logical TILE_SIZE slot: source tiles may be 512px (ArcGIS
+    // static basemap tiles) or 256px (fallback) — both fill the same grid cell.
+    ctx.drawImage(tile.img, tx, ty, TILE_SIZE, TILE_SIZE);
   }
 
   // Lat/lon → canvas pixel.  Same projection used for both polyline and

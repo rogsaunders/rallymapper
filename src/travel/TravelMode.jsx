@@ -35,8 +35,6 @@ import PreStart from "./components/PreStart";
 import DebugHud from "./components/DebugHud";
 import RouteMap from "./components/RouteMap";
 import { primeChime, playOffRouteChime } from "./lib/chime";
-import { useOfflineTiles } from "./hooks/useOfflineTiles";
-import { formatBytes } from "./lib/offlineTiles";
 
 // localStorage keys — settings persist across sessions
 const LS_AUTO_ADVANCE = "rm_drive_auto_advance";
@@ -257,26 +255,6 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
       : gps;
   const mapAvailable = Array.isArray(trackPoints) && trackPoints.length >= 2;
 
-  // Offline map pre-caching (Phase 2b). Cache the currently-selected tile
-  // source; if tiles are off, default to satellite (the usual choice).
-  const offlineSourceKey =
-    { satellite: "esri_imagery", street: "osm", topo: "opentopo" }[
-      (typeof localStorage !== "undefined" &&
-        localStorage.getItem("rm_drive_tile_mode")) ||
-        ""
-    ] || "esri_imagery";
-  const offlineSourceLabel = {
-    esri_imagery: "Satellite",
-    osm: "Street",
-    opentopo: "Topographic",
-  }[offlineSourceKey];
-  const offline = useOfflineTiles({ trackPoints, sourceKey: offlineSourceKey });
-  const offlineEstimateLabel = offline.corridor.count
-    ? `${offlineSourceLabel} · ~${offline.corridor.count} tiles · ${formatBytes(
-        offline.corridor.bytesEst,
-      )}`
-    : null;
-
   // Hold the source picker back while the one-shot IndexedDB restore is
   // still resolving, so a resumable stage doesn't flash the picker first.
   if (restoring && !roadbook) {
@@ -350,13 +328,6 @@ export default function TravelMode({ initialFile = null, libraryHref = null } = 
           setVoiceDelayMs={setVoiceDelayMs}
           showDebug={showDebug}
           setShowDebug={setShowDebug}
-          offlineAvailable={mapAvailable}
-          offlineEstimateLabel={offlineEstimateLabel}
-          offlineState={offline.state}
-          offlineProgress={offline.progress}
-          offlineCached={offline.cached}
-          onOfflineStart={offline.start}
-          onOfflineCancel={offline.cancel}
         />
       </div>
     );
