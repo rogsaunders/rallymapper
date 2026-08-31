@@ -16,12 +16,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
-const VALID_PLAN_TYPES = [
-  "event_pass",
-  "solo_monthly",
-  "pro_monthly",
-  "pro_yearly",
-];
+// Server-authoritative price map. The price is chosen HERE from the plan
+// type — never trusted from the client — so a caller can't pair an expensive
+// plan with a cheaper price. Mirror of src/lib/stripePrices.js (keep in sync;
+// price IDs are not secrets).
+const PLAN_PRICES = {
+  event_pass:   "price_1TS4QHF7LrulzgMx3E3bQ4Ya",
+  solo_monthly: "price_1TS4SPF7LrulzgMxb0sufYSM",
+  pro_monthly:  "price_1TS4UMF7LrulzgMxqzxG6BjC",
+  pro_yearly:   "price_1TS4X7F7LrulzgMxi55pKBRY",
+};
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
@@ -45,17 +49,20 @@ exports.handler = async (event) => {
   }
 
   // ── Validate body ──────────────────────────────────────────────────────────
-  let priceId, planType;
+  // Only planType is trusted; the price is derived server-side (any client
+  // priceId is ignored).
+  let planType;
   try {
-    ({ priceId, planType } = JSON.parse(event.body));
+    ({ planType } = JSON.parse(event.body));
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON" }) };
   }
 
-  if (!priceId || !planType || !VALID_PLAN_TYPES.includes(planType)) {
+  const priceId = PLAN_PRICES[planType];
+  if (!priceId) {
     return {
       statusCode: 400,
-      body: JSON.stringify({ error: "Missing or invalid priceId / planType" }),
+      body: JSON.stringify({ error: "Missing or invalid planType" }),
     };
   }
 
@@ -112,6 +119,12 @@ exports.handler = async (event) => {
       supabase_user_id: user.id,
       plan_type: planType,
     },
+    // Stamp the subscription itself too, so later customer.subscription.*
+    // webhook events carry the user + plan and can reconcile regardless of
+    // delivery order (see stripe-webhook.cjs syncSubscription).
+    subscription_data: isSubscription
+      ? { metadata: { supabase_user_id: user.id, plan_type: planType } }
+      : undefined,
     // Pre-fill the customer's email on the Stripe-hosted page
     customer_update: isSubscription
       ? { address: "auto" }
