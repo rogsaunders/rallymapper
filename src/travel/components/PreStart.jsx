@@ -77,7 +77,10 @@ export default function PreStart({
   gps,
   gpsError,
   triggerRadiusM,
-  tileSource = "osm",
+  // Default the "Head to the start" backdrop to satellite imagery — it's the
+  // most useful for eyeballing the staging area / start line, and matches the
+  // live map's default. (Same token-free-per-key ArcGIS source as the map.)
+  tileSource = "esri_imagery",
   onBegin,
   onCancel,
   voiceSpeak,
