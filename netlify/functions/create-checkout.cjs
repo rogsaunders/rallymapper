@@ -18,13 +18,17 @@ const supabase = createClient(
 
 // Server-authoritative price map. The price is chosen HERE from the plan
 // type — never trusted from the client — so a caller can't pair an expensive
-// plan with a cheaper price. Mirror of src/lib/stripePrices.js (keep in sync;
-// price IDs are not secrets).
+// plan with a cheaper price.
+//
+// Each price ID can be overridden by an env var, so switching between Stripe
+// TEST and LIVE mode is purely an env change (test price IDs alongside an
+// sk_test_ key) with no code edit. Unset → the live defaults below. Keep the
+// defaults in sync with src/lib/stripePrices.js (price IDs are not secrets).
 const PLAN_PRICES = {
-  event_pass:   "price_1TS4QHF7LrulzgMx3E3bQ4Ya",
-  solo_monthly: "price_1TS4SPF7LrulzgMxb0sufYSM",
-  pro_monthly:  "price_1TS4UMF7LrulzgMxqzxG6BjC",
-  pro_yearly:   "price_1TS4X7F7LrulzgMxi55pKBRY",
+  event_pass:   process.env.STRIPE_PRICE_EVENT_PASS   || "price_1TS4QHF7LrulzgMx3E3bQ4Ya",
+  solo_monthly: process.env.STRIPE_PRICE_SOLO_MONTHLY || "price_1TS4SPF7LrulzgMxb0sufYSM",
+  pro_monthly:  process.env.STRIPE_PRICE_PRO_MONTHLY  || "price_1TS4UMF7LrulzgMxqzxG6BjC",
+  pro_yearly:   process.env.STRIPE_PRICE_PRO_YEARLY   || "price_1TS4X7F7LrulzgMxi55pKBRY",
 };
 
 exports.handler = async (event) => {
