@@ -27,3 +27,13 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Local `netlify dev` only (ignored by builds/deploys). This repo has two Vite
+# configs and a build-only `command` above, which confuses netlify dev's
+# framework auto-detection ("Could not proxy request"). Pin it: run the editor
+# Vite dev server and proxy to it, and serve the functions.
+[dev]
+  command = "npm run dev -- --port 5173 --strictPort"
+  targetPort = 5173
+  framework = "#custom"
+  autoLaunch = false

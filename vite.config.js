@@ -66,7 +66,15 @@ export default defineConfig({
     ),
   },
   server: {
-    https: getHttpsConfig(),
+    // Local `netlify dev` proxies over plain HTTP, so an HTTPS Vite target
+    // 500s ("Could not proxy request"). Under netlify dev (it sets
+    // NETLIFY_DEV) — or when VITE_DEV_HTTP=1 is set explicitly — serve plain
+    // HTTP. Normal `npm run dev` is unaffected and keeps the self-signed HTTPS
+    // that Geolocation/Speech need.
+    https:
+      process.env.NETLIFY_DEV || process.env.VITE_DEV_HTTP === "1"
+        ? false
+        : getHttpsConfig(),
     host: "0.0.0.0",
     port: 5173,
   },
