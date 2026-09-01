@@ -104,22 +104,20 @@ async function handleCheckoutCompleted(session) {
   }
 
   if (planType === "event_pass") {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 60);
-
+    // A purchased pass is UNUSED until the buyer activates it: access and the
+    // 60-day window both start at ACTIVATION, not purchase (see
+    // activate-event-pass.cjs). So we only record the pass here — no plan
+    // grant, no dates.
     // Idempotent: unique(stripe_payment_intent_id) → a redelivery is a no-op.
     const { error } = await supabase.from("event_passes").upsert(
       {
         user_id: userId,
         stripe_payment_intent_id: session.payment_intent,
         status: "unused",
-        expires_at: expiresAt.toISOString(),
       },
       { onConflict: "stripe_payment_intent_id", ignoreDuplicates: true },
     );
     if (error) throw new Error(`event_passes upsert: ${error.message}`);
-
-    await setProfilePlan(userId, "event_pass");
   } else {
     const subscription = await stripe.subscriptions.retrieve(session.subscription);
     await syncSubscription(subscription);

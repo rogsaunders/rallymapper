@@ -4,6 +4,7 @@ import "react-phone-number-input/style.css";
 import { useAuth } from "../auth/AuthProvider";
 import { supabase } from "../lib/supabaseClient";
 import { updateProfile } from "../lib/profile";
+import { fetchEventPasses, activateEventPass } from "../lib/eventPass";
 
 const PLAN_LABELS = {
   free: "Free",
@@ -32,6 +33,12 @@ export default function AccountModal({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // Event passes
+  const [passes, setPasses] = useState([]);
+  const [eventName, setEventName] = useState("");
+  const [activating, setActivating] = useState(false);
+  const [passMsg, setPassMsg] = useState("");
+
   // Repopulate form whenever the modal opens or the profile changes
   useEffect(() => {
     if (!open) return;
@@ -40,7 +47,22 @@ export default function AccountModal({
     setPhone(profile?.phone || "");
     setUsernameStatus("idle");
     setMsg("");
+    setPassMsg("");
+    setEventName("");
   }, [open, profile]);
+
+  // Load the user's event passes when the modal opens (and after the plan
+  // changes, e.g. right after activation).
+  useEffect(() => {
+    if (!open || !user?.id) return;
+    let cancelled = false;
+    fetchEventPasses(user.id).then((rows) => {
+      if (!cancelled) setPasses(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, user?.id, profile?.plan]);
 
   // Debounced username availability check
   const checkSeq = useRef(0);
@@ -140,6 +162,31 @@ export default function AccountModal({
 
   const planLabel = PLAN_LABELS[profile?.plan] || PLAN_LABELS.free;
 
+  const unusedPasses = passes.filter((p) => p.status === "unused");
+  const activePass = passes
+    .filter((p) => p.status === "active" && p.expires_at)
+    .sort((a, b) => new Date(b.expires_at) - new Date(a.expires_at))[0];
+
+  function daysLeft(iso) {
+    return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000));
+  }
+
+  async function handleActivatePass() {
+    setActivating(true);
+    setPassMsg("");
+    try {
+      await activateEventPass(eventName.trim());
+      setEventName("");
+      await refreshProfile?.();
+      setPasses(await fetchEventPasses(user.id));
+      setPassMsg("Event Pass activated — you're set for 60 days.");
+    } catch (e) {
+      setPassMsg(e?.message || "Could not activate pass.");
+    } finally {
+      setActivating(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000] p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -191,6 +238,51 @@ export default function AccountModal({
               )}
             </div>
           </div>
+
+          {/* Event Pass status / activation */}
+          {(unusedPasses.length > 0 || activePass) && (
+            <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+              <div className="text-sm font-medium text-gray-700">Event Pass</div>
+
+              {activePass && (
+                <p className="text-sm text-gray-800">
+                  ✓ Active{activePass.trip_name ? ` — ${activePass.trip_name}` : ""} · expires in{" "}
+                  <span className="font-semibold">{daysLeft(activePass.expires_at)} days</span>{" "}
+                  ({new Date(activePass.expires_at).toLocaleDateString()})
+                </p>
+              )}
+
+              {unusedPasses.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 leading-snug">
+                    You have {unusedPasses.length} event pass
+                    {unusedPasses.length > 1 ? "es" : ""} ready. Activation starts
+                    your <strong>60-day</strong> access — do it when your event
+                    begins.
+                  </p>
+                  <input
+                    type="text"
+                    value={eventName}
+                    onChange={(e) => setEventName(e.target.value)}
+                    placeholder="Event name (optional)"
+                    maxLength={120}
+                    className="w-full p-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleActivatePass}
+                    disabled={activating}
+                    className="w-full px-3 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                    style={{ backgroundColor: "#588233" }}
+                  >
+                    {activating ? "Activating…" : "Activate Event Pass"}
+                  </button>
+                </div>
+              )}
+
+              {passMsg && <p className="text-xs text-gray-600">{passMsg}</p>}
+            </div>
+          )}
 
           {/* Full name */}
           <div>
