@@ -227,7 +227,10 @@ export default function AccountModal({
                   Upgrade →
                 </button>
               )}
-              {profile?.plan && profile.plan !== "free" && onManagePlan && (
+              {profile?.plan &&
+                profile.plan !== "free" &&
+                profile.plan !== "event_pass" &&
+                onManagePlan && (
                 <button
                   type="button"
                   onClick={onManagePlan}

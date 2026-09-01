@@ -567,6 +567,8 @@ export default function RouteMapperLayout() {
     const billing = params.get("billing");
     if (!billing) return;
 
+    const planParam = params.get("plan");
+
     // Remove the param from the URL without a page reload
     params.delete("billing");
     params.delete("plan");
@@ -575,7 +577,9 @@ export default function RouteMapperLayout() {
     window.history.replaceState({}, "", clean);
 
     if (billing === "success") {
-      setBillingToast("success");
+      // Event Pass grants access on ACTIVATION, not purchase — so it must NOT
+      // claim the plan was upgraded; it just tells the user to go activate it.
+      setBillingToast(planParam === "event_pass" ? "success_pass" : "success");
       // Refresh the profile so planLimits updates immediately
       refreshProfile?.();
       setTimeout(() => setBillingToast(null), 6000);
@@ -642,6 +646,20 @@ export default function RouteMapperLayout() {
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [tryFlush]);
+
+  // Refresh the plan when this tab regains focus. Checkout/portal now open in
+  // a NEW tab (see src/lib/checkout.js), so Stripe's success redirect lands
+  // there; this keeps the original tab's plan in sync when the user returns to
+  // it, without a manual reload. Ref-held so the listener is added once.
+  const refreshProfileRef = useRef(refreshProfile);
+  refreshProfileRef.current = refreshProfile;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshProfileRef.current?.();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   // Trigger 3: periodic retry while queue is non-empty.
   useEffect(() => {
@@ -2698,12 +2716,14 @@ export default function RouteMapperLayout() {
       {billingToast && (
         <div
           className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all ${
-            billingToast === "success" ? "bg-green-600" : "bg-gray-500"
+            billingToast === "cancelled" ? "bg-gray-500" : "bg-green-600"
           }`}
         >
           {billingToast === "success"
             ? "✓ Payment successful — your plan has been upgraded!"
-            : "Checkout cancelled — no payment was taken."}
+            : billingToast === "success_pass"
+              ? "✓ Event pass purchased — activate it in Account when your event begins."
+              : "Checkout cancelled — no payment was taken."}
         </div>
       )}
 
