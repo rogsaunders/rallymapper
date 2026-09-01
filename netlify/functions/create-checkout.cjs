@@ -70,6 +70,7 @@ exports.handler = async (event) => {
     };
   }
 
+  try {
   // ── Get or create Stripe customer ──────────────────────────────────────────
   const { data: profile } = await supabase
     .from("profiles")
@@ -129,10 +130,12 @@ exports.handler = async (event) => {
     subscription_data: isSubscription
       ? { metadata: { supabase_user_id: user.id, plan_type: planType } }
       : undefined,
-    // Pre-fill the customer's email on the Stripe-hosted page
-    customer_update: isSubscription
-      ? { address: "auto" }
-      : undefined,
+    // Save the billing address entered at Checkout back to the Customer, in
+    // BOTH payment (Event Pass) and subscription modes. automatic_tax below
+    // needs an address on the Customer, so this must not be subscription-only
+    // (Event Pass = payment mode, which otherwise 500s "requires a valid
+    // address on the Customer").
+    customer_update: { address: "auto" },
     // Collect billing address for tax purposes (Australian GST)
     billing_address_collection: "auto",
     automatic_tax: { enabled: true },
@@ -143,4 +146,15 @@ exports.handler = async (event) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url: session.url }),
   };
+  } catch (e) {
+    // Surface the real Stripe error to the caller instead of a generic
+    // "Could not start checkout" — critical for diagnosing setup issues
+    // (e.g. price/mode mismatch, Stripe Tax not enabled).
+    console.error("create-checkout failed:", e?.message, e?.raw?.message || "");
+    return {
+      statusCode: 500,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: e?.message || "Checkout failed" }),
+    };
+  }
 };
