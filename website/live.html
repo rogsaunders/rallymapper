@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>RouteMapper — the roadbook that navigates itself</title>
+    <meta
+      name="description"
+      content="Record a route once, then let RouteMapper drive it back to you — a spoken, self-advancing roadbook on satellite imagery, track-up, fully offline. Free to try, no install."
+    />
+
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="preload" href="assets/route-logo.png" as="image" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="RouteMapper — the roadbook that navigates itself" />
+    <meta
+      property="og:description"
+      content="Record a route once, then let it drive you back — spoken, track-up, on satellite imagery, fully offline. Free to try."
+    />
+    <meta property="og:image" content="assets/route-og.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://routemapper.net/live" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KXZH5V9Q0K"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-KXZH5V9Q0K");
+    </script>
+
+    <style>
+      /* ---- Landing-page-only styles (inherits tokens from styles.css) ---- */
+      body {
+        overflow-x: hidden;
+      }
+      .lp-topbar {
+        display: flex;
+        justify-content: center;
+        padding: 18px 0 0;
+      }
+      .lp-topbar img {
+        height: 64px;
+        width: auto;
+      }
+      .lp-wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 22px;
+      }
+
+      /* HERO */
+      .lp-hero {
+        text-align: center;
+        padding: 40px 0 20px;
+      }
+      .lp-eyebrow {
+        display: inline-block;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--amber);
+        border: 1px solid #3a2e12;
+        background: #1a1405;
+        padding: 6px 14px;
+        border-radius: 999px;
+        margin-bottom: 22px;
+      }
+      .lp-hero h1 {
+        font-size: clamp(34px, 6vw, 62px);
+        line-height: 1.04;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #fff;
+        margin: 0 auto 18px;
+        max-width: 15ch;
+      }
+      .lp-hero h1 .accent {
+        color: var(--amber);
+      }
+      .lp-sub {
+        font-size: clamp(16px, 2.2vw, 20px);
+        line-height: 1.5;
+        color: #cfd8e3;
+        max-width: 54ch;
+        margin: 0 auto 28px;
+      }
+      .btn-xl {
+        font-size: 18px;
+        padding: 16px 30px;
+        border-radius: 12px;
+      }
+      .lp-cta-note {
+        margin: 14px 0 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      /* VIDEO */
+      .lp-video {
+        margin: 38px auto 0;
+        max-width: 940px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid #1c2434;
+        background: #060a12;
+        box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+      }
+      .lp-video video {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* SECTION HEADS */
+      .lp-section {
+        padding: 66px 0;
+      }
+      .lp-section.alt {
+        background: linear-gradient(180deg, var(--alt), #0c1325);
+      }
+      .lp-kicker {
+        text-align: center;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--amber);
+        margin: 0 0 10px;
+      }
+      .lp-h2 {
+        text-align: center;
+        font-size: clamp(26px, 4vw, 40px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #fff;
+        margin: 0 auto 12px;
+        max-width: 22ch;
+      }
+      .lp-intro {
+        text-align: center;
+        color: #cfd8e3;
+        max-width: 60ch;
+        margin: 0 auto 44px;
+        font-size: 17px;
+        line-height: 1.55;
+      }
+
+      /* MAGIC — 3 beats */
+      .lp-magic {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+      .lp-magic .card {
+        text-align: left;
+        padding: 26px 22px;
+      }
+      .lp-magic .ic {
+        font-size: 30px;
+        line-height: 1;
+        margin-bottom: 14px;
+      }
+      .lp-magic h3 {
+        color: #fff;
+        font-size: 19px;
+        margin: 0 0 8px;
+      }
+      .lp-magic p {
+        color: #b7c2d0;
+        font-size: 15px;
+        line-height: 1.55;
+        margin: 0;
+      }
+
+      /* STEPS — record / review / drive */
+      .lp-steps {
+        display: grid;
+        gap: 46px;
+      }
+      .lp-step {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+        align-items: center;
+      }
+      .lp-step:nth-child(even) .lp-step-media {
+        order: 2;
+      }
+      .lp-step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--green);
+        color: #fff;
+        font-weight: 800;
+        font-size: 18px;
+        margin-bottom: 16px;
+      }
+      .lp-step h3 {
+        color: #fff;
+        font-size: 24px;
+        margin: 0 0 10px;
+      }
+      .lp-step p {
+        color: #c1ccd9;
+        font-size: 16px;
+        line-height: 1.6;
+        margin: 0;
+      }
+      /* Crop the browser chrome off the top of the tablet screenshots */
+      .lp-shot {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #1c2434;
+        background: #060a12;
+        box-shadow: 0 20px 50px -25px rgba(0, 0, 0, 0.8);
+        aspect-ratio: 1640 / 2090; /* crops the browser chrome off the top */
+      }
+      .lp-shot img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 100%; /* anchor bottom → hide the top Safari bar */
+      }
+
+      /* FOUNDER */
+      .lp-founder {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 40px;
+        align-items: center;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .lp-founder img {
+        width: 100%;
+        border-radius: 18px;
+        border: 1px solid #1c2434;
+      }
+      .lp-founder h2 {
+        color: #fff;
+        font-size: clamp(24px, 3.4vw, 34px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0 0 16px;
+      }
+      .lp-founder p {
+        color: #c8d2de;
+        font-size: 16px;
+        line-height: 1.65;
+        margin: 0 0 14px;
+      }
+      .lp-founder .sig {
+        color: var(--amber);
+        font-weight: 700;
+      }
+
+      /* FINAL CTA */
+      .lp-final {
+        text-align: center;
+        padding: 76px 0;
+        background: radial-gradient(
+          900px 340px at 50% -10%,
+          rgba(88, 130, 52, 0.22),
+          transparent
+        );
+      }
+      .lp-final h2 {
+        color: #fff;
+        font-size: clamp(28px, 4.4vw, 44px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0 auto 14px;
+        max-width: 18ch;
+      }
+      .lp-final p {
+        color: #cfd8e3;
+        font-size: 17px;
+        max-width: 50ch;
+        margin: 0 auto 26px;
+      }
+      .lp-plans-link {
+        display: block;
+        margin-top: 18px;
+        font-size: 15px;
+      }
+      .lp-plans-link a {
+        color: #c7f9cc;
+        text-decoration: underline;
+      }
+
+      /* FOOTER */
+      .lp-foot {
+        border-top: 1px solid #0b1220;
+        background: #0a0f1a;
+        padding: 26px 0;
+        text-align: center;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .lp-foot img {
+        height: 34px;
+        margin-bottom: 10px;
+      }
+      .lp-foot a {
+        color: #9fb0c4;
+        text-decoration: none;
+        margin: 0 8px;
+      }
+      .lp-foot a:hover {
+        color: #fff;
+      }
+
+      @media (max-width: 820px) {
+        .lp-magic {
+          grid-template-columns: 1fr;
+        }
+        .lp-step {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .lp-step:nth-child(even) .lp-step-media {
+          order: 0;
+        }
+        .lp-step-media {
+          max-width: 420px;
+          margin: 0 auto;
+        }
+        .lp-founder {
+          grid-template-columns: 1fr;
+          text-align: center;
+          gap: 24px;
+        }
+        .lp-founder img {
+          max-width: 220px;
+          margin: 0 auto;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="lp-topbar">
+      <a href="https://routemapper.net" aria-label="RouteMapper home">
+        <img src="assets/route-logo.png" alt="RouteMapper" />
+      </a>
+    </div>
+
+    <!-- HERO -->
+    <header class="lp-hero">
+      <div class="lp-wrap">
+        <span class="lp-eyebrow">Rally · 4WD tours · overlanding · adventure riding</span>
+        <h1>Record the route once. Then let it <span class="accent">drive you back.</span></h1>
+        <p class="lp-sub">
+          RouteMapper turns a track you've driven into a spoken, self-advancing
+          roadbook — on satellite imagery, track-up, and working
+          <strong>online or off</strong>.
+        </p>
+        <a
+          class="btn btn-green btn-xl"
+          href="https://app.routemapper.net/?utm_source=social&utm_medium=landing&utm_campaign=live"
+          onclick="gtag('event','cta_click',{campaign:'live',location:'hero'})"
+          >Try it free →</a
+        >
+        <p class="lp-cta-note">No install. No sign-up needed. Runs in any browser.</p>
+
+        <div class="lp-video">
+          <video
+            src="assets/RouteMapper-Intro-v4-720.mp4"
+            poster="assets/video-poster.jpg"
+            playsinline
+            controls
+            preload="metadata"
+          ></video>
+        </div>
+      </div>
+    </header>
+
+    <!-- THE MAGIC -->
+    <section class="lp-section alt">
+      <div class="lp-wrap">
+        <p class="lp-kicker">Navigation nobody else does</p>
+        <h2 class="lp-h2">Your roadbook, driving itself</h2>
+        <p class="lp-intro">
+          Plenty of apps record a track. RouteMapper is built for the other
+          half — following it back, at speed, where there's no phone signal.
+        </p>
+        <div class="lp-magic">
+          <div class="card">
+            <div class="ic">🗣️</div>
+            <h3>It advances itself</h3>
+            <p>
+              Your GPS position drives the roadbook. Each instruction appears —
+              and speaks aloud — exactly when you reach it. Eyes on the track,
+              not on a screen.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ic">🛰️</div>
+            <h3>Works with zero bars</h3>
+            <p>
+              Satellite imagery and your whole route are cached on the device.
+              Deep in the outback with no signal, it just keeps navigating.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ic">🧭</div>
+            <h3>Track-up, always</h3>
+            <p>
+              The map rotates to your heading, so “left” on screen is left
+              through the windscreen. No mental rotation at 80&nbsp;km/h.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="lp-section">
+      <div class="lp-wrap">
+        <p class="lp-kicker">The whole loop</p>
+        <h2 class="lp-h2">Record → Review → Drive</h2>
+        <p class="lp-intro">
+          One tool from the first recon run to the start line — no juggling a
+          GPS, a notebook and a voice recorder that never talk to each other.
+        </p>
+
+        <div class="lp-steps">
+          <div class="lp-step">
+            <div class="lp-step-media">
+              <div class="lp-shot"><img src="assets/screenshot-interface.png" alt="Recording waypoints in RouteMapper" /></div>
+            </div>
+            <div class="lp-step-body">
+              <span class="lp-step-num">1</span>
+              <h3>Record</h3>
+              <p>
+                Drop a waypoint by tap or push-to-talk voice in about two
+                seconds — “left onto Forbes Road” — while you keep driving. 38
+                rally-standard icons, auto track recording, live turn detection.
+              </p>
+            </div>
+          </div>
+
+          <div class="lp-step">
+            <div class="lp-step-media">
+              <div class="lp-shot"><img src="assets/screenshot-review.png" alt="Review Mode — map and roadbook side by side" /></div>
+            </div>
+            <div class="lp-step-body">
+              <span class="lp-step-num">2</span>
+              <h3>Review</h3>
+              <p>
+                Map and roadbook side by side. Tap a row to fly to it, check
+                every tulip against the real corner geometry, and fix notes and
+                icons in place — before anyone drives it for real.
+              </p>
+            </div>
+          </div>
+
+          <div class="lp-step">
+            <div class="lp-step-media">
+              <div class="lp-shot"><img src="assets/screenshot-travel.png" alt="Travel Mode — in-vehicle navigation" /></div>
+            </div>
+            <div class="lp-step-body">
+              <span class="lp-step-num">3</span>
+              <h3>Drive</h3>
+              <p>
+                Load the stage in Travel Mode and go. Spoken turns, distance to
+                the next instruction, auto-advance from your position, and the
+                offline satellite map — the same data you recorded, now
+                navigating you.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOUNDER -->
+    <section class="lp-section alt">
+      <div class="lp-wrap">
+        <div class="lp-founder">
+          <img src="assets/roger-headshot.png" alt="Roger Saunders, founder of RouteMapper" />
+          <div>
+            <h2>Built on real recon, not in an office</h2>
+            <p>
+              I'm Roger. I built RouteMapper because I was mapping charity and
+              competitive rallies with paper, a handheld GPS and a voice
+              recorder — and none of them talked to each other.
+            </p>
+            <p>
+              Every feature here earned its place on an actual stage. If it
+              didn't work at 80&nbsp;km/h on corrugations, with dust on the
+              screen and no signal for a hundred kilometres, it didn't ship.
+            </p>
+            <p class="sig">— Roger Saunders, founder</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="lp-final">
+      <div class="lp-wrap">
+        <h2>Try it on your next route</h2>
+        <p>
+          Free to start — really. One saved stage and 20 waypoints, free
+          forever. Upgrade only when you need unlimited stages and the full
+          export package.
+        </p>
+        <a
+          class="btn btn-green btn-xl"
+          href="https://app.routemapper.net/?utm_source=social&utm_medium=landing&utm_campaign=live"
+          onclick="gtag('event','cta_click',{campaign:'live',location:'footer'})"
+          >Try it free →</a
+        >
+        <span class="lp-plans-link"
+          >Ready to go further? <a href="https://routemapper.net/#pricing">See all plans</a></span
+        >
+      </div>
+    </section>
+
+    <footer class="lp-foot">
+      <img src="assets/route-logo.png" alt="RouteMapper" />
+      <p>
+        <a href="https://routemapper.net">Home</a> ·
+        <a href="/guide">User Guide</a> ·
+        <a href="https://routemapper.net/#pricing">Pricing</a>
+      </p>
+      <p>&copy; 2026 RouteMapper. Built for the journey.</p>
+    </footer>
+  </body>
+</html>
